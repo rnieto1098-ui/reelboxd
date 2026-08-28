@@ -9,9 +9,27 @@ export default async function CrewPage({ searchParams }: PageProps<"/crew">) {
   const params = await searchParams;
   const query = typeof params.q === "string" ? params.q : "";
 
-  const [people, companies] = query
+  const [initialPeople, companies] = query
     ? await Promise.all([searchPeople(query), searchCompanies(query)])
     : [null, null];
+
+  // TMDB's search does literal matching, not fuzzy matching — a first-name
+  // typo (e.g. "John Bernthal" instead of "Jon Bernthal") returns zero
+  // results even though the person is in TMDB. Retrying with just the last
+  // word recovers most of these cases without needing real fuzzy search.
+  let people = initialPeople;
+  let fallbackQuery: string | null = null;
+  if (query && people && people.results.length === 0) {
+    const words = query.trim().split(/\s+/);
+    const lastWord = words[words.length - 1];
+    if (words.length > 1) {
+      const fallback = await searchPeople(lastWord);
+      if (fallback.results.length > 0) {
+        people = fallback;
+        fallbackQuery = lastWord;
+      }
+    }
+  }
 
   const browseRows = query ? null : await getBrowseRows();
 
@@ -39,8 +57,38 @@ export default async function CrewPage({ searchParams }: PageProps<"/crew">) {
             <h2 className="mb-3 text-lg font-semibold">
               People {people.results.length > 0 && `(${people.results.length})`}
             </h2>
+            {fallbackQuery && (
+              <p className="mb-3 text-sm text-muted">
+                No exact match for &ldquo;{query}&rdquo; &mdash; showing results for &ldquo;
+                {fallbackQuery}&rdquo; instead.
+              </p>
+            )}
             {people.results.length === 0 ? (
-              <p className="text-sm text-muted">No people found.</p>
+              <div className="text-sm text-muted">
+                <p>No people found on TMDB for &ldquo;{query}&rdquo;.</p>
+                <p className="mt-2">
+                  Try{" "}
+                  <a
+                    href={`https://www.google.com/search?q=${encodeURIComponent(query)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-accent-green hover:underline"
+                  >
+                    Google
+                  </a>{" "}
+                  or{" "}
+                  <a
+                    href={`https://www.imdb.com/find/?q=${encodeURIComponent(query)}&s=nm`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-accent-green hover:underline"
+                  >
+                    IMDb
+                  </a>{" "}
+                  instead &mdash; TMDB&apos;s database doesn&apos;t have everyone, especially
+                  lesser-known crew.
+                </p>
+              </div>
             ) : (
               <div className="grid grid-cols-3 gap-4 sm:grid-cols-4 md:grid-cols-6">
                 {people.results.map((person) => {

@@ -4,7 +4,12 @@ generator client {
 
 datasource db {
   provider = "sqlite"
-  url      = env("DATABASE_URL")
+  // Unused at runtime — the actual connection is controlled by the
+  // PrismaLibSQL adapter (see prisma.config.ts and src/lib/prisma.ts),
+  // which reads DATABASE_URL directly. This must stay a literal "file:"
+  // value or schema validation rejects it (sqlite provider requires it),
+  // even though it's never actually connected to.
+  url = "file:./dev.db"
 }
 
 model User {

@@ -1,0 +1,275 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  username      String    @unique
+  email         String    @unique
+  hashedPassword String?
+  emailVerified DateTime?
+  image         String?
+  backgroundImage String?
+  createdAt     DateTime  @default(now())
+
+  accounts  Account[]
+  sessions  Session[]
+  ratings           Rating[]
+  watchlist         WatchlistItem[]
+  likes             Like[]
+  owned             OwnedItem[]
+  diaryEntries      DiaryEntry[]
+  customPosters     CustomPoster[]
+  customListCovers  CustomListCover[]
+  streamingServices StreamingService[]
+  lists             List[]
+  watchGoals        WatchGoal[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// Local cache of movies pulled from TMDB, keyed by TMDB id.
+// Lets us store per-movie data (ratings, reviews, watchlists) without
+// re-fetching TMDB on every read.
+model Movie {
+  id          String   @id @default(cuid())
+  tmdbId      Int      @unique
+  title       String
+  overview    String?
+  posterPath  String?
+  backdropPath String?
+  releaseDate String?
+  runtime     Int?
+  genres      String? // comma-separated TMDB genre names
+  voteAverage Float?
+  popularity  Float?
+  directorId  Int? // TMDB person id of the credited director, if any
+  topCastIds  String? // comma-separated TMDB person ids, billing order, top 5
+  cachedAt    DateTime @default(now())
+
+  ratings       Rating[]
+  watchlist     WatchlistItem[]
+  likes         Like[]
+  owned         OwnedItem[]
+  diaryEntries  DiaryEntry[]
+  customPosters CustomPoster[]
+}
+
+model Rating {
+  id        String   @id @default(cuid())
+  score     Float // 0.5 - 5.0 in 0.5 steps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId  String
+  user    User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  movieId String
+  movie   Movie @relation(fields: [movieId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, movieId])
+}
+
+model WatchlistItem {
+  id        String   @id @default(cuid())
+  addedAt   DateTime @default(now())
+
+  userId  String
+  user    User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  movieId String
+  movie   Movie @relation(fields: [movieId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, movieId])
+}
+
+// A simple heart/like on a film, independent of its star rating — same idea
+// as Letterboxd's like button (you can like a film you haven't rated, or
+// rate one without liking it).
+model Like {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  userId  String
+  user    User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  movieId String
+  movie   Movie @relation(fields: [movieId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, movieId])
+}
+
+// A film the user owns a physical/digital copy of — distinct from the
+// watchlist (which tracks intent to watch, not ownership).
+model OwnedItem {
+  id        String   @id @default(cuid())
+  addedAt   DateTime @default(now())
+
+  userId  String
+  user    User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  movieId String
+  movie   Movie @relation(fields: [movieId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, movieId])
+}
+
+// One logged watch of a film, dated — the actual "diary" (a Rating is just
+// your current opinion of a film; a film can have many DiaryEntry rows for
+// its rewatches, which is why there's deliberately no unique constraint here
+// unlike every other per-(user, movie) model above).
+model DiaryEntry {
+  id          String   @id @default(cuid())
+  watchedDate DateTime
+  rewatch     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  userId  String
+  user    User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  movieId String
+  movie   Movie @relation(fields: [movieId], references: [id], onDelete: Cascade)
+
+  @@index([userId, watchedDate])
+}
+
+// A user's personal annual watch goal (e.g. "50 films in 2026"), tracked
+// against DiaryEntry counts for that same calendar year.
+model WatchGoal {
+  id        String   @id @default(cuid())
+  year      Int
+  target    Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, year])
+}
+
+// A user's personal choice of alternate poster art for a movie (like
+// Letterboxd's custom poster feature), sourced from TMDB's image library.
+// Applies only to that user's view of the film, everywhere it appears.
+model CustomPoster {
+  id         String   @id @default(cuid())
+  posterPath String
+  createdAt  DateTime @default(now())
+
+  userId  String
+  user    User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  movieId String
+  movie   Movie @relation(fields: [movieId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, movieId])
+}
+
+// A streaming service (from TMDB's watch-provider catalog) the user says
+// they subscribe to, so we can flag which watchlist movies are actually
+// available to them right now (a la Reelgood).
+model StreamingService {
+  id           String   @id @default(cuid())
+  providerId   Int
+  providerName String
+  logoPath     String?
+  createdAt    DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, providerId])
+}
+
+// A named collection of movies — either user-created, or one of a handful
+// of system-curated lists (isSystem: true, ownerId: null) shown to everyone.
+// Items store a snapshot of title/poster/release date directly rather than
+// pointing at the local Movie cache, since a list item doesn't need any of
+// the relational data (ratings, reviews) that justifies that cache elsewhere.
+model List {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  isSystem    Boolean  @default(false)
+  // Stable identifier for system lists only (null, unconstrained, for user
+  // lists — two different users can both call a list "Favorites"). Claimed
+  // via a unique-constrained `create` before the expensive TMDB resolution
+  // work starts, so two concurrent requests seeding the same system list for
+  // the first time can't both succeed and produce duplicates.
+  key         String?  @unique
+  coverImage  String?
+  createdAt   DateTime @default(now())
+
+  ownerId String?
+  owner   User?      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  items   ListItem[]
+  customCovers CustomListCover[]
+}
+
+// A viewer's personal cover image for a list they don't own — most useful
+// for the system-curated lists, which have no owner at all and so can never
+// get a cover via the owner-only `List.coverImage` upload. Same idea as
+// `CustomPoster` for movies: private to the viewer, shown only on their own
+// view of the list, never mutating the shared `List` row.
+model CustomListCover {
+  id        String   @id @default(cuid())
+  imagePath String
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listId String
+  list   List   @relation(fields: [listId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, listId])
+}
+
+model ListItem {
+  id          String   @id @default(cuid())
+  tmdbId      Int
+  title       String
+  posterPath  String?
+  releaseDate String?
+  popularity  Float?
+  position    Int
+  addedAt     DateTime @default(now())
+
+  listId String
+  list   List   @relation(fields: [listId], references: [id], onDelete: Cascade)
+
+  @@unique([listId, tmdbId])
+}
+

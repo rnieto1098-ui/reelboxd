@@ -1,26 +1,53 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #14181c;
+  --surface: #1c2228;
+  --surface-hover: #253039;
+  --foreground: #e7e9eb;
+  --muted: #9ab;
+  --border: #2c3440;
+  --accent-green: #00e054;
+  --accent-blue: #40bcf4;
+  --accent-orange: #ff8000;
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-accent-green: var(--accent-green);
+  --color-accent-blue: var(--accent-blue);
+  --color-accent-orange: var(--accent-orange);
+  --font-sans: "Trebuchet MS", "Segoe UI", Tahoma, sans-serif;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+}
+
+::selection {
+  background: var(--accent-green);
+  color: #0a0a0a;
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Set on a per-movie wrapper by pages with a "fade watched" control; the
+   brightness value comes from a CSS var scoped to that control's subtree, so
+   it has no effect anywhere the variable isn't set. */
+[data-watched="true"] {
+  filter: brightness(var(--watched-brightness, 1));
+  transition: filter 200ms ease;
 }

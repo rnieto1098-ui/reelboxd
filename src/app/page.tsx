@@ -1,69 +1,283 @@
-import Image from "next/image";
+import Link from "next/link";
+import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
+import {
+  discoverMovies,
+  getGenres,
+  getPopularMovies,
+  getTrendingMovies,
+  getUpcomingMovies,
+  type TmdbMovieSummary,
+} from "@/lib/tmdb";
+import { getRecommendationsForUser, getWatchedTmdbIds } from "@/lib/recommendations";
+import { applyPosterOverrides, getCustomPosterMap } from "@/lib/customPosters";
+import { filterMoviesByStreaming, filterRentBuyOnly, getUserProviderIds } from "@/lib/streaming";
+import { getHomepageListCards, getCuratedListsProgress } from "@/lib/systemLists";
+import { MovieRow } from "@/components/MovieRow";
+import { ListRow } from "@/components/ListRow";
+import { UpcomingReleasesRow } from "@/components/UpcomingReleasesRow";
+import { CuratedListsProgress } from "@/components/CuratedListsProgress";
 
-export default function Home() {
+const WELCOME_PHRASES = [
+  "Here's what we think you'll love next.",
+  "Ready for your next favorite film?",
+  "We've got some picks worth your popcorn.",
+  "Let's find your next five-star watch.",
+  "Curated just for your taste in film.",
+];
+
+// TMDB doesn't have a "Superhero" genre, so it's approximated with Action.
+const GENRE_ROWS = [
+  { title: "Superhero", genreName: "Action" },
+  { title: "Comedy", genreName: "Comedy" },
+  { title: "Drama", genreName: "Drama" },
+  { title: "Crime", genreName: "Crime" },
+];
+
+export default async function HomePage({ searchParams }: PageProps<"/">) {
+  const { streaming } = await searchParams;
+  const streamingOnly = streaming === "1";
+
+  const session = await auth();
+  const userId = session?.user?.id;
+  const welcomePhrase = WELCOME_PHRASES[Math.floor(Math.random() * WELCOME_PHRASES.length)];
+
+  const [
+    popularRaw,
+    trendingRaw,
+    comingSoonRaw,
+    watchedIds,
+    genreCatalog,
+    userProviderIds,
+    listCards,
+    watchlistRows,
+  ] = await Promise.all([
+      getPopularMovies(),
+      getTrendingMovies("week"),
+      getUpcomingMovies(),
+      getWatchedTmdbIds(userId),
+      getGenres(),
+      getUserProviderIds(userId),
+      getHomepageListCards(userId),
+      userId
+        ? prisma.watchlistItem.findMany({
+            where: { userId },
+            select: {
+              movie: {
+                select: {
+                  tmdbId: true,
+                  title: true,
+                  overview: true,
+                  posterPath: true,
+                  backdropPath: true,
+                  releaseDate: true,
+                  voteAverage: true,
+                },
+              },
+            },
+          })
+        : Promise.resolve([]),
+    ]);
+
+  // Stubbed into TmdbMovieSummary shape from the local cache snapshot —
+  // MovieCard/MovieRow only ever read id/title/poster_path/release_date.
+  const watchlistMoviesRaw: TmdbMovieSummary[] = watchlistRows.map((w) => ({
+    id: w.movie.tmdbId,
+    title: w.movie.title,
+    overview: w.movie.overview ?? "",
+    poster_path: w.movie.posterPath,
+    backdrop_path: w.movie.backdropPath,
+    release_date: w.movie.releaseDate ?? "",
+    vote_average: w.movie.voteAverage ?? 0,
+  }));
+
+  // Watchlist items with a future release date, soonest first — cheap to
+  // derive since watchlistMoviesRaw is already fetched above.
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const upcomingReleases = watchlistMoviesRaw
+    .filter((m) => m.release_date > todayStr)
+    .sort((a, b) => a.release_date.localeCompare(b.release_date));
+
+  const genreIdByName = new Map(genreCatalog.genres.map((g) => [g.name, g.id]));
+  const hasServicesConfigured = userProviderIds.size > 0;
+  const applyStreamingFilter = streamingOnly && hasServicesConfigured;
+
+  async function narrow(movies: TmdbMovieSummary[]) {
+    return applyStreamingFilter ? filterMoviesByStreaming(movies, userProviderIds) : movies;
+  }
+
+  // recommendedRaw doesn't depend on anything below, and nothing below
+  // depends on it (only the `excludeFromPopular` filter does, after) — so it
+  // runs alongside the rest instead of serializing in front of them.
+  const [recommendedRaw, highestRatedRaw, ...genreRowsRaw] = await Promise.all([
+    getRecommendationsForUser(userId, watchedIds, genreCatalog.genres),
+    // A high vote-count floor is what actually gets you "universally agreed
+    // masterpiece" territory (Shawshank, The Godfather, ...) — the default
+    // floor of 100 lets small-but-devoted-fanbase obscurities with a handful
+    // of 10/10s outrank real consensus classics.
+    discoverMovies({ sortBy: "vote_average.desc", minVoteCount: 10000 }),
+    ...GENRE_ROWS.map((row) => {
+      const genreId = genreIdByName.get(row.genreName);
+      return genreId
+        ? discoverMovies({ genreIds: [genreId] })
+        : Promise.resolve({ results: [] as TmdbMovieSummary[] });
+    }),
+  ]);
+
+  const excludeFromPopular = new Set([...watchedIds, ...recommendedRaw.map((m) => m.id)]);
+  const popularFilteredRaw = popularRaw.results.filter(
+    (movie) => !excludeFromPopular.has(movie.id)
+  );
+
+  const trendingFiltered = trendingRaw.results.filter((m) => !watchedIds.has(m.id));
+  const highestRatedFiltered = highestRatedRaw.results.filter((m) => !watchedIds.has(m.id));
+  const genreRowsFiltered = GENRE_ROWS.map((row, i) => ({
+    title: row.title,
+    movies: genreRowsRaw[i].results.filter((m) => !watchedIds.has(m.id)),
+  }));
+
+  const [
+    recommended,
+    popular,
+    trending,
+    highestRated,
+    discover,
+    rentBuy,
+    listsProgress,
+    ...genreMoviesNarrowed
+  ] = await Promise.all([
+    narrow(recommendedRaw),
+    narrow(popularFilteredRaw),
+    narrow(trendingFiltered),
+    narrow(highestRatedFiltered),
+    // Unlike the other rows, this one always filters to the user's
+    // services regardless of the "Showing" toggle above — that's the
+    // whole point of "Discover": personalized picks you can watch right
+    // now, not just when the global filter happens to be on.
+    hasServicesConfigured
+      ? filterMoviesByStreaming(recommendedRaw, userProviderIds)
+      : Promise.resolve([] as TmdbMovieSummary[]),
+    filterRentBuyOnly(watchlistMoviesRaw),
+    getCuratedListsProgress(userId, watchedIds),
+    ...genreRowsFiltered.map((row) => narrow(row.movies)),
+  ]);
+  const genreRows = genreRowsFiltered.map((row, i) => ({ ...row, movies: genreMoviesNarrowed[i] }));
+
+  const posterOverrides = await getCustomPosterMap(userId, [
+    ...recommended.map((m) => m.id),
+    ...popular.map((m) => m.id),
+    ...trending.map((m) => m.id),
+    ...highestRated.map((m) => m.id),
+    ...discover.map((m) => m.id),
+    ...rentBuy.map((m) => m.id),
+    ...upcomingReleases.map((m) => m.id),
+    ...comingSoonRaw.results.map((m) => m.id),
+    ...genreRows.flatMap((row) => row.movies.map((m) => m.id)),
+  ]);
+
+  const recommendedWithPosters = applyPosterOverrides(recommended, posterOverrides);
+  const popularWithPosters = applyPosterOverrides(popular, posterOverrides);
+  const trendingWithPosters = applyPosterOverrides(trending, posterOverrides);
+  const highestRatedWithPosters = applyPosterOverrides(highestRated, posterOverrides);
+  const discoverWithPosters = applyPosterOverrides(discover, posterOverrides);
+  const rentBuyWithPosters = applyPosterOverrides(rentBuy, posterOverrides);
+  const upcomingReleasesWithPosters = applyPosterOverrides(upcomingReleases, posterOverrides);
+  const comingSoonWithPosters = applyPosterOverrides(comingSoonRaw.results, posterOverrides);
+  const genreRowsWithPosters = genreRows.map((row) => ({
+    ...row,
+    movies: applyPosterOverrides(row.movies, posterOverrides),
+  }));
+
+  const discoverEmptyMessage = !hasServicesConfigured ? (
+    <>
+      <Link href="/streaming" className="text-accent-green hover:underline">
+        Add your streaming services
+      </Link>{" "}
+      to see personalized picks you can actually watch right now.
+    </>
+  ) : recommendedRaw.length === 0 ? (
+    "Rate a few movies you liked and we'll start recommending things you haven't seen."
+  ) : (
+    "Nothing on your services matches your taste yet — check back soon."
+  );
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <div className="space-y-10">
+      {session?.user && (
+        <div>
+          <h1 className="text-2xl font-bold">Welcome back, {session.user.name}.</h1>
+          <p className="mt-1 text-muted">{welcomePhrase}</p>
+        </div>
+      )}
+
+      {session?.user && (
+        <div className="flex flex-wrap items-center gap-3 text-sm">
+          <span className="text-muted">Showing:</span>
+          <Link
+            href="/"
+            className={`rounded-full px-3 py-1 transition-colors ${
+              !streamingOnly ? "bg-accent-green text-black" : "text-muted hover:text-foreground"
+            }`}
+          >
+            All movies
+          </Link>
+          <Link
+            href="/?streaming=1"
+            className={`rounded-full px-3 py-1 transition-colors ${
+              streamingOnly ? "bg-accent-green text-black" : "text-muted hover:text-foreground"
+            }`}
+          >
+            On my streaming services
+          </Link>
+          {streamingOnly && !hasServicesConfigured && (
+            <span className="text-xs text-muted">
+              You haven&apos;t added any services yet —{" "}
+              <Link href="/streaming" className="text-accent-green hover:underline">
+                add them here
+              </Link>
+              .
+            </span>
+          )}
+        </div>
+      )}
+
+      <MovieRow title="Popular right now" movies={popularWithPosters} />
+      <MovieRow title="Trending this week" movies={trendingWithPosters} />
+      <ListRow title="Lists" lists={listCards} />
+      {session?.user && (
+        <MovieRow
+          title="For You"
+          movies={recommendedWithPosters}
+          emptyMessage="Rate a few movies you liked and we'll start recommending things you haven't seen."
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+      )}
+      {comingSoonWithPosters.length > 0 && (
+        <UpcomingReleasesRow title="Coming Soon" movies={comingSoonWithPosters} />
+      )}
+      {session?.user && listsProgress.length > 0 && (
+        <CuratedListsProgress lists={listsProgress} />
+      )}
+      {session?.user && (
+        <MovieRow
+          title="Discover"
+          movies={discoverWithPosters}
+          emptyMessage={discoverEmptyMessage}
+        />
+      )}
+      {session?.user && watchlistMoviesRaw.length > 0 && (
+        <MovieRow
+          title="Rent or Buy"
+          movies={rentBuyWithPosters}
+          emptyMessage="Nothing on your watchlist currently needs to be rented or bought."
+        />
+      )}
+      {session?.user && upcomingReleasesWithPosters.length > 0 && (
+        <UpcomingReleasesRow movies={upcomingReleasesWithPosters} />
+      )}
+      <MovieRow title="Highest Rated" movies={highestRatedWithPosters} />
+      {genreRowsWithPosters.map((row) => (
+        <MovieRow key={row.title} title={row.title} movies={row.movies} />
+      ))}
     </div>
   );
 }

@@ -2,7 +2,13 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { getFlatrateProviders, getUserProviderIds, isAvailableOnServices } from "@/lib/streaming";
+import {
+  getFlatrateProviders,
+  getUserOwnedTmdbIds,
+  getUserProviderIds,
+  isAvailableOnServices,
+} from "@/lib/streaming";
+import type { TmdbWatchProvider } from "@/lib/tmdb";
 import { MovieCard } from "@/components/MovieCard";
 import { ProviderLogos } from "@/components/ProviderLogos";
 
@@ -20,7 +26,7 @@ export default async function WatchlistPage({ searchParams }: PageProps<"/watchl
   const { tab } = await searchParams;
   const activeTab: TabKey = tab === "unavailable" ? "unavailable" : "available";
 
-  const [items, userProviderIds] = await Promise.all([
+  const [items, userProviderIds, ownedTmdbIds] = await Promise.all([
     prisma.watchlistItem.findMany({
       where: { userId: session.user.id },
       include: {
@@ -31,22 +37,28 @@ export default async function WatchlistPage({ searchParams }: PageProps<"/watchl
       orderBy: { addedAt: "desc" },
     }),
     getUserProviderIds(session.user.id),
+    getUserOwnedTmdbIds(session.user.id),
   ]);
 
   const withAvailability = await Promise.all(
     items.map(async (item) => ({
       item,
-      providers: await getFlatrateProviders(item.movie.tmdbId),
+      providers: ownedTmdbIds.has(item.movie.tmdbId)
+        ? []
+        : await getFlatrateProviders(item.movie.tmdbId),
+      owned: ownedTmdbIds.has(item.movie.tmdbId),
     }))
   );
 
   const hasServicesConfigured = userProviderIds.size > 0;
-  const streamingNow = withAvailability.filter(({ providers }) =>
-    isAvailableOnServices(providers, userProviderIds)
-  );
-  const notStreaming = withAvailability.filter(
-    ({ providers }) => !isAvailableOnServices(providers, userProviderIds)
-  );
+  // Owning a movie makes it watchable right now, same as a subscription
+  // service does — someone with no services but a few owned movies should
+  // still get a meaningful split instead of the flat "add your services" view.
+  const canSplit = hasServicesConfigured || ownedTmdbIds.size > 0;
+  const isAvailable = ({ providers, owned }: { providers: TmdbWatchProvider[]; owned: boolean }) =>
+    owned || isAvailableOnServices(providers, userProviderIds);
+  const streamingNow = withAvailability.filter(isAvailable);
+  const notStreaming = withAvailability.filter((entry) => !isAvailable(entry));
 
   return (
     <div>
@@ -64,13 +76,14 @@ export default async function WatchlistPage({ searchParams }: PageProps<"/watchl
         <p className="text-muted">
           Nothing here yet. Find a movie and click &ldquo;+ Watchlist&rdquo; to add it.
         </p>
-      ) : !hasServicesConfigured ? (
+      ) : !canSplit ? (
         <>
           <p className="mb-6 text-sm text-muted">
             <Link href="/streaming" className="text-accent-green hover:underline">
               Add the streaming services you subscribe to
             </Link>{" "}
-            and we&apos;ll split this list into what you can watch right now and what you can&apos;t.
+            (or mark movies as owned) and we&apos;ll split this list into what you can watch right
+            now and what you can&apos;t.
           </p>
           <WatchlistGrid entries={withAvailability} />
         </>
@@ -100,7 +113,7 @@ export default async function WatchlistPage({ searchParams }: PageProps<"/watchl
           {activeTab === "available" ? (
             streamingNow.length === 0 ? (
               <p className="text-sm text-muted">
-                None of your watchlist is currently on your services.
+                None of your watchlist is currently on your services or owned.
               </p>
             ) : (
               <WatchlistGrid entries={streamingNow} />
@@ -131,11 +144,12 @@ function WatchlistGrid({
       };
     };
     providers: { provider_id: number; provider_name: string; logo_path: string }[];
+    owned?: boolean;
   }[];
 }) {
   return (
     <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-      {entries.map(({ item, providers }) => (
+      {entries.map(({ item, providers, owned }) => (
         <div key={item.id}>
           <MovieCard
             tmdbId={item.movie.tmdbId}
@@ -143,7 +157,13 @@ function WatchlistGrid({
             posterPath={item.movie.customPosters[0]?.posterPath ?? item.movie.posterPath}
             year={item.movie.releaseDate?.slice(0, 4)}
           />
-          <ProviderLogos providers={providers} />
+          {owned ? (
+            <span className="mt-1 inline-block rounded-full border border-accent-green px-2 py-0.5 text-xs text-accent-green">
+              Owned
+            </span>
+          ) : (
+            <ProviderLogos providers={providers} />
+          )}
         </div>
       ))}
     </div>

@@ -11,7 +11,12 @@ import {
 } from "@/lib/tmdb";
 import { getRecommendationsForUser, getWatchedTmdbIds } from "@/lib/recommendations";
 import { applyPosterOverrides, getCustomPosterMap } from "@/lib/customPosters";
-import { filterMoviesByStreaming, filterRentBuyOnly, getUserProviderIds } from "@/lib/streaming";
+import {
+  filterMoviesByStreaming,
+  filterRentBuyOnly,
+  getUserOwnedTmdbIds,
+  getUserProviderIds,
+} from "@/lib/streaming";
 import { getHomepageListCards, getCuratedListsProgress } from "@/lib/systemLists";
 import { MovieRow } from "@/components/MovieRow";
 import { ListRow } from "@/components/ListRow";
@@ -49,6 +54,7 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
     watchedIds,
     genreCatalog,
     userProviderIds,
+    ownedTmdbIds,
     listCards,
     watchlistRows,
   ] = await Promise.all([
@@ -58,6 +64,7 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
       getWatchedTmdbIds(userId),
       getGenres(),
       getUserProviderIds(userId),
+      getUserOwnedTmdbIds(userId),
       getHomepageListCards(userId),
       userId
         ? prisma.watchlistItem.findMany({
@@ -100,10 +107,17 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
 
   const genreIdByName = new Map(genreCatalog.genres.map((g) => [g.name, g.id]));
   const hasServicesConfigured = userProviderIds.size > 0;
-  const applyStreamingFilter = streamingOnly && hasServicesConfigured;
+  const hasOwnedMovies = ownedTmdbIds.size > 0;
+  // Owning a movie makes it watchable right now, same as a subscription
+  // service does — someone with no services but a few owned movies should
+  // still be able to use "On my streaming services" meaningfully.
+  const canFilterByAvailability = hasServicesConfigured || hasOwnedMovies;
+  const applyStreamingFilter = streamingOnly && canFilterByAvailability;
 
   async function narrow(movies: TmdbMovieSummary[]) {
-    return applyStreamingFilter ? filterMoviesByStreaming(movies, userProviderIds) : movies;
+    return applyStreamingFilter
+      ? filterMoviesByStreaming(movies, userProviderIds, ownedTmdbIds)
+      : movies;
   }
 
   // recommendedRaw doesn't depend on anything below, and nothing below
@@ -154,8 +168,8 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
     // services regardless of the "Showing" toggle above — that's the
     // whole point of "Discover": personalized picks you can watch right
     // now, not just when the global filter happens to be on.
-    hasServicesConfigured
-      ? filterMoviesByStreaming(recommendedRaw, userProviderIds)
+    canFilterByAvailability
+      ? filterMoviesByStreaming(recommendedRaw, userProviderIds, ownedTmdbIds)
       : Promise.resolve([] as TmdbMovieSummary[]),
     filterRentBuyOnly(watchlistMoviesRaw),
     getCuratedListsProgress(userId, watchedIds),
@@ -188,7 +202,7 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
     movies: applyPosterOverrides(row.movies, posterOverrides),
   }));
 
-  const discoverEmptyMessage = !hasServicesConfigured ? (
+  const discoverEmptyMessage = !canFilterByAvailability ? (
     <>
       <Link href="/streaming" className="text-accent-green hover:underline">
         Add your streaming services
@@ -198,7 +212,7 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
   ) : recommendedRaw.length === 0 ? (
     "Rate a few movies you liked and we'll start recommending things you haven't seen."
   ) : (
-    "Nothing on your services matches your taste yet — check back soon."
+    "Nothing you own or have streaming matches your taste yet — check back soon."
   );
 
   return (
@@ -229,11 +243,11 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
           >
             On my streaming services
           </Link>
-          {streamingOnly && !hasServicesConfigured && (
+          {streamingOnly && !canFilterByAvailability && (
             <span className="text-xs text-muted">
-              You haven&apos;t added any services yet —{" "}
+              You haven&apos;t added any services or marked anything as owned yet —{" "}
               <Link href="/streaming" className="text-accent-green hover:underline">
-                add them here
+                add your services here
               </Link>
               .
             </span>

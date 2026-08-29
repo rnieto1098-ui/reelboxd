@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { posterUrl } from "@/lib/tmdb";
 import { getCustomPosterMap } from "@/lib/customPosters";
 import { getPersonalListCover } from "@/lib/listCovers";
-import { filterMoviesByStreaming, getUserProviderIds } from "@/lib/streaming";
+import { filterMoviesByStreaming, getUserOwnedTmdbIds, getUserProviderIds } from "@/lib/streaming";
 import { MovieCard } from "@/components/MovieCard";
 import { RemoveFromListButton } from "@/components/RemoveFromListButton";
 import { DeleteListButton } from "@/components/DeleteListButton";
@@ -98,7 +98,7 @@ export default async function ListDetailPage({
 
   const isOwner = !!userId && list.ownerId === userId;
 
-  const [ratingMap, userProviderIds, personalCover] = await Promise.all([
+  const [ratingMap, userProviderIds, ownedTmdbIds, personalCover] = await Promise.all([
     userId && list.items.length > 0
       ? prisma.rating
           .findMany({
@@ -108,6 +108,7 @@ export default async function ListDetailPage({
           .then((rows) => new Map(rows.map((r) => [r.movie.tmdbId, r.score])))
       : Promise.resolve(new Map<number, number>()),
     getUserProviderIds(userId),
+    getUserOwnedTmdbIds(userId),
     getPersonalListCover(userId, listId),
   ]);
 
@@ -120,12 +121,17 @@ export default async function ListDetailPage({
     personalCover ?? list.coverImage ?? posterUrl(list.items[0]?.posterPath ?? null, "w200");
 
   const hasServicesConfigured = userProviderIds.size > 0;
-  const applyStreamingFilter = streamingOnly && hasServicesConfigured;
+  // Owning a movie makes it watchable right now, same as a subscription
+  // service does — someone with no services but a few owned movies should
+  // still be able to use "On my streaming services" meaningfully.
+  const canFilterByAvailability = hasServicesConfigured || ownedTmdbIds.size > 0;
+  const applyStreamingFilter = streamingOnly && canFilterByAvailability;
 
   const filteredItems = applyStreamingFilter
     ? await filterMoviesByStreaming(
         list.items.map((item) => ({ id: item.tmdbId, item })),
-        userProviderIds
+        userProviderIds,
+        ownedTmdbIds
       ).then((kept) => kept.map((k) => k.item))
     : list.items;
 
@@ -267,11 +273,11 @@ export default async function ListDetailPage({
               >
                 On my streaming services
               </Link>
-              {streamingOnly && !hasServicesConfigured && (
+              {streamingOnly && !canFilterByAvailability && (
                 <span className="text-muted">
-                  You haven&apos;t added any services yet —{" "}
+                  You haven&apos;t added any services or marked anything as owned yet —{" "}
                   <Link href="/streaming" className="text-accent-green hover:underline">
-                    add them here
+                    add your services here
                   </Link>
                   .
                 </span>
@@ -284,7 +290,7 @@ export default async function ListDetailPage({
       {list.items.length === 0 ? (
         <p className="text-muted">No movies in this list yet.</p>
       ) : sortedItems.length === 0 ? (
-        <p className="text-muted">None of these are on your streaming services right now.</p>
+        <p className="text-muted">None of these are on your streaming services or owned right now.</p>
       ) : userId ? (
         <FadeWatchedControl>{grid}</FadeWatchedControl>
       ) : (

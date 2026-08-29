@@ -51,6 +51,19 @@ export async function getUserProviderIds(userId: string | undefined): Promise<Se
   return new Set(services.map((s) => s.providerId));
 }
 
+// A movie the user owns is always watchable, same as one on a subscription
+// they pay for — this set is ORed into every availability check below.
+export async function getUserOwnedTmdbIds(userId: string | undefined): Promise<Set<number>> {
+  if (!userId) return new Set();
+
+  const owned = await prisma.ownedItem.findMany({
+    where: { userId },
+    select: { movie: { select: { tmdbId: true } } },
+  });
+
+  return new Set(owned.map((o) => o.movie.tmdbId));
+}
+
 export async function getFlatrateProviders(tmdbId: number): Promise<TmdbWatchProvider[]> {
   try {
     const data = await getWatchProviders(tmdbId);
@@ -78,19 +91,29 @@ export function isAvailableOnServices(
 
 const FILTER_CONCURRENCY = 6;
 
-/** Keeps only the movies available (flatrate) on at least one of the user's services. */
+/**
+ * Keeps only the movies available (flatrate) on at least one of the user's
+ * services, or that the user owns outright — an owned movie is watchable
+ * regardless of what's actually streaming, so it's never worth a TMDB
+ * provider lookup.
+ */
 export async function filterMoviesByStreaming<T extends { id: number }>(
   movies: T[],
-  userProviderIds: Set<number>
+  userProviderIds: Set<number>,
+  ownedTmdbIds: Set<number> = new Set()
 ): Promise<T[]> {
-  if (userProviderIds.size === 0) return movies;
+  if (userProviderIds.size === 0 && ownedTmdbIds.size === 0) return movies;
 
   const kept: T[] = [];
   for (let i = 0; i < movies.length; i += FILTER_CONCURRENCY) {
     const batch = movies.slice(i, i + FILTER_CONCURRENCY);
-    const providerLists = await Promise.all(batch.map((m) => getFlatrateProviders(m.id)));
+    const providerLists = await Promise.all(
+      batch.map((m) => (ownedTmdbIds.has(m.id) ? Promise.resolve([]) : getFlatrateProviders(m.id)))
+    );
     batch.forEach((movie, idx) => {
-      if (isAvailableOnServices(providerLists[idx], userProviderIds)) kept.push(movie);
+      if (ownedTmdbIds.has(movie.id) || isAvailableOnServices(providerLists[idx], userProviderIds)) {
+        kept.push(movie);
+      }
     });
   }
   return kept;

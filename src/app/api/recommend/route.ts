@@ -11,6 +11,7 @@ const promptSchema = z
     maxRuntimeMinutes: z.number().int().positive().max(600).nullable().optional(),
     onlyWatchlist: z.boolean().default(false),
     onlyStreaming: z.boolean().default(false),
+    allowR: z.boolean().default(false),
     excludeIds: z.array(z.number().int().positive()).max(100).default([]),
   })
   .refine(
@@ -19,7 +20,8 @@ const promptSchema = z
       data.genres.length > 0 ||
       data.maxRuntimeMinutes != null ||
       data.onlyWatchlist ||
-      data.onlyStreaming,
+      data.onlyStreaming ||
+      data.allowR,
     { message: "Tell us a bit more about what you're in the mood for, or pick a filter." }
   );
 
@@ -43,6 +45,7 @@ export async function POST(request: Request) {
     maxRuntimeMinutes: parsed.data.maxRuntimeMinutes ?? null,
     onlyWatchlist: parsed.data.onlyWatchlist,
     onlyStreaming: parsed.data.onlyStreaming,
+    allowR: parsed.data.allowR,
     excludeIds: parsed.data.excludeIds,
   });
 

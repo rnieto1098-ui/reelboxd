@@ -69,6 +69,7 @@ export function RecommendForm() {
   const [selectedRuntimes, setSelectedRuntimes] = useState<Set<number>>(new Set());
   const [onlyWatchlist, setOnlyWatchlist] = useState(false);
   const [onlyStreaming, setOnlyStreaming] = useState(false);
+  const [allowR, setAllowR] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<ApiResponse | null>(null);
@@ -84,7 +85,8 @@ export function RecommendForm() {
     selectedGenres.size > 0 ||
     selectedRuntimes.size > 0 ||
     onlyWatchlist ||
-    onlyStreaming;
+    onlyStreaming ||
+    allowR;
 
   function toggleGenre(genre: string) {
     setSelectedGenres((prev) => {
@@ -125,6 +127,7 @@ export function RecommendForm() {
       maxRuntimeMinutes,
       onlyWatchlist,
       onlyStreaming,
+      allowR,
     });
     const isRepeat = criteria === lastCriteriaRef.current;
     const excludeIds = isRepeat ? shownIdsRef.current : [];
@@ -138,6 +141,7 @@ export function RecommendForm() {
         maxRuntimeMinutes,
         onlyWatchlist,
         onlyStreaming,
+        allowR,
         excludeIds,
       }),
     });
@@ -206,6 +210,16 @@ export function RecommendForm() {
           </div>
         </div>
 
+        <div>
+          <p className="mb-2 text-xs text-muted">Content Rating</p>
+          <div className="flex flex-wrap gap-2">
+            <Chip label="R and below" selected={allowR} onClick={() => setAllowR((v) => !v)} />
+          </div>
+          <p className="mt-1 text-xs text-muted">
+            {allowR ? "Includes R-rated movies." : "PG-13 and below — leave unchecked to keep it there."}
+          </p>
+        </div>
+
         <textarea
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
@@ -272,6 +286,10 @@ function PromptSummary({ data }: { data: ApiResponse }) {
       ) : (
         <p>Didn&apos;t catch specific filters from that — showing popular picks instead.</p>
       )}
+      <p className="mt-1 text-xs">
+        Rated {parsed.allowR ? "R" : "PG-13"} or below
+        {parsed.onlyWatchlist ? " (not applied to watchlist picks)" : ""}.
+      </p>
       {relaxed && (
         <p className="mt-1 text-xs">
           Loosened some of those filters to find enough good matches.

@@ -206,6 +206,12 @@ export function discoverMovies(params: {
   page?: number;
   castId?: number;
   crewId?: number;
+  // US MPAA rating cap (e.g. "PG-13" or "R") — TMDB resolves the actual
+  // G/PG/PG-13/R/NC-17 ordering server-side, so this is a real severity cap
+  // rather than a string comparison. certificationCountry is required
+  // alongside it for the filter to take effect.
+  certificationCountry?: string;
+  maxCertification?: string;
 }) {
   return tmdbFetch<TmdbListResponse>("/discover/movie", {
     with_genres:
@@ -219,6 +225,8 @@ export function discoverMovies(params: {
     page: params.page ?? 1,
     with_cast: params.castId,
     with_crew: params.crewId,
+    certification_country: params.certificationCountry,
+    "certification.lte": params.maxCertification,
   });
 }
 

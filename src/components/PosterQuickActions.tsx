@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { posterUrl, type TmdbImage } from "@/lib/tmdb";
@@ -132,57 +133,64 @@ export function PosterQuickActions({ tmdbId }: { tmdbId: number }) {
         </button>
       </div>
 
-      {pickerOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-          onClick={() => setPickerOpen(false)}
-        >
+      {pickerOpen &&
+        createPortal(
+          // Portaled to <body> — MovieCard's poster wrapper has
+          // overflow-hidden (to clip/round the poster image), which would
+          // otherwise clip this modal down to the card's own tiny box even
+          // though it's position:fixed. The movie page's own poster picker
+          // has no such ancestor, which is why only this one needed it.
           <div
-            className="max-h-[80vh] w-full max-w-2xl overflow-y-auto rounded-lg border border-border bg-surface p-4"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+            onClick={() => setPickerOpen(false)}
           >
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-sm font-semibold">Choose a poster</h3>
-              <button
-                type="button"
-                onClick={() => setPickerOpen(false)}
-                className="text-xs text-muted hover:text-foreground"
-              >
-                Close
-              </button>
-            </div>
-
-            {loadingPosters && <p className="text-sm text-muted">Loading posters...</p>}
-            {posterError && <p className="text-sm text-red-400">{posterError}</p>}
-
-            {posters && posters.length === 0 && (
-              <p className="text-sm text-muted">No alternate posters found for this movie.</p>
-            )}
-
-            {posters && posters.length > 0 && (
-              <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
-                {posters.map((img) => (
-                  <button
-                    key={img.file_path}
-                    type="button"
-                    disabled={savingPoster}
-                    onClick={() => choosePoster(img.file_path)}
-                    className="overflow-hidden rounded-md border border-border transition-colors hover:border-accent-green disabled:opacity-50"
-                  >
-                    <Image
-                      src={posterUrl(img.file_path, "w200")!}
-                      alt=""
-                      width={200}
-                      height={300}
-                      className="h-full w-full object-cover"
-                    />
-                  </button>
-                ))}
+            <div
+              className="max-h-[80vh] w-full max-w-2xl overflow-y-auto rounded-lg border border-border bg-surface p-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-sm font-semibold">Choose a poster</h3>
+                <button
+                  type="button"
+                  onClick={() => setPickerOpen(false)}
+                  className="text-xs text-muted hover:text-foreground"
+                >
+                  Close
+                </button>
               </div>
-            )}
-          </div>
-        </div>
-      )}
+
+              {loadingPosters && <p className="text-sm text-muted">Loading posters...</p>}
+              {posterError && <p className="text-sm text-red-400">{posterError}</p>}
+
+              {posters && posters.length === 0 && (
+                <p className="text-sm text-muted">No alternate posters found for this movie.</p>
+              )}
+
+              {posters && posters.length > 0 && (
+                <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
+                  {posters.map((img) => (
+                    <button
+                      key={img.file_path}
+                      type="button"
+                      disabled={savingPoster}
+                      onClick={() => choosePoster(img.file_path)}
+                      className="overflow-hidden rounded-md border border-border transition-colors hover:border-accent-green disabled:opacity-50"
+                    >
+                      <Image
+                        src={posterUrl(img.file_path, "w200")!}
+                        alt=""
+                        width={200}
+                        height={300}
+                        className="h-full w-full object-cover"
+                      />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>,
+          document.body
+        )}
     </>
   );
 }

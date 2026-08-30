@@ -11,6 +11,7 @@ const promptSchema = z
     maxRuntimeMinutes: z.number().int().positive().max(600).nullable().optional(),
     onlyWatchlist: z.boolean().default(false),
     onlyStreaming: z.boolean().default(false),
+    excludeIds: z.array(z.number().int().positive()).max(100).default([]),
   })
   .refine(
     (data) =>
@@ -42,6 +43,7 @@ export async function POST(request: Request) {
     maxRuntimeMinutes: parsed.data.maxRuntimeMinutes ?? null,
     onlyWatchlist: parsed.data.onlyWatchlist,
     onlyStreaming: parsed.data.onlyStreaming,
+    excludeIds: parsed.data.excludeIds,
   });
 
   const posterOverrides = await getCustomPosterMap(

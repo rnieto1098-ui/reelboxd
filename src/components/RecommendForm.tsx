@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { MovieCard } from "@/components/MovieCard";
 import type { TmdbMovieSummary } from "@/lib/tmdb";
 import type { ParsedPrompt } from "@/lib/promptRecommender";
@@ -73,6 +73,12 @@ export function RecommendForm() {
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<ApiResponse | null>(null);
 
+  // Lets a repeat click of "Recommend me something" — same criteria, nothing
+  // changed — surface a different set instead of the same one. Refs, not
+  // state: this bookkeeping doesn't drive any rendering itself.
+  const lastCriteriaRef = useRef<string | null>(null);
+  const shownIdsRef = useRef<number[]>([]);
+
   const hasSelection =
     prompt.trim().length > 0 ||
     selectedGenres.size > 0 ||
@@ -110,6 +116,19 @@ export function RecommendForm() {
     // restrictive (smallest) cap among them.
     const maxRuntimeMinutes = selectedRuntimes.size > 0 ? Math.min(...selectedRuntimes) : null;
 
+    // Same criteria as the last submit — a genuine "click again" — so ask
+    // the server to leave out what it just showed. Anything different
+    // (including the very first submit) starts a fresh exclusion history.
+    const criteria = JSON.stringify({
+      prompt: prompt.trim(),
+      genres: [...selectedGenres].sort(),
+      maxRuntimeMinutes,
+      onlyWatchlist,
+      onlyStreaming,
+    });
+    const isRepeat = criteria === lastCriteriaRef.current;
+    const excludeIds = isRepeat ? shownIdsRef.current : [];
+
     const res = await fetch("/api/recommend", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -119,6 +138,7 @@ export function RecommendForm() {
         maxRuntimeMinutes,
         onlyWatchlist,
         onlyStreaming,
+        excludeIds,
       }),
     });
     const body = await res.json();
@@ -128,6 +148,13 @@ export function RecommendForm() {
       setError(body.error ?? "Something went wrong");
       return;
     }
+
+    lastCriteriaRef.current = criteria;
+    const newIds: number[] = body.results.map((m: TmdbMovieSummary) => m.id);
+    // Bounded well under the API's excludeIds cap (100) so a long streak of
+    // repeat clicks never fails validation — recent history is what matters
+    // for "give me something different" anyway.
+    shownIdsRef.current = (isRepeat ? [...excludeIds, ...newIds] : newIds).slice(-60);
 
     setData(body);
   }

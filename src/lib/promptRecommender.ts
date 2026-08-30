@@ -53,6 +53,10 @@ export type PromptPresets = {
   maxRuntimeMinutes?: number | null;
   onlyWatchlist?: boolean;
   onlyStreaming?: boolean;
+  // Movie ids to leave out of the results — sent when the user hits
+  // "Recommend me something" again without changing any criteria, so a
+  // repeat click surfaces a fresh set instead of the same one.
+  excludeIds?: number[];
 };
 
 export async function parsePrompt(prompt: string, presets?: PromptPresets): Promise<ParsedPrompt> {
@@ -172,6 +176,8 @@ async function getWatchlistCandidates(userId: string | undefined) {
 
 type WatchlistCandidate = Awaited<ReturnType<typeof getWatchlistCandidates>>[number];
 
+const RESULT_LIMIT = 10;
+
 export async function getPromptRecommendations(
   userId: string | undefined,
   prompt: string,
@@ -179,6 +185,7 @@ export async function getPromptRecommendations(
 ): Promise<PromptRecommendation> {
   const onlyWatchlist = presets?.onlyWatchlist ?? false;
   const onlyStreaming = presets?.onlyStreaming ?? false;
+  const excludeIds = new Set(presets?.excludeIds ?? []);
 
   const [parsed, watchedIds, genreCatalog, watchlistCandidates, userProviderIds, ownedTmdbIds] =
     await Promise.all([
@@ -213,18 +220,27 @@ export async function getPromptRecommendations(
     effectiveGenreIds.map((id) => genreIdToName.get(id)).filter((n): n is string => !!n)
   );
 
-  async function runDiscover(stage: Stage) {
+  // A repeat click (same criteria, excludeIds set) needs a real shot at
+  // fresh candidates beyond whatever page 1 already showed — pull a second
+  // page too in that case rather than just hoping page 1 had overflow.
+  async function runDiscover(stage: Stage): Promise<TmdbMovieSummary[]> {
+    const pages = excludeIds.size > 0 ? [1, 2] : [1];
     if (stage === "popularOnly") {
-      const popular = await getPopularMovies();
-      return popular.results;
+      const results = await Promise.all(pages.map((page) => getPopularMovies(page)));
+      return results.flatMap((r) => r.results);
     }
-    const page = await discoverMovies({
-      genreIds: effectiveGenreIds,
-      minVoteAverage: stage === "full" ? parsed.minRating10 ?? undefined : undefined,
-      minRuntime: stage === "genreOnly" ? undefined : parsed.runtimeMinMinutes ?? undefined,
-      maxRuntime: stage === "genreOnly" ? undefined : parsed.runtimeMaxMinutes ?? undefined,
-    });
-    return page.results;
+    const results = await Promise.all(
+      pages.map((page) =>
+        discoverMovies({
+          genreIds: effectiveGenreIds,
+          minVoteAverage: stage === "full" ? parsed.minRating10 ?? undefined : undefined,
+          minRuntime: stage === "genreOnly" ? undefined : parsed.runtimeMinMinutes ?? undefined,
+          maxRuntime: stage === "genreOnly" ? undefined : parsed.runtimeMaxMinutes ?? undefined,
+          page,
+        })
+      )
+    );
+    return results.flatMap((r) => r.results);
   }
 
   // Mirrors runDiscover's stages, but filtered client-side against the
@@ -263,14 +279,16 @@ export async function getPromptRecommendations(
       }));
   }
 
-  async function buildFinal(pool: TmdbMovieSummary[]) {
+  async function buildFinal(pool: TmdbMovieSummary[], skipExclude: boolean) {
     const merged = new Map<number, TmdbMovieSummary>();
     // The "similar to X" pool comes from TMDB's general similar-movies
     // endpoint, not the user's watchlist — folding it in would defeat the
     // point of an explicit "on watchlist" filter, so it's excluded there.
     const sources = onlyWatchlist ? [pool] : [pool, similarPool];
     for (const movie of sources.flat()) {
-      if (!watchedIds.has(movie.id)) merged.set(movie.id, movie);
+      if (watchedIds.has(movie.id)) continue;
+      if (!skipExclude && excludeIds.has(movie.id)) continue;
+      merged.set(movie.id, movie);
     }
     const sorted = [...merged.values()].sort((a, b) => (b.popularity ?? 0) - (a.popularity ?? 0));
     // Same reasoning as "on watchlist" above: an explicit "on your services"
@@ -279,25 +297,40 @@ export async function getPromptRecommendations(
     return onlyStreaming ? filterMoviesByStreaming(sorted, userProviderIds, ownedTmdbIds) : sorted;
   }
 
-  async function runStage(stage: Stage) {
-    return buildFinal(onlyWatchlist ? runWatchlistPool(stage) : await runDiscover(stage));
+  async function runStage(stage: Stage, skipExclude: boolean) {
+    return buildFinal(onlyWatchlist ? runWatchlistPool(stage) : await runDiscover(stage), skipExclude);
   }
 
-  let relaxed = false;
-  let pool = await runStage("full");
+  async function runAllStages(skipExclude: boolean) {
+    let relaxed = false;
+    let pool = await runStage("full", skipExclude);
 
-  if (pool.length < 3 && (parsed.minRating10 || parsed.runtimeMaxMinutes || parsed.runtimeMinMinutes)) {
-    relaxed = true;
-    pool = await runStage("dropRating");
-  }
-  if (pool.length < 3 && effectiveGenreIds.length > 0) {
-    relaxed = true;
-    pool = await runStage("genreOnly");
-  }
-  if (pool.length < 3) {
-    relaxed = true;
-    pool = await runStage("popularOnly");
+    if (
+      pool.length < RESULT_LIMIT &&
+      (parsed.minRating10 || parsed.runtimeMaxMinutes || parsed.runtimeMinMinutes)
+    ) {
+      relaxed = true;
+      pool = await runStage("dropRating", skipExclude);
+    }
+    if (pool.length < RESULT_LIMIT && effectiveGenreIds.length > 0) {
+      relaxed = true;
+      pool = await runStage("genreOnly", skipExclude);
+    }
+    if (pool.length < RESULT_LIMIT) {
+      relaxed = true;
+      pool = await runStage("popularOnly", skipExclude);
+    }
+    return { pool, relaxed };
   }
 
-  return { parsed, similarToMovie, results: pool.slice(0, 5), relaxed };
+  let { pool, relaxed } = await runAllStages(false);
+
+  // Excluding the previously-shown set left nothing at all (a narrow filter
+  // fully exhausted) — a repeat click should never land on a bare "nothing
+  // found" screen, so fall back to the same set rather than an empty one.
+  if (pool.length === 0 && excludeIds.size > 0) {
+    ({ pool, relaxed } = await runAllStages(true));
+  }
+
+  return { parsed, similarToMovie, results: pool.slice(0, RESULT_LIMIT), relaxed };
 }

@@ -9,10 +9,17 @@ const promptSchema = z
     prompt: z.string().max(500).default(""),
     genres: z.array(z.string()).max(12).default([]),
     maxRuntimeMinutes: z.number().int().positive().max(600).nullable().optional(),
+    onlyWatchlist: z.boolean().default(false),
+    onlyStreaming: z.boolean().default(false),
   })
   .refine(
-    (data) => data.prompt.trim().length >= 3 || data.genres.length > 0 || data.maxRuntimeMinutes != null,
-    { message: "Tell us a bit more about what you're in the mood for, or pick a genre/runtime." }
+    (data) =>
+      data.prompt.trim().length >= 3 ||
+      data.genres.length > 0 ||
+      data.maxRuntimeMinutes != null ||
+      data.onlyWatchlist ||
+      data.onlyStreaming,
+    { message: "Tell us a bit more about what you're in the mood for, or pick a filter." }
   );
 
 export async function POST(request: Request) {
@@ -33,6 +40,8 @@ export async function POST(request: Request) {
   const recommendation = await getPromptRecommendations(session.user.id, parsed.data.prompt, {
     genreNames: parsed.data.genres,
     maxRuntimeMinutes: parsed.data.maxRuntimeMinutes ?? null,
+    onlyWatchlist: parsed.data.onlyWatchlist,
+    onlyStreaming: parsed.data.onlyStreaming,
   });
 
   const posterOverrides = await getCustomPosterMap(

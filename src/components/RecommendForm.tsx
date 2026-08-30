@@ -67,11 +67,18 @@ export function RecommendForm() {
   const [prompt, setPrompt] = useState("");
   const [selectedGenres, setSelectedGenres] = useState<Set<string>>(new Set());
   const [selectedRuntimes, setSelectedRuntimes] = useState<Set<number>>(new Set());
+  const [onlyWatchlist, setOnlyWatchlist] = useState(false);
+  const [onlyStreaming, setOnlyStreaming] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<ApiResponse | null>(null);
 
-  const hasSelection = prompt.trim().length > 0 || selectedGenres.size > 0 || selectedRuntimes.size > 0;
+  const hasSelection =
+    prompt.trim().length > 0 ||
+    selectedGenres.size > 0 ||
+    selectedRuntimes.size > 0 ||
+    onlyWatchlist ||
+    onlyStreaming;
 
   function toggleGenre(genre: string) {
     setSelectedGenres((prev) => {
@@ -110,6 +117,8 @@ export function RecommendForm() {
         prompt,
         genres: [...selectedGenres],
         maxRuntimeMinutes,
+        onlyWatchlist,
+        onlyStreaming,
       }),
     });
     const body = await res.json();
@@ -151,6 +160,22 @@ export function RecommendForm() {
                 onClick={() => toggleRuntime(preset.maxMinutes)}
               />
             ))}
+          </div>
+        </div>
+
+        <div>
+          <p className="mb-2 text-xs text-muted">Availability</p>
+          <div className="flex flex-wrap gap-2">
+            <Chip
+              label="On watchlist"
+              selected={onlyWatchlist}
+              onClick={() => setOnlyWatchlist((v) => !v)}
+            />
+            <Chip
+              label="On your services"
+              selected={onlyStreaming}
+              onClick={() => setOnlyStreaming((v) => !v)}
+            />
           </div>
         </div>
 
@@ -208,6 +233,8 @@ function PromptSummary({ data }: { data: ApiResponse }) {
   if (parsed.runtimeMaxMinutes) bits.push(`under ${formatMinutes(parsed.runtimeMaxMinutes)}`);
   if (parsed.runtimeMinMinutes) bits.push(`over ${formatMinutes(parsed.runtimeMinMinutes)}`);
   if (parsed.minRating10) bits.push(`rated ${parsed.minRating10.toFixed(1)}+/10`);
+  if (parsed.onlyWatchlist) bits.push("on your watchlist");
+  if (parsed.onlyStreaming) bits.push("on your streaming services");
 
   return (
     <div className="text-sm text-muted">

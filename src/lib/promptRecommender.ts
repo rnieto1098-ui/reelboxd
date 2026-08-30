@@ -1,4 +1,7 @@
+import { prisma } from "@/lib/prisma";
+import { parseGenres } from "@/lib/movies";
 import { getWatchedTmdbIds } from "@/lib/recommendations";
+import { filterMoviesByStreaming, getUserOwnedTmdbIds, getUserProviderIds } from "@/lib/streaming";
 import {
   discoverMovies,
   getGenres,
@@ -37,6 +40,8 @@ export type ParsedPrompt = {
   runtimeMinMinutes: number | null;
   minRating10: number | null;
   similarToQuery: string | null;
+  onlyWatchlist: boolean;
+  onlyStreaming: boolean;
 };
 
 function toMinutes(value: number, unit: string): number {
@@ -46,6 +51,8 @@ function toMinutes(value: number, unit: string): number {
 export type PromptPresets = {
   genreNames?: string[];
   maxRuntimeMinutes?: number | null;
+  onlyWatchlist?: boolean;
+  onlyStreaming?: boolean;
 };
 
 export async function parsePrompt(prompt: string, presets?: PromptPresets): Promise<ParsedPrompt> {
@@ -122,6 +129,8 @@ export async function parsePrompt(prompt: string, presets?: PromptPresets): Prom
     runtimeMinMinutes,
     minRating10,
     similarToQuery,
+    onlyWatchlist: presets?.onlyWatchlist ?? false,
+    onlyStreaming: presets?.onlyStreaming ?? false,
   };
 }
 
@@ -132,15 +141,56 @@ export type PromptRecommendation = {
   relaxed: boolean;
 };
 
+type Stage = "full" | "dropRating" | "genreOnly" | "popularOnly";
+
+// The user's watchlist, in the fields the local Movie cache actually has —
+// used as the candidate pool instead of TMDB discover when "on watchlist" is
+// checked. Empty (no query at all) when the filter isn't in use.
+async function getWatchlistCandidates(userId: string | undefined) {
+  if (!userId) return [];
+  const items = await prisma.watchlistItem.findMany({
+    where: { userId },
+    select: {
+      movie: {
+        select: {
+          tmdbId: true,
+          title: true,
+          overview: true,
+          posterPath: true,
+          backdropPath: true,
+          releaseDate: true,
+          runtime: true,
+          genres: true,
+          voteAverage: true,
+          popularity: true,
+        },
+      },
+    },
+  });
+  return items.map((i) => i.movie);
+}
+
+type WatchlistCandidate = Awaited<ReturnType<typeof getWatchlistCandidates>>[number];
+
 export async function getPromptRecommendations(
   userId: string | undefined,
   prompt: string,
   presets?: PromptPresets
 ): Promise<PromptRecommendation> {
-  const [parsed, watchedIds] = await Promise.all([
-    parsePrompt(prompt, presets),
-    getWatchedTmdbIds(userId),
-  ]);
+  const onlyWatchlist = presets?.onlyWatchlist ?? false;
+  const onlyStreaming = presets?.onlyStreaming ?? false;
+
+  const [parsed, watchedIds, genreCatalog, watchlistCandidates, userProviderIds, ownedTmdbIds] =
+    await Promise.all([
+      parsePrompt(prompt, presets),
+      getWatchedTmdbIds(userId),
+      getGenres(),
+      onlyWatchlist ? getWatchlistCandidates(userId) : Promise.resolve<WatchlistCandidate[]>([]),
+      onlyStreaming ? getUserProviderIds(userId) : Promise.resolve(new Set<number>()),
+      onlyStreaming ? getUserOwnedTmdbIds(userId) : Promise.resolve(new Set<number>()),
+    ]);
+
+  const genreIdToName = new Map(genreCatalog.genres.map((g) => [g.id, g.name]));
 
   let similarToMovie: { id: number; title: string } | null = null;
   let similarPool: TmdbMovieSummary[] = [];
@@ -159,7 +209,11 @@ export async function getPromptRecommendations(
     }
   }
 
-  async function runDiscover(stage: "full" | "dropRating" | "genreOnly" | "popularOnly") {
+  const effectiveGenreNames = new Set(
+    effectiveGenreIds.map((id) => genreIdToName.get(id)).filter((n): n is string => !!n)
+  );
+
+  async function runDiscover(stage: Stage) {
     if (stage === "popularOnly") {
       const popular = await getPopularMovies();
       return popular.results;
@@ -173,28 +227,76 @@ export async function getPromptRecommendations(
     return page.results;
   }
 
-  function buildFinal(discoverPool: TmdbMovieSummary[]) {
+  // Mirrors runDiscover's stages, but filtered client-side against the
+  // watchlist cache instead of queried from TMDB — "on watchlist" is a hard
+  // constraint on the candidate pool itself, never relaxed away like genre/
+  // runtime/rating are, so even the loosest stage stays watchlist-only.
+  function runWatchlistPool(stage: Stage): TmdbMovieSummary[] {
+    return watchlistCandidates
+      .filter((m) => {
+        if (stage !== "popularOnly" && effectiveGenreNames.size > 0) {
+          const movieGenres = parseGenres(m.genres);
+          if (!movieGenres.some((g) => effectiveGenreNames.has(g))) return false;
+        }
+        if (stage === "full" || stage === "dropRating") {
+          if (parsed.runtimeMaxMinutes != null && (m.runtime == null || m.runtime > parsed.runtimeMaxMinutes)) {
+            return false;
+          }
+          if (parsed.runtimeMinMinutes != null && (m.runtime == null || m.runtime < parsed.runtimeMinMinutes)) {
+            return false;
+          }
+        }
+        if (stage === "full" && parsed.minRating10 != null) {
+          if (m.voteAverage == null || m.voteAverage < parsed.minRating10) return false;
+        }
+        return true;
+      })
+      .map((m) => ({
+        id: m.tmdbId,
+        title: m.title,
+        overview: m.overview ?? "",
+        poster_path: m.posterPath,
+        backdrop_path: m.backdropPath,
+        release_date: m.releaseDate ?? "",
+        vote_average: m.voteAverage ?? 0,
+        popularity: m.popularity ?? undefined,
+      }));
+  }
+
+  async function buildFinal(pool: TmdbMovieSummary[]) {
     const merged = new Map<number, TmdbMovieSummary>();
-    for (const movie of [...discoverPool, ...similarPool]) {
+    // The "similar to X" pool comes from TMDB's general similar-movies
+    // endpoint, not the user's watchlist — folding it in would defeat the
+    // point of an explicit "on watchlist" filter, so it's excluded there.
+    const sources = onlyWatchlist ? [pool] : [pool, similarPool];
+    for (const movie of sources.flat()) {
       if (!watchedIds.has(movie.id)) merged.set(movie.id, movie);
     }
-    return [...merged.values()].sort((a, b) => (b.popularity ?? 0) - (a.popularity ?? 0));
+    const sorted = [...merged.values()].sort((a, b) => (b.popularity ?? 0) - (a.popularity ?? 0));
+    // Same reasoning as "on watchlist" above: an explicit "on your services"
+    // filter is a hard constraint, applied after every stage and never
+    // relaxed away, whatever the candidate pool's source.
+    return onlyStreaming ? filterMoviesByStreaming(sorted, userProviderIds, ownedTmdbIds) : sorted;
+  }
+
+  async function runStage(stage: Stage) {
+    return buildFinal(onlyWatchlist ? runWatchlistPool(stage) : await runDiscover(stage));
   }
 
   let relaxed = false;
-  let pool = buildFinal(await runDiscover("full"));
+  let pool = await runStage("full");
 
   if (pool.length < 3 && (parsed.minRating10 || parsed.runtimeMaxMinutes || parsed.runtimeMinMinutes)) {
     relaxed = true;
-    pool = buildFinal(await runDiscover("dropRating"));
+    pool = await runStage("dropRating");
   }
   if (pool.length < 3 && effectiveGenreIds.length > 0) {
     relaxed = true;
-    pool = buildFinal(await runDiscover("genreOnly"));
+    pool = await runStage("genreOnly");
   }
   if (pool.length < 3) {
     relaxed = true;
-    pool = buildFinal(await runDiscover("popularOnly"));
+    pool = await runStage("popularOnly");
   }
 
   return { parsed, similarToMovie, results: pool.slice(0, 5), relaxed };

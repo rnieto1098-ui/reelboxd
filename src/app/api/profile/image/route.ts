@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { mkdir, readdir, unlink, writeFile } from "node:fs/promises";
-import path from "node:path";
+import { del, put } from "@vercel/blob";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -17,15 +16,6 @@ type ImageType = "avatar" | "background";
 
 function folderFor(type: ImageType) {
   return type === "avatar" ? "avatars" : "backgrounds";
-}
-
-async function clearExisting(dir: string, userId: string) {
-  const files = await readdir(dir).catch(() => [] as string[]);
-  await Promise.all(
-    files
-      .filter((f) => f.startsWith(`${userId}-`))
-      .map((f) => unlink(path.join(dir, f)).catch(() => null))
-  );
 }
 
 export async function POST(request: Request) {
@@ -55,26 +45,29 @@ export async function POST(request: Request) {
     );
   }
 
-  const dir = path.join(process.cwd(), "public", "uploads", folderFor(type));
-  await mkdir(dir, { recursive: true });
-  await clearExisting(dir, session.user.id);
+  const existing = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { image: true, backgroundImage: true },
+  });
+  const oldUrl = type === "avatar" ? existing?.image : existing?.backgroundImage;
 
   // The timestamp is baked into the filename (not a query string) so a
   // fresh upload gets a brand-new path — Next.js 16 requires local image
   // query strings to be pre-registered exactly in next.config, which won't
   // work for a value that's different on every upload.
-  const filename = `${session.user.id}-${Date.now()}.${extension}`;
-  const buffer = Buffer.from(await file.arrayBuffer());
-  await writeFile(path.join(dir, filename), buffer);
-
-  const publicPath = `/uploads/${folderFor(type)}/${filename}`;
+  const filename = `${folderFor(type)}/${session.user.id}-${Date.now()}.${extension}`;
+  const blob = await put(filename, file, { access: "public" });
 
   await prisma.user.update({
     where: { id: session.user.id },
-    data: type === "avatar" ? { image: publicPath } : { backgroundImage: publicPath },
+    data: type === "avatar" ? { image: blob.url } : { backgroundImage: blob.url },
   });
 
-  return NextResponse.json({ path: publicPath });
+  // Delete the old blob only after the new one is safely stored and saved —
+  // never risk losing a working image because a later step failed.
+  if (oldUrl) await del(oldUrl).catch(() => null);
+
+  return NextResponse.json({ path: blob.url });
 }
 
 export async function DELETE(request: Request) {
@@ -88,13 +81,18 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: "Invalid image type" }, { status: 400 });
   }
 
-  const dir = path.join(process.cwd(), "public", "uploads", folderFor(type));
-  await clearExisting(dir, session.user.id);
+  const existing = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { image: true, backgroundImage: true },
+  });
+  const url = type === "avatar" ? existing?.image : existing?.backgroundImage;
 
   await prisma.user.update({
     where: { id: session.user.id },
     data: type === "avatar" ? { image: null } : { backgroundImage: null },
   });
+
+  if (url) await del(url).catch(() => null);
 
   return NextResponse.json({ ok: true });
 }

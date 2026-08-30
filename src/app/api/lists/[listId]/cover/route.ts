@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { mkdir, readdir, unlink, writeFile } from "node:fs/promises";
-import path from "node:path";
+import { del, put } from "@vercel/blob";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -12,17 +11,6 @@ const MIME_EXTENSIONS: Record<string, string> = {
   "image/webp": "webp",
   "image/gif": "gif",
 };
-
-const COVERS_DIR = path.join(process.cwd(), "public", "uploads", "list-covers");
-
-async function clearExisting(listId: string) {
-  const files = await readdir(COVERS_DIR).catch(() => [] as string[]);
-  await Promise.all(
-    files
-      .filter((f) => f.startsWith(`${listId}-`))
-      .map((f) => unlink(path.join(COVERS_DIR, f)).catch(() => null))
-  );
-}
 
 async function assertOwnedList(listId: string, userId: string) {
   const list = await prisma.list.findUnique({ where: { id: listId }, select: { ownerId: true } });
@@ -57,20 +45,19 @@ export async function POST(request: Request, context: { params: Promise<{ listId
     );
   }
 
-  await mkdir(COVERS_DIR, { recursive: true });
-  await clearExisting(listId);
+  const existing = await prisma.list.findUnique({ where: { id: listId }, select: { coverImage: true } });
 
   // Timestamp baked into the filename (not a query string) so a fresh
   // upload gets a brand-new path — same reasoning as profile image uploads.
-  const filename = `${listId}-${Date.now()}.${extension}`;
-  const buffer = Buffer.from(await file.arrayBuffer());
-  await writeFile(path.join(COVERS_DIR, filename), buffer);
+  const filename = `list-covers/${listId}-${Date.now()}.${extension}`;
+  const blob = await put(filename, file, { access: "public" });
 
-  const publicPath = `/uploads/list-covers/${filename}`;
+  await prisma.list.update({ where: { id: listId }, data: { coverImage: blob.url } });
 
-  await prisma.list.update({ where: { id: listId }, data: { coverImage: publicPath } });
+  // Delete the old blob only after the new one is safely stored and saved.
+  if (existing?.coverImage) await del(existing.coverImage).catch(() => null);
 
-  return NextResponse.json({ path: publicPath });
+  return NextResponse.json({ path: blob.url });
 }
 
 export async function DELETE(_request: Request, context: { params: Promise<{ listId: string }> }) {
@@ -84,8 +71,9 @@ export async function DELETE(_request: Request, context: { params: Promise<{ lis
     return NextResponse.json({ error: "Not your list" }, { status: 403 });
   }
 
-  await clearExisting(listId);
+  const existing = await prisma.list.findUnique({ where: { id: listId }, select: { coverImage: true } });
   await prisma.list.update({ where: { id: listId }, data: { coverImage: null } });
+  if (existing?.coverImage) await del(existing.coverImage).catch(() => null);
 
   return NextResponse.json({ ok: true });
 }

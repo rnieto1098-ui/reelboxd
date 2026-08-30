@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { mkdir, readdir, unlink, writeFile } from "node:fs/promises";
-import path from "node:path";
+import { del, put } from "@vercel/blob";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -12,17 +11,6 @@ const MIME_EXTENSIONS: Record<string, string> = {
   "image/webp": "webp",
   "image/gif": "gif",
 };
-
-const COVERS_DIR = path.join(process.cwd(), "public", "uploads", "list-covers");
-
-async function clearExisting(prefix: string) {
-  const files = await readdir(COVERS_DIR).catch(() => [] as string[]);
-  await Promise.all(
-    files
-      .filter((f) => f.startsWith(`${prefix}-`))
-      .map((f) => unlink(path.join(COVERS_DIR, f)).catch(() => null))
-  );
-}
 
 // This is a personal, viewer-only cover — no ownership check, since the
 // whole point is letting anyone set their own cover for a list they don't
@@ -57,23 +45,24 @@ export async function POST(request: Request, context: { params: Promise<{ listId
     );
   }
 
-  await mkdir(COVERS_DIR, { recursive: true });
-  const prefix = `${userId}-${listId}`;
-  await clearExisting(prefix);
+  const existing = await prisma.customListCover.findUnique({
+    where: { userId_listId: { userId, listId } },
+    select: { imagePath: true },
+  });
 
-  const filename = `${prefix}-${Date.now()}.${extension}`;
-  const buffer = Buffer.from(await file.arrayBuffer());
-  await writeFile(path.join(COVERS_DIR, filename), buffer);
-
-  const publicPath = `/uploads/list-covers/${filename}`;
+  const filename = `list-covers/${userId}-${listId}-${Date.now()}.${extension}`;
+  const blob = await put(filename, file, { access: "public" });
 
   await prisma.customListCover.upsert({
     where: { userId_listId: { userId, listId } },
-    create: { userId, listId, imagePath: publicPath },
-    update: { imagePath: publicPath },
+    create: { userId, listId, imagePath: blob.url },
+    update: { imagePath: blob.url },
   });
 
-  return NextResponse.json({ path: publicPath });
+  // Delete the old blob only after the new one is safely stored and saved.
+  if (existing?.imagePath) await del(existing.imagePath).catch(() => null);
+
+  return NextResponse.json({ path: blob.url });
 }
 
 export async function DELETE(_request: Request, context: { params: Promise<{ listId: string }> }) {
@@ -84,8 +73,12 @@ export async function DELETE(_request: Request, context: { params: Promise<{ lis
   const userId = session.user.id;
   const { listId } = await context.params;
 
-  await clearExisting(`${userId}-${listId}`);
+  const existing = await prisma.customListCover.findUnique({
+    where: { userId_listId: { userId, listId } },
+    select: { imagePath: true },
+  });
   await prisma.customListCover.deleteMany({ where: { userId, listId } });
+  if (existing?.imagePath) await del(existing.imagePath).catch(() => null);
 
   return NextResponse.json({ ok: true });
 }

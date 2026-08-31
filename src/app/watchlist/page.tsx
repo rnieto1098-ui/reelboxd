@@ -12,6 +12,7 @@ import {
 import type { TmdbWatchProvider } from "@/lib/tmdb";
 import { MovieCard } from "@/components/MovieCard";
 import { ProviderLogos } from "@/components/ProviderLogos";
+import { WatchlistImportForm } from "@/components/WatchlistImportForm";
 import type { Prisma } from "@prisma/client";
 
 const TABS = {
@@ -95,14 +96,17 @@ export default async function WatchlistPage({ searchParams }: PageProps<"/watchl
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-4 flex items-center justify-between gap-4">
         <h1 className="text-2xl font-bold">Your Watchlist</h1>
-        <Link
-          href="/streaming"
-          className="text-sm text-muted hover:text-accent-green hover:underline"
-        >
-          {hasServicesConfigured ? "Edit your streaming services" : "Add your streaming services"}
-        </Link>
+        <div className="flex items-center gap-4">
+          <WatchlistImportForm />
+          <Link
+            href="/streaming"
+            className="text-sm text-muted hover:text-accent-green hover:underline"
+          >
+            {hasServicesConfigured ? "Edit your streaming services" : "Add your streaming services"}
+          </Link>
+        </div>
       </div>
 
       {items.length > 1 && (

@@ -130,3 +130,76 @@ export async function importLetterboxdZip(
 
   return { ratingsImported, watchlistImported, unmatched };
 }
+
+export type WatchlistImportSummary = {
+  imported: number;
+  unmatched: { title: string; year: string }[];
+};
+
+// Accepts either a full Letterboxd export .zip (pulls just watchlist.csv out
+// of it) or a standalone .csv with Name/Year columns — which also covers
+// re-importing this app's own watchlist export, since exportData.ts
+// deliberately mirrors that column layout.
+async function parseWatchlistRows(file: File): Promise<CsvRow[]> {
+  const name = file.name.toLowerCase();
+
+  if (name.endsWith(".zip")) {
+    const buffer = await file.arrayBuffer();
+    const zip = await JSZip.loadAsync(buffer);
+    const rows = await readCsv(zip, "watchlist.csv");
+    if (!rows) {
+      throw new Error("That .zip didn't contain a watchlist.csv.");
+    }
+    return rows;
+  }
+
+  if (name.endsWith(".csv")) {
+    const text = await file.text();
+    const { data } = Papa.parse<CsvRow>(text, { header: true, skipEmptyLines: true });
+    return data;
+  }
+
+  throw new Error("Please upload a .csv or .zip file.");
+}
+
+export async function importWatchlistFile(
+  userId: string,
+  file: File
+): Promise<WatchlistImportSummary> {
+  const rows = await parseWatchlistRows(file);
+  const films = rows
+    .filter((row) => row["Name"])
+    .map((row) => ({ title: row["Name"], year: row["Year"] ?? "" }));
+
+  if (films.length === 0) {
+    throw new Error(
+      "No movies found in that file — make sure it has Name and Year columns."
+    );
+  }
+
+  const unmatched: { title: string; year: string }[] = [];
+  let imported = 0;
+
+  for (let i = 0; i < films.length; i += MATCH_CONCURRENCY) {
+    const batch = films.slice(i, i + MATCH_CONCURRENCY);
+    await Promise.all(
+      batch.map(async (film) => {
+        const tmdbId = await matchTmdbId(film.title, film.year);
+        if (!tmdbId) {
+          unmatched.push(film);
+          return;
+        }
+
+        const movie = await ensureMovieCached(tmdbId);
+        await prisma.watchlistItem.upsert({
+          where: { userId_movieId: { userId, movieId: movie.id } },
+          update: {},
+          create: { userId, movieId: movie.id },
+        });
+        imported++;
+      })
+    );
+  }
+
+  return { imported, unmatched };
+}

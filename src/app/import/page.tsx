@@ -24,6 +24,13 @@ export default async function ImportPage() {
         your ratings and watchlist. Movies with unusual titles might not match
         automatically; we&apos;ll list anything we couldn&apos;t find.
       </p>
+      <p className="mb-6 text-sm text-muted">
+        Want to back up or move your reelboxd data instead? You can{" "}
+        <a href="/api/export" className="text-accent-green hover:underline">
+          export it
+        </a>{" "}
+        from Settings.
+      </p>
 
       <ImportForm />
     </div>

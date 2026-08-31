@@ -15,7 +15,8 @@ export function OwnedButton({
   const { active: owned, saving, toggle } = useToggleAction(
     initialOwned,
     `/api/movies/${tmdbId}/owned`,
-    signedIn
+    signedIn,
+    ["Marked as owned", "Removed from owned"]
   );
 
   return (

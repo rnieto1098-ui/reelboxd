@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -36,6 +37,37 @@ function buildHref(username: string, key: SortKey, dir: SortDir) {
   if (dir !== "desc") params.set("dir", dir);
   const qs = params.toString();
   return `/profile/${username}${qs ? `?${qs}` : ""}`;
+}
+
+export async function generateMetadata({
+  params,
+}: PageProps<"/profile/[username]">): Promise<Metadata> {
+  const { username } = await params;
+  const user = await prisma.user.findUnique({
+    where: { username },
+    select: { image: true, _count: { select: { ratings: true } } },
+  });
+  if (!user) return {};
+
+  const title = `${username} on reelboxd`;
+  const description = `${user._count.ratings} film${user._count.ratings === 1 ? "" : "s"} rated on reelboxd.`;
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      type: "profile",
+      images: user.image ? [user.image] : undefined,
+    },
+    twitter: {
+      card: "summary",
+      title,
+      description,
+      images: user.image ? [user.image] : undefined,
+    },
+  };
 }
 
 export default async function ProfilePage({

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -67,6 +68,48 @@ function buildHref(listId: string, sortKey: SortKey, dir: SortDir, streamingOnly
   if (streamingOnly) params.set("streaming", "1");
   const qs = params.toString();
   return `/lists/${listId}${qs ? `?${qs}` : ""}`;
+}
+
+export async function generateMetadata({
+  params,
+}: PageProps<"/lists/[listId]">): Promise<Metadata> {
+  const { listId } = await params;
+  const list = await prisma.list.findUnique({
+    where: { id: listId },
+    select: {
+      title: true,
+      description: true,
+      isSystem: true,
+      coverImage: true,
+      owner: { select: { username: true } },
+      items: { take: 1, orderBy: { position: "asc" }, select: { posterPath: true } },
+    },
+  });
+  if (!list) return {};
+
+  const title = list.title;
+  const description =
+    list.description ??
+    (list.isSystem ? `Curated by reelboxd.` : `By ${list.owner?.username} on reelboxd.`);
+  // coverImage is already a full URL (Vercel Blob) if set — unlike a list
+  // item's posterPath, which is a raw TMDB path that still needs posterUrl().
+  const image = list.coverImage ?? posterUrl(list.items[0]?.posterPath ?? null, "w500");
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      images: image ? [image] : undefined,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: image ? [image] : undefined,
+    },
+  };
 }
 
 export default async function ListDetailPage({

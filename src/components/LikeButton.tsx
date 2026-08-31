@@ -16,7 +16,8 @@ export function LikeButton({
   const { active: liked, saving, toggle } = useToggleAction(
     initialLiked,
     `/api/movies/${tmdbId}/like`,
-    signedIn
+    signedIn,
+    ["Liked", "Unliked"]
   );
 
   return (

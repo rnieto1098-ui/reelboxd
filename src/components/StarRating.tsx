@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useToast } from "@/components/Toast";
 
 const STAR_COUNT = 5;
 
@@ -15,6 +16,7 @@ export function StarRating({
   signedIn: boolean;
 }) {
   const router = useRouter();
+  const showToast = useToast();
   const [score, setScore] = useState(initialScore ?? 0);
   const [hoverScore, setHoverScore] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
@@ -28,20 +30,28 @@ export function StarRating({
     }
     // Clicking the same rating again clears it.
     const nextScore = newScore === score ? 0 : newScore;
+    const previousScore = score;
     setScore(nextScore);
     setSaving(true);
 
-    if (nextScore === 0) {
-      await fetch(`/api/movies/${tmdbId}/rating`, { method: "DELETE" });
-    } else {
-      await fetch(`/api/movies/${tmdbId}/rating`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ score: nextScore }),
-      });
-    }
+    const res =
+      nextScore === 0
+        ? await fetch(`/api/movies/${tmdbId}/rating`, { method: "DELETE" })
+        : await fetch(`/api/movies/${tmdbId}/rating`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ score: nextScore }),
+          });
 
     setSaving(false);
+
+    if (!res.ok) {
+      setScore(previousScore);
+      showToast("Couldn't save that rating — try again.", "error");
+      return;
+    }
+
+    showToast(nextScore === 0 ? "Rating removed" : `Rated ${nextScore} stars`);
     router.refresh();
   }
 

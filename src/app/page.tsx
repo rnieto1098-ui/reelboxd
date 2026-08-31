@@ -25,6 +25,7 @@ import { ListRow } from "@/components/ListRow";
 import { UpcomingReleasesRow } from "@/components/UpcomingReleasesRow";
 import { CuratedListsProgress } from "@/components/CuratedListsProgress";
 import { AvailabilityFilterLinks } from "@/components/AvailabilityFilterLinks";
+import { OnboardingChecklist, type ChecklistItem } from "@/components/OnboardingChecklist";
 
 const WELCOME_PHRASES = [
   "Here's what we think you'll love next.",
@@ -206,6 +207,29 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
     movies: applyPosterOverrides(row.movies, posterOverrides),
   }));
 
+  // Reuses data already fetched above for the page's own rows/filters —
+  // no extra queries just to know whether these are done.
+  const onboardingItems: ChecklistItem[] = [
+    {
+      key: "streaming",
+      label: "Add your streaming services (or mark a movie as owned)",
+      href: "/streaming",
+      done: canFilterByAvailability,
+    },
+    {
+      key: "rate",
+      label: "Rate a few movies you've seen",
+      href: "/search",
+      done: watchedIds.size >= 3,
+    },
+    {
+      key: "watchlist",
+      label: "Add something to your watchlist",
+      href: "/search",
+      done: watchlistTmdbIds.size >= 1,
+    },
+  ];
+
   const discoverEmptyMessage = !canFilterByAvailability ? (
     <>
       <Link href="/streaming" className="text-accent-green hover:underline">
@@ -236,6 +260,8 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
           canFilterByAvailability={canFilterByAvailability}
         />
       )}
+
+      {session?.user && <OnboardingChecklist items={onboardingItems} />}
 
       <MovieRow
         title="Popular right now"

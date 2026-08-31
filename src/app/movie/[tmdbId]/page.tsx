@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -25,6 +26,42 @@ import { AboutMovieModal } from "@/components/AboutMovieModal";
 import { AddToListButton } from "@/components/AddToListButton";
 import { ContentAdvisoryModal } from "@/components/ContentAdvisoryModal";
 import { MovieRow } from "@/components/MovieRow";
+
+// Next dedupes this against the identical getMovieDetails(tmdbId) call the
+// page component below makes — both run within the same request, so this
+// doesn't cost a second TMDB fetch.
+export async function generateMetadata({
+  params,
+}: PageProps<"/movie/[tmdbId]">): Promise<Metadata> {
+  const { tmdbId: tmdbIdParam } = await params;
+  const tmdbId = Number(tmdbIdParam);
+  if (!Number.isFinite(tmdbId)) return {};
+
+  const details = await getMovieDetails(tmdbId).catch(() => null);
+  if (!details) return {};
+
+  const year = details.release_date?.slice(0, 4);
+  const title = year ? `${details.title} (${year})` : details.title;
+  const description = details.overview || `${details.title} on reelboxd.`;
+  const poster = posterUrl(details.poster_path, "w500");
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      type: "video.movie",
+      images: poster ? [{ url: poster, width: 500, height: 750 }] : undefined,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: poster ? [poster] : undefined,
+    },
+  };
+}
 
 export default async function MovieDetailPage({
   params,

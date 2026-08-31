@@ -3,9 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarIcon } from "@/components/icons";
+import { useToast } from "@/components/Toast";
 
 export function LogWatchButton({ tmdbId, signedIn }: { tmdbId: number; signedIn: boolean }) {
   const router = useRouter();
+  const showToast = useToast();
   const [saving, setSaving] = useState(false);
 
   async function logToday() {
@@ -14,12 +16,18 @@ export function LogWatchButton({ tmdbId, signedIn }: { tmdbId: number; signedIn:
       return;
     }
     setSaving(true);
-    await fetch("/api/diary", {
+    const res = await fetch("/api/diary", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ tmdbId }),
     });
     setSaving(false);
+
+    if (!res.ok) {
+      showToast("Couldn't log that watch — try again.", "error");
+      return;
+    }
+    showToast("Logged as watched today");
     router.refresh();
   }
 

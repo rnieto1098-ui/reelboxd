@@ -15,7 +15,8 @@ export function WatchlistButton({
   const { active: inWatchlist, saving, toggle } = useToggleAction(
     initialInWatchlist,
     `/api/movies/${tmdbId}/watchlist`,
-    signedIn
+    signedIn,
+    ["Added to watchlist", "Removed from watchlist"]
   );
 
   return (

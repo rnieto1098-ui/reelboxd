@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { NavBar } from "@/components/NavBar";
 import { Footer } from "@/components/Footer";
+import { ToastProvider } from "@/components/Toast";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { SITE_URL } from "@/lib/siteUrl";
@@ -48,9 +49,11 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className="h-full antialiased">
       <body className="min-h-full flex flex-col" style={bodyStyle}>
-        <NavBar />
-        <main className="flex-1 mx-auto w-full max-w-[1600px] px-4 py-8">{children}</main>
-        <Footer />
+        <ToastProvider>
+          <NavBar />
+          <main className="flex-1 mx-auto w-full max-w-[1600px] px-4 py-8">{children}</main>
+          <Footer />
+        </ToastProvider>
       </body>
     </html>
   );

@@ -11,10 +11,23 @@
 // Requires the dev server running (npm run dev) at BASE_URL (defaults to
 // http://localhost:3000). Usage: npm run smoke-test
 
+import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
+import { PrismaLibSQL } from "@prisma/adapter-libsql";
 
 const BASE_URL = process.env.BASE_URL ?? "http://localhost:3000";
-const prisma = new PrismaClient();
+
+// A bare `new PrismaClient()` can't find the DB — this app connects via the
+// libsql driver adapter (see src/lib/prisma.ts), with DATABASE_URL read
+// directly from the environment rather than from schema.prisma's (unused,
+// placeholder) datasource url. Without both of those, every query here
+// fails with "Unable to open the database file", even against a perfectly
+// fine local dev.db.
+const adapter = new PrismaLibSQL({
+  url: process.env.DATABASE_URL,
+  authToken: process.env.TURSO_AUTH_TOKEN,
+});
+const prisma = new PrismaClient({ adapter });
 
 // Note: Next.js's default not-found page text ("This page could not be
 // found") is bundled into a shared client chunk present on every page in
@@ -116,6 +129,11 @@ async function checkRoutes() {
     "/recommend",
     "/import",
     "/settings",
+    "/login",
+    "/signup",
+    "/forgot-password",
+    "/robots.txt",
+    "/sitemap.xml",
     `/profile/${username}`,
     `/profile/${username}/diary`,
     `/profile/${username}/stats`,

@@ -6,6 +6,10 @@ import {
   type TmdbWatchProvider,
 } from "@/lib/tmdb";
 
+import { isAvailableOnServices } from "@/lib/streamingAvailability";
+
+export { hasStreamingAvailability, isAvailableOnServices } from "@/lib/streamingAvailability";
+
 // TMDB's watch-provider data (sourced from JustWatch) is region-specific.
 // Hardcoding US for now — see project notes for how to add a region picker.
 export const WATCH_REGION = "US";
@@ -80,24 +84,6 @@ export async function getWatchAvailability(tmdbId: number): Promise<TmdbWatchPro
   } catch {
     return {};
   }
-}
-
-// Owning a movie makes it watchable right now, same as a subscription
-// service does — used everywhere a page needs to know whether "on my
-// streaming services" filtering is meaningful to offer at all (someone with
-// no services but a few owned movies should still get it).
-export function hasStreamingAvailability(
-  userProviderIds: Set<number>,
-  ownedTmdbIds: Set<number>
-): boolean {
-  return userProviderIds.size > 0 || ownedTmdbIds.size > 0;
-}
-
-export function isAvailableOnServices(
-  providers: TmdbWatchProvider[],
-  userProviderIds: Set<number>
-): boolean {
-  return providers.some((p) => userProviderIds.has(p.provider_id));
 }
 
 const FILTER_CONCURRENCY = 6;

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { NavBar } from "@/components/NavBar";
+import { Footer } from "@/components/Footer";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { SITE_URL } from "@/lib/siteUrl";
@@ -49,6 +50,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col" style={bodyStyle}>
         <NavBar />
         <main className="flex-1 mx-auto w-full max-w-[1600px] px-4 py-8">{children}</main>
+        <Footer />
       </body>
     </html>
   );

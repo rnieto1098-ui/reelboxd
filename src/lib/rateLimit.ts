@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+export { getClientIp } from "@/lib/getClientIp";
 
 // How long a hit stays around before it's eligible for pruning — generous
 // headroom above any caller's actual window (currently at most 1 hour) so
@@ -23,11 +24,4 @@ export async function recordHit(key: string): Promise<void> {
     prisma.rateLimitHit.create({ data: { key } }),
     prisma.rateLimitHit.deleteMany({ where: { key, createdAt: { lt: staleBefore } } }),
   ]);
-}
-
-// Vercel (and most proxies) forward the real client IP via x-forwarded-for,
-// as a comma-separated list with the original client first.
-export function getClientIp(request: Request): string {
-  const forwarded = request.headers.get("x-forwarded-for");
-  return forwarded?.split(",")[0]?.trim() ?? "unknown";
 }

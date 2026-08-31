@@ -134,6 +134,37 @@ export function getPopularMovies(page = 1) {
   return tmdbFetch<TmdbListResponse>("/movie/popular", { page });
 }
 
+// Dedupes across pages (TMDB result lists can overlap slightly at the
+// boundary as rankings shift) while preserving original page order. TMDB's
+// API occasionally 500s on an individual page (seen in practice on deep
+// pages of some /discover/movie queries) — one flaky page shouldn't crash
+// a whole homepage row, so failed pages are silently dropped rather than
+// rejecting the whole batch.
+async function mergeSettledPages(
+  requests: Promise<TmdbListResponse>[]
+): Promise<TmdbMovieSummary[]> {
+  const settled = await Promise.allSettled(requests);
+  const seen = new Set<number>();
+  const merged: TmdbMovieSummary[] = [];
+  for (const outcome of settled) {
+    if (outcome.status !== "fulfilled") continue;
+    for (const movie of outcome.value.results) {
+      if (!seen.has(movie.id)) {
+        seen.add(movie.id);
+        merged.push(movie);
+      }
+    }
+  }
+  return merged;
+}
+
+// Fetches several pages in parallel and flattens them into one list — used
+// for homepage rows so there's enough raw pool left over after a client-side
+// filter (e.g. streaming availability) narrows it down.
+export async function getPopularMoviesMultiPage(pages: number): Promise<TmdbMovieSummary[]> {
+  return mergeSettledPages(Array.from({ length: pages }, (_, i) => getPopularMovies(i + 1)));
+}
+
 export function getTopRatedMovies(page = 1) {
   return tmdbFetch<TmdbListResponse>("/movie/top_rated", { page });
 }
@@ -155,8 +186,17 @@ export function getUpcomingMovies(page = 1) {
   });
 }
 
-export function getTrendingMovies(window: "day" | "week" = "week") {
-  return tmdbFetch<TmdbListResponse>(`/trending/movie/${window}`);
+export function getTrendingMovies(window: "day" | "week" = "week", page = 1) {
+  return tmdbFetch<TmdbListResponse>(`/trending/movie/${window}`, { page });
+}
+
+export async function getTrendingMoviesMultiPage(
+  window: "day" | "week",
+  pages: number
+): Promise<TmdbMovieSummary[]> {
+  return mergeSettledPages(
+    Array.from({ length: pages }, (_, i) => getTrendingMovies(window, i + 1))
+  );
 }
 
 export function searchMovies(query: string, page = 1, year?: number) {
@@ -239,6 +279,15 @@ export function discoverMovies(params: {
     certification_country: params.certificationCountry,
     "certification.lte": params.maxCertification,
   });
+}
+
+export async function discoverMoviesMultiPage(
+  params: Parameters<typeof discoverMovies>[0],
+  pages: number
+): Promise<TmdbMovieSummary[]> {
+  return mergeSettledPages(
+    Array.from({ length: pages }, (_, i) => discoverMovies({ ...params, page: i + 1 }))
+  );
 }
 
 export function getMovieImages(tmdbId: number) {

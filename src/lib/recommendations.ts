@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import {
   discoverMovies,
-  discoverMoviesByGenre,
+  discoverMoviesMultiPage,
   type TmdbGenre,
   type TmdbMovieSummary,
 } from "@/lib/tmdb";
@@ -17,6 +17,10 @@ const RESULT_COUNT = 12;
 const PEOPLE_RESULT_CAP = 6;
 const TOP_DIRECTOR_COUNT = 2;
 const TOP_CAST_COUNT = 3;
+// How many TMDB pages to pull per genre when building the candidate pool —
+// pulling more than we'll ever show means there's still plenty left after
+// the "Discover" row's streaming-availability filter narrows it down.
+const GENRE_PAGES_PER_QUERY = 3;
 
 // Sums liked-rating scores per TMDB person id from a movie field that's
 // either a single id (director) or a comma-separated list (top cast).
@@ -59,7 +63,8 @@ export async function getWatchedTmdbIds(userId: string | undefined): Promise<Set
 export async function getRecommendationsForUser(
   userId: string | undefined,
   watchedTmdbIds: Set<number>,
-  allGenres: TmdbGenre[]
+  allGenres: TmdbGenre[],
+  resultCount: number = RESULT_COUNT
 ): Promise<TmdbMovieSummary[]> {
   if (!userId) return [];
 
@@ -98,6 +103,10 @@ export async function getRecommendationsForUser(
 
   if (genreIds.length === 0 && topDirectorIds.length === 0 && topCastIds.length === 0) return [];
 
+  // Scale the people-vs-genre split with the requested result count, keeping
+  // the original ~1:1 ratio (6 of 12) between them.
+  const peopleResultCap = Math.round((resultCount * PEOPLE_RESULT_CAP) / RESULT_COUNT);
+
   const seen = new Set(watchedTmdbIds);
   const results: TmdbMovieSummary[] = [];
 
@@ -110,24 +119,24 @@ export async function getRecommendationsForUser(
     }
   }
 
-  // Director/cast overlap first, capped well below RESULT_COUNT so genre
+  // Director/cast overlap first, capped well below resultCount so genre
   // still gets a fair share of the row even for someone with strong,
   // consistent people-signal.
   for (const directorId of topDirectorIds) {
-    if (results.length >= PEOPLE_RESULT_CAP) break;
+    if (results.length >= peopleResultCap) break;
     const page = await discoverMovies({ crewId: directorId });
-    addFromPage(page.results, PEOPLE_RESULT_CAP);
+    addFromPage(page.results, peopleResultCap);
   }
   for (const castId of topCastIds) {
-    if (results.length >= PEOPLE_RESULT_CAP) break;
+    if (results.length >= peopleResultCap) break;
     const page = await discoverMovies({ castId });
-    addFromPage(page.results, PEOPLE_RESULT_CAP);
+    addFromPage(page.results, peopleResultCap);
   }
 
   for (const genreId of genreIds) {
-    if (results.length >= RESULT_COUNT) break;
-    const page = await discoverMoviesByGenre(genreId);
-    addFromPage(page.results, RESULT_COUNT);
+    if (results.length >= resultCount) break;
+    const movies = await discoverMoviesMultiPage({ genreIds: [genreId] }, GENRE_PAGES_PER_QUERY);
+    addFromPage(movies, resultCount);
   }
 
   return results;

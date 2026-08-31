@@ -2,10 +2,10 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import {
-  discoverMovies,
+  discoverMoviesMultiPage,
   getGenres,
-  getPopularMovies,
-  getTrendingMovies,
+  getPopularMoviesMultiPage,
+  getTrendingMoviesMultiPage,
   getUpcomingMovies,
   type TmdbMovieSummary,
 } from "@/lib/tmdb";
@@ -43,6 +43,16 @@ const GENRE_ROWS = [
   { title: "Crime", genreName: "Crime" },
 ];
 
+// TMDB pages are 20 movies each. These sizes are raw pool depth, fetched
+// before any streaming-availability filter runs — plain rows just get a
+// long scroll, but rows the user narrows to "their services" need a much
+// bigger pool up front so the filter has enough to keep, instead of
+// collapsing down to a handful of movies.
+const BASE_ROW_PAGES = 3; // ~60 movies unfiltered
+const STREAMING_ROW_PAGES = 8; // ~160 movies to filter down when narrowed
+const BASE_RECOMMEND_COUNT = 12;
+const STREAMING_RECOMMEND_COUNT = 36;
+
 export default async function HomePage({ searchParams }: PageProps<"/">) {
   const { streaming } = await searchParams;
   const streamingOnly = streaming === "1";
@@ -56,8 +66,6 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
   const welcomePhrase = WELCOME_PHRASES[Math.floor(Math.random() * WELCOME_PHRASES.length)];
 
   const [
-    popularRaw,
-    trendingRaw,
     comingSoonRaw,
     watchedIds,
     genreCatalog,
@@ -67,8 +75,6 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
     listCards,
     watchlistRows,
   ] = await Promise.all([
-      getPopularMovies(),
-      getTrendingMovies("week"),
       getUpcomingMovies(),
       getWatchedTmdbIds(userId),
       getGenres(),
@@ -96,6 +102,20 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
         : Promise.resolve([]),
     ]);
 
+  // Known before the paginated rows are fetched, so the pool sizes below can
+  // react to it — canFilterByAvailability governs the always-on "Discover"
+  // filter, applyStreamingFilter (below) governs the "Showing: My services"
+  // toggle on the plain rows.
+  const canFilterByAvailability = hasStreamingAvailability(userProviderIds, ownedTmdbIds);
+  const applyStreamingFilter = streamingOnly && canFilterByAvailability;
+  const rowPages = applyStreamingFilter ? STREAMING_ROW_PAGES : BASE_ROW_PAGES;
+  const recommendCount = canFilterByAvailability ? STREAMING_RECOMMEND_COUNT : BASE_RECOMMEND_COUNT;
+
+  const [popularRaw, trendingRaw] = await Promise.all([
+    getPopularMoviesMultiPage(rowPages),
+    getTrendingMoviesMultiPage("week", rowPages),
+  ]);
+
   // Stubbed into TmdbMovieSummary shape from the local cache snapshot —
   // MovieCard/MovieRow only ever read id/title/poster_path/release_date.
   const watchlistMoviesRaw: TmdbMovieSummary[] = watchlistRows.map((w) => ({
@@ -116,8 +136,6 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
     .sort((a, b) => a.release_date.localeCompare(b.release_date));
 
   const genreIdByName = new Map(genreCatalog.genres.map((g) => [g.name, g.id]));
-  const canFilterByAvailability = hasStreamingAvailability(userProviderIds, ownedTmdbIds);
-  const applyStreamingFilter = streamingOnly && canFilterByAvailability;
 
   async function narrow(movies: TmdbMovieSummary[]) {
     return applyStreamingFilter
@@ -129,30 +147,28 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
   // depends on it (only the `excludeFromPopular` filter does, after) — so it
   // runs alongside the rest instead of serializing in front of them.
   const [recommendedRaw, highestRatedRaw, ...genreRowsRaw] = await Promise.all([
-    getRecommendationsForUser(userId, watchedIds, genreCatalog.genres),
+    getRecommendationsForUser(userId, watchedIds, genreCatalog.genres, recommendCount),
     // A high vote-count floor is what actually gets you "universally agreed
     // masterpiece" territory (Shawshank, The Godfather, ...) — the default
     // floor of 100 lets small-but-devoted-fanbase obscurities with a handful
     // of 10/10s outrank real consensus classics.
-    discoverMovies({ sortBy: "vote_average.desc", minVoteCount: 10000 }),
+    discoverMoviesMultiPage({ sortBy: "vote_average.desc", minVoteCount: 10000 }, rowPages),
     ...GENRE_ROWS.map((row) => {
       const genreId = genreIdByName.get(row.genreName);
       return genreId
-        ? discoverMovies({ genreIds: [genreId] })
-        : Promise.resolve({ results: [] as TmdbMovieSummary[] });
+        ? discoverMoviesMultiPage({ genreIds: [genreId] }, rowPages)
+        : Promise.resolve([] as TmdbMovieSummary[]);
     }),
   ]);
 
   const excludeFromPopular = new Set([...watchedIds, ...recommendedRaw.map((m) => m.id)]);
-  const popularFilteredRaw = popularRaw.results.filter(
-    (movie) => !excludeFromPopular.has(movie.id)
-  );
+  const popularFilteredRaw = popularRaw.filter((movie) => !excludeFromPopular.has(movie.id));
 
-  const trendingFiltered = trendingRaw.results.filter((m) => !watchedIds.has(m.id));
-  const highestRatedFiltered = highestRatedRaw.results.filter((m) => !watchedIds.has(m.id));
+  const trendingFiltered = trendingRaw.filter((m) => !watchedIds.has(m.id));
+  const highestRatedFiltered = highestRatedRaw.filter((m) => !watchedIds.has(m.id));
   const genreRowsFiltered = GENRE_ROWS.map((row, i) => ({
     title: row.title,
-    movies: genreRowsRaw[i].results.filter((m) => !watchedIds.has(m.id)),
+    movies: genreRowsRaw[i].filter((m) => !watchedIds.has(m.id)),
   }));
 
   const [

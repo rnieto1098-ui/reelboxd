@@ -1,6 +1,9 @@
 import Image from "next/image";
 import { notFound } from "next/navigation";
+import { auth } from "@/auth";
 import { discoverMoviesByCompany, getCompanyDetails, logoUrl } from "@/lib/tmdb";
+import { getUserWatchlistedTmdbIds } from "@/lib/movies";
+import { getUserOwnedTmdbIds } from "@/lib/streaming";
 import { MovieCard } from "@/components/MovieCard";
 
 export default async function StudioPage({
@@ -10,9 +13,14 @@ export default async function StudioPage({
   const companyId = Number(companyIdParam);
   if (!Number.isFinite(companyId)) notFound();
 
-  const [details, movies] = await Promise.all([
+  const session = await auth();
+  const userId = session?.user?.id;
+
+  const [details, movies, ownedIds, watchlistIds] = await Promise.all([
     getCompanyDetails(companyId).catch(() => null),
     discoverMoviesByCompany(companyId).catch(() => ({ results: [] })),
+    getUserOwnedTmdbIds(userId),
+    getUserWatchlistedTmdbIds(userId),
   ]);
 
   if (!details) notFound();
@@ -64,6 +72,8 @@ export default async function StudioPage({
               title={movie.title}
               posterPath={movie.poster_path}
               year={movie.release_date?.slice(0, 4)}
+              owned={ownedIds.has(movie.id)}
+              inWatchlist={watchlistIds.has(movie.id)}
             />
           ))}
         </div>

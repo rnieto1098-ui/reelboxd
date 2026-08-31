@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -17,19 +17,43 @@ function CheckIcon() {
   );
 }
 
-const quickActionButtonClass =
-  "pointer-events-auto flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-white backdrop-blur-sm transition-colors hover:bg-accent-green hover:text-black disabled:opacity-50";
+function actionButtonClass(active: boolean) {
+  const base =
+    "pointer-events-auto flex h-7 w-7 items-center justify-center rounded-full backdrop-blur-sm transition-colors disabled:opacity-50";
+  // Active (owned/watchlisted) stays highlighted at rest, not just on
+  // hover — that's the whole point of showing it's already engaged.
+  return active
+    ? `${base} bg-accent-green text-black hover:bg-accent-green/90`
+    : `${base} bg-black/70 text-white hover:bg-accent-green hover:text-black`;
+}
 
-export function PosterQuickActions({ tmdbId }: { tmdbId: number }) {
+export function PosterQuickActions({
+  tmdbId,
+  initialOwned = false,
+  initialInWatchlist = false,
+}: {
+  tmdbId: number;
+  initialOwned?: boolean;
+  initialInWatchlist?: boolean;
+}) {
   const router = useRouter();
   const [diaryState, setDiaryState] = useState<ActionState>("idle");
-  const [watchlistState, setWatchlistState] = useState<ActionState>("idle");
-  const [ownedState, setOwnedState] = useState<ActionState>("idle");
+  const [owned, setOwned] = useState(initialOwned);
+  const [ownedSaving, setOwnedSaving] = useState(false);
+  const [inWatchlist, setInWatchlist] = useState(initialInWatchlist);
+  const [watchlistSaving, setWatchlistSaving] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [posters, setPosters] = useState<TmdbImage[] | null>(null);
   const [loadingPosters, setLoadingPosters] = useState(false);
   const [savingPoster, setSavingPoster] = useState(false);
   const [posterError, setPosterError] = useState<string | null>(null);
+
+  // initialOwned/initialInWatchlist can change out from under this component
+  // after a router.refresh() triggered elsewhere on the page (e.g. the same
+  // movie's card appears in two rows) — useState's initial value only
+  // applies on mount, so this re-syncs when the server-provided prop changes.
+  useEffect(() => setOwned(initialOwned), [initialOwned]);
+  useEffect(() => setInWatchlist(initialInWatchlist), [initialInWatchlist]);
 
   async function runAction(
     e: React.MouseEvent,
@@ -54,6 +78,39 @@ export function PosterQuickActions({ tmdbId }: { tmdbId: number }) {
     setState("done");
     router.refresh();
     setTimeout(() => setState("idle"), 1500);
+  }
+
+  // Owned/watchlist are real toggles (unlike Log watch, which just logs a
+  // new event each click) — clicking again removes it, same as the buttons
+  // on the movie page itself.
+  async function toggleOwned(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setOwnedSaving(true);
+    const res = await fetch(`/api/movies/${tmdbId}/owned`, { method: owned ? "DELETE" : "POST" });
+    setOwnedSaving(false);
+    if (res.status === 401) {
+      router.push("/login");
+      return;
+    }
+    setOwned((v) => !v);
+    router.refresh();
+  }
+
+  async function toggleWatchlist(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setWatchlistSaving(true);
+    const res = await fetch(`/api/movies/${tmdbId}/watchlist`, {
+      method: inWatchlist ? "DELETE" : "POST",
+    });
+    setWatchlistSaving(false);
+    if (res.status === 401) {
+      router.push("/login");
+      return;
+    }
+    setInWatchlist((v) => !v);
+    router.refresh();
   }
 
   function openPosterPicker(e: React.MouseEvent) {
@@ -94,19 +151,20 @@ export function PosterQuickActions({ tmdbId }: { tmdbId: number }) {
           title="Change poster"
           aria-label="Change poster"
           onClick={openPosterPicker}
-          className={quickActionButtonClass}
+          className={actionButtonClass(false)}
         >
           <ImageIcon />
         </button>
         <button
           type="button"
-          title="Mark as owned"
+          title={owned ? "Owned — click to remove" : "Mark as owned"}
           aria-label="Mark as owned"
-          disabled={ownedState === "saving"}
-          onClick={(e) => runAction(e, setOwnedState, `/api/movies/${tmdbId}/owned`)}
-          className={quickActionButtonClass}
+          aria-pressed={owned}
+          disabled={ownedSaving}
+          onClick={toggleOwned}
+          className={actionButtonClass(owned)}
         >
-          {ownedState === "done" ? <CheckIcon /> : <DiscIcon />}
+          <DiscIcon />
         </button>
       </div>
 
@@ -117,19 +175,20 @@ export function PosterQuickActions({ tmdbId }: { tmdbId: number }) {
           aria-label="Log watch"
           disabled={diaryState === "saving"}
           onClick={(e) => runAction(e, setDiaryState, "/api/diary", { tmdbId })}
-          className={quickActionButtonClass}
+          className={actionButtonClass(false)}
         >
           {diaryState === "done" ? <CheckIcon /> : <CalendarIcon />}
         </button>
         <button
           type="button"
-          title="Add to watchlist"
+          title={inWatchlist ? "On watchlist — click to remove" : "Add to watchlist"}
           aria-label="Add to watchlist"
-          disabled={watchlistState === "saving"}
-          onClick={(e) => runAction(e, setWatchlistState, `/api/movies/${tmdbId}/watchlist`)}
-          className={quickActionButtonClass}
+          aria-pressed={inWatchlist}
+          disabled={watchlistSaving}
+          onClick={toggleWatchlist}
+          className={actionButtonClass(inWatchlist)}
         >
-          {watchlistState === "done" ? <CheckIcon /> : <BookmarkIcon />}
+          <BookmarkIcon />
         </button>
       </div>
 

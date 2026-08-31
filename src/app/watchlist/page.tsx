@@ -11,6 +11,7 @@ import {
 import type { TmdbWatchProvider } from "@/lib/tmdb";
 import { MovieCard } from "@/components/MovieCard";
 import { ProviderLogos } from "@/components/ProviderLogos";
+import type { Prisma } from "@prisma/client";
 
 const TABS = {
   available: { label: "Streaming on your services" },
@@ -19,12 +20,46 @@ const TABS = {
 
 type TabKey = keyof typeof TABS;
 
+const SORT_OPTIONS = {
+  added: { label: "Date Added", orderBy: (dir: Prisma.SortOrder) => ({ addedAt: dir }) },
+  release: {
+    label: "Release Date",
+    orderBy: (dir: Prisma.SortOrder) => ({ movie: { releaseDate: dir } }),
+  },
+  popularity: {
+    label: "Popularity",
+    orderBy: (dir: Prisma.SortOrder) => ({ movie: { popularity: dir } }),
+  },
+  runtime: { label: "Runtime", orderBy: (dir: Prisma.SortOrder) => ({ movie: { runtime: dir } }) },
+  rating: {
+    label: "TMDB Rating",
+    orderBy: (dir: Prisma.SortOrder) => ({ movie: { voteAverage: dir } }),
+  },
+} satisfies Record<
+  string,
+  { label: string; orderBy: (dir: Prisma.SortOrder) => Prisma.WatchlistItemOrderByWithRelationInput }
+>;
+
+type SortKey = keyof typeof SORT_OPTIONS;
+type SortDir = "asc" | "desc";
+
+function buildHref(sortKey: SortKey, dir: SortDir, tab: TabKey) {
+  const params = new URLSearchParams();
+  if (sortKey !== "added") params.set("sort", sortKey);
+  if (dir !== "desc") params.set("dir", dir);
+  if (tab !== "available") params.set("tab", tab);
+  const qs = params.toString();
+  return `/watchlist${qs ? `?${qs}` : ""}`;
+}
+
 export default async function WatchlistPage({ searchParams }: PageProps<"/watchlist">) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
-  const { tab } = await searchParams;
+  const { tab, sort, dir } = await searchParams;
   const activeTab: TabKey = tab === "unavailable" ? "unavailable" : "available";
+  const sortKey: SortKey = typeof sort === "string" && sort in SORT_OPTIONS ? (sort as SortKey) : "added";
+  const sortDir: SortDir = dir === "asc" ? "asc" : "desc";
 
   const [items, userProviderIds, ownedTmdbIds] = await Promise.all([
     prisma.watchlistItem.findMany({
@@ -34,7 +69,7 @@ export default async function WatchlistPage({ searchParams }: PageProps<"/watchl
           include: { customPosters: { where: { userId: session.user.id } } },
         },
       },
-      orderBy: { addedAt: "desc" },
+      orderBy: SORT_OPTIONS[sortKey].orderBy(sortDir),
     }),
     getUserProviderIds(session.user.id),
     getUserOwnedTmdbIds(session.user.id),
@@ -72,6 +107,30 @@ export default async function WatchlistPage({ searchParams }: PageProps<"/watchl
         </Link>
       </div>
 
+      {items.length > 1 && (
+        <div className="mb-6 flex flex-wrap items-center gap-1 text-xs">
+          <span className="mr-1 text-muted">Sort:</span>
+          {(Object.keys(SORT_OPTIONS) as SortKey[]).map((key) => {
+            const isActive = sortKey === key;
+            // Clicking the already-active sort flips its direction;
+            // clicking a different one starts it at the default direction.
+            const nextDir: SortDir = isActive ? (sortDir === "desc" ? "asc" : "desc") : "desc";
+            return (
+              <Link
+                key={key}
+                href={buildHref(key, nextDir, activeTab)}
+                className={`rounded-full px-2.5 py-1 transition-colors ${
+                  isActive ? "bg-accent-green text-black" : "text-muted hover:text-foreground"
+                }`}
+              >
+                {SORT_OPTIONS[key].label}
+                {isActive && <span className="ml-1">{sortDir === "asc" ? "↑" : "↓"}</span>}
+              </Link>
+            );
+          })}
+        </div>
+      )}
+
       {items.length === 0 ? (
         <p className="text-muted">
           Nothing here yet. Find a movie and click &ldquo;+ Watchlist&rdquo; to add it.
@@ -96,7 +155,7 @@ export default async function WatchlistPage({ searchParams }: PageProps<"/watchl
                 return (
                   <Link
                     key={key}
-                    href={key === "available" ? "/watchlist" : "/watchlist?tab=unavailable"}
+                    href={buildHref(sortKey, sortDir, key)}
                     className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
                       activeTab === key
                         ? "bg-accent-green text-black"
@@ -156,6 +215,8 @@ function WatchlistGrid({
             title={item.movie.title}
             posterPath={item.movie.customPosters[0]?.posterPath ?? item.movie.posterPath}
             year={item.movie.releaseDate?.slice(0, 4)}
+            owned={owned}
+            inWatchlist
           />
           {owned ? (
             <span className="mt-1 inline-block rounded-full border border-accent-green px-2 py-0.5 text-xs text-accent-green">

@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getCustomPosterMap } from "@/lib/customPosters";
+import { getUserWatchlistedTmdbIds } from "@/lib/movies";
+import { getUserOwnedTmdbIds } from "@/lib/streaming";
 import { MovieCard } from "@/components/MovieCard";
 import { ProfileImageUpload } from "@/components/ProfileImageUpload";
 import { HorizontalScroller } from "@/components/HorizontalScroller";
@@ -71,9 +73,15 @@ export default async function ProfilePage({
 
   // Use the viewer's own poster choices, not the profile owner's — a custom
   // poster is a personal preference that follows you wherever a film shows up.
-  const posterOverrides = await getCustomPosterMap(session?.user?.id, [
-    ...user.ratings.map((r) => r.movie.tmdbId),
-    ...user.owned.map((o) => o.movie.tmdbId),
+  // Same reasoning for owned/watchlist highlighting below: it reflects
+  // whoever is looking, not necessarily this profile's owner.
+  const [posterOverrides, viewerOwnedIds, viewerWatchlistIds] = await Promise.all([
+    getCustomPosterMap(session?.user?.id, [
+      ...user.ratings.map((r) => r.movie.tmdbId),
+      ...user.owned.map((o) => o.movie.tmdbId),
+    ]),
+    getUserOwnedTmdbIds(session?.user?.id),
+    getUserWatchlistedTmdbIds(session?.user?.id),
   ]);
 
   return (
@@ -200,6 +208,8 @@ export default async function ProfilePage({
               title={r.movie.title}
               posterPath={posterOverrides.get(r.movie.tmdbId) ?? r.movie.posterPath}
               year={r.movie.releaseDate?.slice(0, 4)}
+              owned={viewerOwnedIds.has(r.movie.tmdbId)}
+              inWatchlist={viewerWatchlistIds.has(r.movie.tmdbId)}
             />
             <p className="mt-1 text-xs text-accent-green">{r.score.toFixed(1)} ★</p>
           </div>
@@ -219,6 +229,8 @@ export default async function ProfilePage({
                 title={o.movie.title}
                 posterPath={posterOverrides.get(o.movie.tmdbId) ?? o.movie.posterPath}
                 year={o.movie.releaseDate?.slice(0, 4)}
+                owned={viewerOwnedIds.has(o.movie.tmdbId)}
+                inWatchlist={viewerWatchlistIds.has(o.movie.tmdbId)}
               />
             </div>
           ))}

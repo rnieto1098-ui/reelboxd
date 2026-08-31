@@ -3,6 +3,8 @@ import { z } from "zod";
 import { auth } from "@/auth";
 import { getPromptRecommendations } from "@/lib/promptRecommender";
 import { applyPosterOverrides, getCustomPosterMap } from "@/lib/customPosters";
+import { getUserWatchlistedTmdbIds } from "@/lib/movies";
+import { getUserOwnedTmdbIds } from "@/lib/streaming";
 
 const promptSchema = z
   .object({
@@ -11,7 +13,9 @@ const promptSchema = z
     maxRuntimeMinutes: z.number().int().positive().max(600).nullable().optional(),
     onlyWatchlist: z.boolean().default(false),
     onlyStreaming: z.boolean().default(false),
-    allowR: z.boolean().default(false),
+    // R is allowed by default — the UI's "PG-13 and below" toggle sends
+    // allowR: false to opt INTO the stricter cap.
+    allowR: z.boolean().default(true),
     excludeIds: z.array(z.number().int().positive()).max(100).default([]),
   })
   .refine(
@@ -21,7 +25,9 @@ const promptSchema = z
       data.maxRuntimeMinutes != null ||
       data.onlyWatchlist ||
       data.onlyStreaming ||
-      data.allowR,
+      // allowR === true is the default (no filter picked) — only an
+      // active restriction to PG-13 counts as a selection.
+      !data.allowR,
     { message: "Tell us a bit more about what you're in the mood for, or pick a filter." }
   );
 
@@ -49,13 +55,16 @@ export async function POST(request: Request) {
     excludeIds: parsed.data.excludeIds,
   });
 
-  const posterOverrides = await getCustomPosterMap(
-    session.user.id,
-    recommendation.results.map((m) => m.id)
-  );
+  const [posterOverrides, ownedIds, watchlistIds] = await Promise.all([
+    getCustomPosterMap(session.user.id, recommendation.results.map((m) => m.id)),
+    getUserOwnedTmdbIds(session.user.id),
+    getUserWatchlistedTmdbIds(session.user.id),
+  ]);
 
   return NextResponse.json({
     ...recommendation,
     results: applyPosterOverrides(recommendation.results, posterOverrides),
+    ownedIds: [...ownedIds],
+    watchlistIds: [...watchlistIds],
   });
 }

@@ -8,11 +8,15 @@ export function MovieCard({
   title,
   posterPath,
   year,
+  owned,
+  inWatchlist,
 }: {
   tmdbId: number;
   title: string;
   posterPath: string | null;
   year?: string;
+  owned?: boolean;
+  inWatchlist?: boolean;
 }) {
   const src = posterUrl(posterPath);
 
@@ -40,7 +44,7 @@ export function MovieCard({
             </div>
           )}
         </Link>
-        <PosterQuickActions tmdbId={tmdbId} />
+        <PosterQuickActions tmdbId={tmdbId} initialOwned={owned} initialInWatchlist={inWatchlist} />
       </div>
       <Link
         href={href}

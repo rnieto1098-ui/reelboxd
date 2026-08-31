@@ -7,10 +7,14 @@ export function MovieRow({
   title,
   movies,
   emptyMessage,
+  ownedIds,
+  watchlistIds,
 }: {
   title: string;
   movies: TmdbMovieSummary[];
   emptyMessage?: ReactNode;
+  ownedIds?: Set<number>;
+  watchlistIds?: Set<number>;
 }) {
   return (
     <HorizontalScroller title={title} isEmpty={movies.length === 0} emptyMessage={emptyMessage}>
@@ -21,6 +25,8 @@ export function MovieRow({
             title={movie.title}
             posterPath={movie.poster_path}
             year={movie.release_date?.slice(0, 4)}
+            owned={ownedIds?.has(movie.id)}
+            inWatchlist={watchlistIds?.has(movie.id)}
           />
         </div>
       ))}

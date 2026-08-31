@@ -1,6 +1,21 @@
 import { prisma } from "@/lib/prisma";
 import { getMovieDetails } from "@/lib/tmdb";
 
+// Every movie card's hover overlay needs to know, for the signed-in viewer,
+// which posters are already owned/watchlisted so it can render those icons
+// highlighted instead of always starting "off". These two are the shared
+// per-page lookup — call once per page load, not per card.
+export async function getUserWatchlistedTmdbIds(userId: string | undefined): Promise<Set<number>> {
+  if (!userId) return new Set();
+
+  const items = await prisma.watchlistItem.findMany({
+    where: { userId },
+    select: { movie: { select: { tmdbId: true } } },
+  });
+
+  return new Set(items.map((i) => i.movie.tmdbId));
+}
+
 // Movie.genres is cached as a comma-separated string (see the `create` call
 // below); this reverses that back into a clean array wherever it's read.
 export function parseGenres(genres: string | null): string[] {

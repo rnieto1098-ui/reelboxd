@@ -10,6 +10,8 @@ type ApiResponse = {
   similarToMovie: { id: number; title: string } | null;
   results: TmdbMovieSummary[];
   relaxed: boolean;
+  ownedIds: number[];
+  watchlistIds: number[];
 };
 
 const PLACEHOLDER =
@@ -69,7 +71,9 @@ export function RecommendForm() {
   const [selectedRuntimes, setSelectedRuntimes] = useState<Set<number>>(new Set());
   const [onlyWatchlist, setOnlyWatchlist] = useState(false);
   const [onlyStreaming, setOnlyStreaming] = useState(false);
-  const [allowR, setAllowR] = useState(false);
+  // R-rated movies are allowed by default; checking this opts INTO the
+  // stricter PG-13 cap instead.
+  const [restrictToPG13, setRestrictToPG13] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<ApiResponse | null>(null);
@@ -86,7 +90,7 @@ export function RecommendForm() {
     selectedRuntimes.size > 0 ||
     onlyWatchlist ||
     onlyStreaming ||
-    allowR;
+    restrictToPG13;
 
   function toggleGenre(genre: string) {
     setSelectedGenres((prev) => {
@@ -127,7 +131,7 @@ export function RecommendForm() {
       maxRuntimeMinutes,
       onlyWatchlist,
       onlyStreaming,
-      allowR,
+      restrictToPG13,
     });
     const isRepeat = criteria === lastCriteriaRef.current;
     const excludeIds = isRepeat ? shownIdsRef.current : [];
@@ -141,7 +145,7 @@ export function RecommendForm() {
         maxRuntimeMinutes,
         onlyWatchlist,
         onlyStreaming,
-        allowR,
+        allowR: !restrictToPG13,
         excludeIds,
       }),
     });
@@ -213,10 +217,16 @@ export function RecommendForm() {
         <div>
           <p className="mb-2 text-xs text-muted">Content Rating</p>
           <div className="flex flex-wrap gap-2">
-            <Chip label="R and below" selected={allowR} onClick={() => setAllowR((v) => !v)} />
+            <Chip
+              label="PG-13 and below"
+              selected={restrictToPG13}
+              onClick={() => setRestrictToPG13((v) => !v)}
+            />
           </div>
           <p className="mt-1 text-xs text-muted">
-            {allowR ? "Includes R-rated movies." : "PG-13 and below — leave unchecked to keep it there."}
+            {restrictToPG13
+              ? "PG-13 and below only."
+              : "Includes R-rated movies — check to keep it to PG-13 and below."}
           </p>
         </div>
 
@@ -255,6 +265,8 @@ export function RecommendForm() {
                   title={movie.title}
                   posterPath={movie.poster_path}
                   year={movie.release_date?.slice(0, 4)}
+                  owned={data.ownedIds.includes(movie.id)}
+                  inWatchlist={data.watchlistIds.includes(movie.id)}
                 />
               ))}
             </div>

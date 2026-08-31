@@ -2,6 +2,8 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { searchMovies } from "@/lib/tmdb";
 import { applyPosterOverrides, getCustomPosterMap } from "@/lib/customPosters";
+import { getUserWatchlistedTmdbIds } from "@/lib/movies";
+import { getUserOwnedTmdbIds } from "@/lib/streaming";
 import { MovieCard } from "@/components/MovieCard";
 
 // TMDB never returns more than 500 pages for any query, regardless of total_results.
@@ -20,10 +22,11 @@ export default async function SearchPage({
     auth(),
   ]);
 
-  const posterOverrides = await getCustomPosterMap(
-    session?.user?.id,
-    results?.results.map((m) => m.id) ?? []
-  );
+  const [posterOverrides, ownedIds, watchlistIds] = await Promise.all([
+    getCustomPosterMap(session?.user?.id, results?.results.map((m) => m.id) ?? []),
+    getUserOwnedTmdbIds(session?.user?.id),
+    getUserWatchlistedTmdbIds(session?.user?.id),
+  ]);
   const movies = applyPosterOverrides(results?.results ?? [], posterOverrides);
   const totalPages = results ? Math.min(results.total_pages, MAX_PAGE) : 0;
 
@@ -49,6 +52,8 @@ export default async function SearchPage({
             title={movie.title}
             posterPath={movie.poster_path}
             year={movie.release_date?.slice(0, 4)}
+            owned={ownedIds.has(movie.id)}
+            inWatchlist={watchlistIds.has(movie.id)}
           />
         ))}
       </div>

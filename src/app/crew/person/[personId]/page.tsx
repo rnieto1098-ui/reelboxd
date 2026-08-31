@@ -9,6 +9,8 @@ import {
   type TmdbCastCredit,
   type TmdbCrewCredit,
 } from "@/lib/tmdb";
+import { getUserWatchlistedTmdbIds } from "@/lib/movies";
+import { getUserOwnedTmdbIds } from "@/lib/streaming";
 import { MovieCard } from "@/components/MovieCard";
 import { FadeWatchedControl } from "@/components/FadeWatchedControl";
 
@@ -69,15 +71,18 @@ export default async function PersonPage({
   const session = await auth();
   const userId = session?.user?.id;
 
-  const ratingMap =
+  const [ratingMap, ownedIds, watchlistIds] = await Promise.all([
     userId && allCreditIds.size > 0
-      ? await prisma.rating
+      ? prisma.rating
           .findMany({
             where: { userId, movie: { tmdbId: { in: [...allCreditIds] } } },
             select: { score: true, movie: { select: { tmdbId: true } } },
           })
           .then((rows) => new Map(rows.map((r) => [r.movie.tmdbId, r.score])))
-      : new Map<number, number>();
+      : Promise.resolve(new Map<number, number>()),
+    getUserOwnedTmdbIds(userId),
+    getUserWatchlistedTmdbIds(userId),
+  ]);
 
   const watchedPercent =
     userId && allCreditIds.size > 0
@@ -112,6 +117,8 @@ export default async function PersonPage({
           title={section.key}
           credits={section.credits}
           ratingMap={ratingMap}
+          ownedIds={ownedIds}
+          watchlistIds={watchlistIds}
         />
       ))}
     </div>
@@ -187,10 +194,14 @@ function CreditSection({
   title,
   credits,
   ratingMap,
+  ownedIds,
+  watchlistIds,
 }: {
   title: string;
   credits: (TmdbCastCredit | TmdbCrewCredit)[];
   ratingMap: Map<number, number>;
+  ownedIds: Set<number>;
+  watchlistIds: Set<number>;
 }) {
   const shown = credits.slice(0, MAX_PER_SECTION);
 
@@ -207,6 +218,8 @@ function CreditSection({
               title={credit.title}
               posterPath={credit.poster_path}
               year={credit.release_date?.slice(0, 4)}
+              owned={ownedIds.has(credit.id)}
+              inWatchlist={watchlistIds.has(credit.id)}
             />
           </div>
         ))}

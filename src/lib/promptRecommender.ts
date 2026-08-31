@@ -41,7 +41,7 @@ export type ParsedPrompt = {
   similarToQuery: string | null;
   onlyWatchlist: boolean;
   onlyStreaming: boolean;
-  // US MPAA cap: false = PG-13 or below (the default), true = R or below.
+  // US MPAA cap: true = R or below (the default), false = PG-13 or below.
   allowR: boolean;
 };
 
@@ -137,7 +137,9 @@ export async function parsePrompt(prompt: string, presets?: PromptPresets): Prom
     similarToQuery,
     onlyWatchlist: presets?.onlyWatchlist ?? false,
     onlyStreaming: presets?.onlyStreaming ?? false,
-    allowR: presets?.allowR ?? false,
+    // R is allowed by default — the UI's "PG-13 and below" toggle opts INTO
+    // the stricter cap, rather than opting into R.
+    allowR: presets?.allowR ?? true,
   };
 }
 
@@ -194,7 +196,7 @@ export async function getPromptRecommendations(
   // fallback stages, since it's a content-appropriateness choice rather
   // than a "loosen this if results are scarce" preference like genre/
   // runtime/rating.
-  const maxCertification = (presets?.allowR ?? false) ? "R" : "PG-13";
+  const maxCertification = (presets?.allowR ?? true) ? "R" : "PG-13";
 
   const [parsed, watchedIds, genreCatalog, watchlistCandidates, userProviderIds, ownedTmdbIds] =
     await Promise.all([

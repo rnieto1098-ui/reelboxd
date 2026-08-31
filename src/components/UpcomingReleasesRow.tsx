@@ -5,9 +5,11 @@ import type { TmdbMovieSummary } from "@/lib/tmdb";
 export function UpcomingReleasesRow({
   movies,
   title = "Upcoming Releases",
+  ownedIds,
 }: {
   movies: TmdbMovieSummary[];
   title?: string;
+  ownedIds?: Set<number>;
 }) {
   return (
     <HorizontalScroller title={title} isEmpty={movies.length === 0}>
@@ -22,6 +24,8 @@ export function UpcomingReleasesRow({
               day: "numeric",
               year: "numeric",
             })}
+            owned={ownedIds?.has(movie.id)}
+            inWatchlist
           />
         </div>
       ))}

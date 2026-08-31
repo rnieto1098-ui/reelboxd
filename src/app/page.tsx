@@ -11,6 +11,7 @@ import {
 } from "@/lib/tmdb";
 import { getRecommendationsForUser, getWatchedTmdbIds } from "@/lib/recommendations";
 import { applyPosterOverrides, getCustomPosterMap } from "@/lib/customPosters";
+import { getUserWatchlistedTmdbIds } from "@/lib/movies";
 import {
   filterMoviesByStreaming,
   filterRentBuyOnly,
@@ -55,6 +56,7 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
     genreCatalog,
     userProviderIds,
     ownedTmdbIds,
+    watchlistTmdbIds,
     listCards,
     watchlistRows,
   ] = await Promise.all([
@@ -65,6 +67,7 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
       getGenres(),
       getUserProviderIds(userId),
       getUserOwnedTmdbIds(userId),
+      getUserWatchlistedTmdbIds(userId),
       getHomepageListCards(userId),
       userId
         ? prisma.watchlistItem.findMany({
@@ -255,18 +258,30 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
         </div>
       )}
 
-      <MovieRow title="Popular right now" movies={popularWithPosters} />
-      <MovieRow title="Trending this week" movies={trendingWithPosters} />
+      <MovieRow
+        title="Popular right now"
+        movies={popularWithPosters}
+        ownedIds={ownedTmdbIds}
+        watchlistIds={watchlistTmdbIds}
+      />
+      <MovieRow
+        title="Trending this week"
+        movies={trendingWithPosters}
+        ownedIds={ownedTmdbIds}
+        watchlistIds={watchlistTmdbIds}
+      />
       <ListRow title="Lists" lists={listCards} />
       {session?.user && (
         <MovieRow
           title="For You"
           movies={recommendedWithPosters}
           emptyMessage="Rate a few movies you liked and we'll start recommending things you haven't seen."
+          ownedIds={ownedTmdbIds}
+          watchlistIds={watchlistTmdbIds}
         />
       )}
       {comingSoonWithPosters.length > 0 && (
-        <UpcomingReleasesRow title="Coming Soon" movies={comingSoonWithPosters} />
+        <UpcomingReleasesRow title="Coming Soon" movies={comingSoonWithPosters} ownedIds={ownedTmdbIds} />
       )}
       {session?.user && listsProgress.length > 0 && (
         <CuratedListsProgress lists={listsProgress} />
@@ -276,6 +291,8 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
           title="Discover"
           movies={discoverWithPosters}
           emptyMessage={discoverEmptyMessage}
+          ownedIds={ownedTmdbIds}
+          watchlistIds={watchlistTmdbIds}
         />
       )}
       {session?.user && watchlistMoviesRaw.length > 0 && (
@@ -283,14 +300,27 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
           title="Rent or Buy"
           movies={rentBuyWithPosters}
           emptyMessage="Nothing on your watchlist currently needs to be rented or bought."
+          ownedIds={ownedTmdbIds}
+          watchlistIds={watchlistTmdbIds}
         />
       )}
       {session?.user && upcomingReleasesWithPosters.length > 0 && (
-        <UpcomingReleasesRow movies={upcomingReleasesWithPosters} />
+        <UpcomingReleasesRow movies={upcomingReleasesWithPosters} ownedIds={ownedTmdbIds} />
       )}
-      <MovieRow title="Highest Rated" movies={highestRatedWithPosters} />
+      <MovieRow
+        title="Highest Rated"
+        movies={highestRatedWithPosters}
+        ownedIds={ownedTmdbIds}
+        watchlistIds={watchlistTmdbIds}
+      />
       {genreRowsWithPosters.map((row) => (
-        <MovieRow key={row.title} title={row.title} movies={row.movies} />
+        <MovieRow
+          key={row.title}
+          title={row.title}
+          movies={row.movies}
+          ownedIds={ownedTmdbIds}
+          watchlistIds={watchlistTmdbIds}
+        />
       ))}
     </div>
   );

@@ -7,6 +7,7 @@ import { posterUrl } from "@/lib/tmdb";
 import { getCustomPosterMap } from "@/lib/customPosters";
 import { getPersonalListCover } from "@/lib/listCovers";
 import { filterMoviesByStreaming, getUserOwnedTmdbIds, getUserProviderIds } from "@/lib/streaming";
+import { getUserWatchlistedTmdbIds } from "@/lib/movies";
 import { MovieCard } from "@/components/MovieCard";
 import { RemoveFromListButton } from "@/components/RemoveFromListButton";
 import { DeleteListButton } from "@/components/DeleteListButton";
@@ -98,7 +99,7 @@ export default async function ListDetailPage({
 
   const isOwner = !!userId && list.ownerId === userId;
 
-  const [ratingMap, userProviderIds, ownedTmdbIds, personalCover] = await Promise.all([
+  const [ratingMap, userProviderIds, ownedTmdbIds, watchlistTmdbIds, personalCover] = await Promise.all([
     userId && list.items.length > 0
       ? prisma.rating
           .findMany({
@@ -109,6 +110,7 @@ export default async function ListDetailPage({
       : Promise.resolve(new Map<number, number>()),
     getUserProviderIds(userId),
     getUserOwnedTmdbIds(userId),
+    getUserWatchlistedTmdbIds(userId),
     getPersonalListCover(userId, listId),
   ]);
 
@@ -151,6 +153,8 @@ export default async function ListDetailPage({
             title={item.title}
             posterPath={posterOverrides.get(item.tmdbId) ?? item.posterPath}
             year={item.releaseDate?.slice(0, 4)}
+            owned={ownedTmdbIds.has(item.tmdbId)}
+            inWatchlist={watchlistTmdbIds.has(item.tmdbId)}
           />
           {isOwner && <RemoveFromListButton listId={list.id} tmdbId={item.tmdbId} />}
         </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 /**
@@ -10,18 +10,21 @@ import { useRouter } from "next/navigation";
  *
  * `initialActive` can change out from under the caller after a
  * `router.refresh()` triggered by a *different* component on the page (e.g.
- * rating a movie auto-removes it from the watchlist server-side) — the
- * `useEffect` re-sync exists because `useState`'s initial value only applies
- * on mount.
+ * rating a movie auto-removes it from the watchlist server-side) — `active`
+ * is reset in response, during render (React's documented pattern for
+ * "adjusting state when a prop changes"), rather than in a `useEffect`, so
+ * the stale value never paints even for a single frame.
  */
 export function useToggleAction(initialActive: boolean, url: string, signedIn: boolean) {
   const router = useRouter();
   const [active, setActive] = useState(initialActive);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
+  const [prevInitialActive, setPrevInitialActive] = useState(initialActive);
+  if (initialActive !== prevInitialActive) {
+    setPrevInitialActive(initialActive);
     setActive(initialActive);
-  }, [initialActive]);
+  }
 
   async function toggle() {
     if (!signedIn) {

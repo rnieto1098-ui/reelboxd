@@ -22,6 +22,11 @@ export function PosterPicker({
   useEffect(() => {
     if (!open || posters) return;
 
+    // Initiating a fetch is exactly what an effect is for — the setState
+    // calls here aren't "deriving" state from a prop, they're kicking off
+    // and tracking a real network request (loading/error/result), which
+    // can't happen during render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch trigger, not a derived-state effect
     setLoading(true);
     setError(null);
     fetch(`/api/movies/${tmdbId}/images`)

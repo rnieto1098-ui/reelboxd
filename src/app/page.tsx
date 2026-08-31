@@ -17,12 +17,14 @@ import {
   filterRentBuyOnly,
   getUserOwnedTmdbIds,
   getUserProviderIds,
+  hasStreamingAvailability,
 } from "@/lib/streaming";
 import { getHomepageListCards, getCuratedListsProgress } from "@/lib/systemLists";
 import { MovieRow } from "@/components/MovieRow";
 import { ListRow } from "@/components/ListRow";
 import { UpcomingReleasesRow } from "@/components/UpcomingReleasesRow";
 import { CuratedListsProgress } from "@/components/CuratedListsProgress";
+import { AvailabilityFilterLinks } from "@/components/AvailabilityFilterLinks";
 
 const WELCOME_PHRASES = [
   "Here's what we think you'll love next.",
@@ -46,6 +48,10 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
 
   const session = await auth();
   const userId = session?.user?.id;
+  // A different phrase per page load is the point — this is a Server
+  // Component that runs fresh per request, not a client render the
+  // purity rule needs to protect from re-render flicker.
+  // eslint-disable-next-line react-hooks/purity -- intentional per-request randomness in a Server Component
   const welcomePhrase = WELCOME_PHRASES[Math.floor(Math.random() * WELCOME_PHRASES.length)];
 
   const [
@@ -109,12 +115,7 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
     .sort((a, b) => a.release_date.localeCompare(b.release_date));
 
   const genreIdByName = new Map(genreCatalog.genres.map((g) => [g.name, g.id]));
-  const hasServicesConfigured = userProviderIds.size > 0;
-  const hasOwnedMovies = ownedTmdbIds.size > 0;
-  // Owning a movie makes it watchable right now, same as a subscription
-  // service does — someone with no services but a few owned movies should
-  // still be able to use "On my streaming services" meaningfully.
-  const canFilterByAvailability = hasServicesConfigured || hasOwnedMovies;
+  const canFilterByAvailability = hasStreamingAvailability(userProviderIds, ownedTmdbIds);
   const applyStreamingFilter = streamingOnly && canFilterByAvailability;
 
   async function narrow(movies: TmdbMovieSummary[]) {
@@ -228,34 +229,12 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
       )}
 
       {session?.user && (
-        <div className="flex flex-wrap items-center gap-3 text-sm">
-          <span className="text-muted">Showing:</span>
-          <Link
-            href="/"
-            className={`rounded-full px-3 py-1 transition-colors ${
-              !streamingOnly ? "bg-accent-green text-black" : "text-muted hover:text-foreground"
-            }`}
-          >
-            All movies
-          </Link>
-          <Link
-            href="/?streaming=1"
-            className={`rounded-full px-3 py-1 transition-colors ${
-              streamingOnly ? "bg-accent-green text-black" : "text-muted hover:text-foreground"
-            }`}
-          >
-            On my streaming services
-          </Link>
-          {streamingOnly && !canFilterByAvailability && (
-            <span className="text-xs text-muted">
-              You haven&apos;t added any services or marked anything as owned yet —{" "}
-              <Link href="/streaming" className="text-accent-green hover:underline">
-                add your services here
-              </Link>
-              .
-            </span>
-          )}
-        </div>
+        <AvailabilityFilterLinks
+          allHref="/"
+          streamingHref="/?streaming=1"
+          streamingOnly={streamingOnly}
+          canFilterByAvailability={canFilterByAvailability}
+        />
       )}
 
       <MovieRow

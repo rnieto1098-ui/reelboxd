@@ -61,9 +61,12 @@ export type PromptPresets = {
   excludeIds?: number[];
 };
 
-export async function parsePrompt(prompt: string, presets?: PromptPresets): Promise<ParsedPrompt> {
+export async function parsePrompt(
+  prompt: string,
+  presets: PromptPresets | undefined,
+  allGenres: { id: number; name: string }[]
+): Promise<ParsedPrompt> {
   const lower = prompt.toLowerCase();
-  const { genres: allGenres } = await getGenres();
   const validGenreNames = new Set(allGenres.map((g) => g.name));
 
   const matchedGenreNames = new Set<string>();
@@ -150,7 +153,13 @@ export type PromptRecommendation = {
   relaxed: boolean;
 };
 
-type Stage = "full" | "dropRating" | "genreOnly" | "popularOnly";
+// Only 3 stages, not 4: nothing besides rating and genre is ever relaxed
+// (runtime/certification are hard caps applied at every stage — see below),
+// so "drop the rating cap, keep genre" is a single stage, not two identical
+// ones. A prior version had a separate "dropRating" stage before "genreOnly"
+// that queried TMDB with the exact same params (genre kept, rating already
+// dropped by then) — a wasted duplicate API call on every relaxation.
+type Stage = "full" | "genreOnly" | "popularOnly";
 
 // The user's watchlist, in the fields the local Movie cache actually has —
 // used as the candidate pool instead of TMDB discover when "on watchlist" is
@@ -198,15 +207,18 @@ export async function getPromptRecommendations(
   // runtime/rating.
   const maxCertification = (presets?.allowR ?? true) ? "R" : "PG-13";
 
-  const [parsed, watchedIds, genreCatalog, watchlistCandidates, userProviderIds, ownedTmdbIds] =
+  const [watchedIds, genreCatalog, watchlistCandidates, userProviderIds, ownedTmdbIds] =
     await Promise.all([
-      parsePrompt(prompt, presets),
       getWatchedTmdbIds(userId),
       getGenres(),
       onlyWatchlist ? getWatchlistCandidates(userId) : Promise.resolve<WatchlistCandidate[]>([]),
       onlyStreaming ? getUserProviderIds(userId) : Promise.resolve(new Set<number>()),
       onlyStreaming ? getUserOwnedTmdbIds(userId) : Promise.resolve(new Set<number>()),
     ]);
+
+  // Parsed once genres are in hand rather than fetching its own copy — the
+  // genre catalog is already being fetched above for the same request.
+  const parsed = await parsePrompt(prompt, presets, genreCatalog.genres);
 
   const genreIdToName = new Map(genreCatalog.genres.map((g) => [g.id, g.name]));
 
@@ -361,13 +373,6 @@ export async function getPromptRecommendations(
     let relaxed = false;
     let pool = await runStage("full", skipExclude);
 
-    if (
-      pool.length < RESULT_LIMIT &&
-      (parsed.minRating10 || parsed.runtimeMaxMinutes || parsed.runtimeMinMinutes)
-    ) {
-      relaxed = true;
-      pool = await runStage("dropRating", skipExclude);
-    }
     if (pool.length < RESULT_LIMIT && effectiveGenreIds.length > 0) {
       relaxed = true;
       pool = await runStage("genreOnly", skipExclude);

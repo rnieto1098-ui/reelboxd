@@ -6,13 +6,20 @@ import { prisma } from "@/lib/prisma";
 import { posterUrl } from "@/lib/tmdb";
 import { getCustomPosterMap } from "@/lib/customPosters";
 import { getPersonalListCover } from "@/lib/listCovers";
-import { filterMoviesByStreaming, getUserOwnedTmdbIds, getUserProviderIds } from "@/lib/streaming";
+import {
+  filterMoviesByStreaming,
+  getUserOwnedTmdbIds,
+  getUserProviderIds,
+  hasStreamingAvailability,
+} from "@/lib/streaming";
 import { getUserWatchlistedTmdbIds } from "@/lib/movies";
+import { compareNullableNumbers, type SortDir } from "@/lib/sortComparator";
 import { MovieCard } from "@/components/MovieCard";
 import { RemoveFromListButton } from "@/components/RemoveFromListButton";
 import { DeleteListButton } from "@/components/DeleteListButton";
 import { FadeWatchedControl } from "@/components/FadeWatchedControl";
 import { ListCoverUpload } from "@/components/ListCoverUpload";
+import { AvailabilityFilterLinks } from "@/components/AvailabilityFilterLinks";
 
 const SORT_OPTIONS = {
   order: { label: "List Order" },
@@ -22,7 +29,6 @@ const SORT_OPTIONS = {
 } satisfies Record<string, { label: string }>;
 
 type SortKey = keyof typeof SORT_OPTIONS;
-type SortDir = "asc" | "desc";
 type ListItemRow = {
   id: string;
   tmdbId: number;
@@ -51,20 +57,7 @@ function sortItems(
     return ratingMap.get(item.tmdbId) ?? null;
   };
 
-  // Highest first by default; items missing the sorted-on value always sort
-  // to the end regardless of direction, so reversing never buries real data
-  // under a pile of unrated/unpopular-data movies.
-  return [...items].sort((a, b) => {
-    const va = valueOf(a);
-    const vb = valueOf(b);
-    if (va == null && vb == null) return 0;
-    if (va == null) return 1;
-    if (vb == null) return -1;
-    // desc (highest first): comparator must be negative when va > vb, i.e.
-    // vb - va. asc flips that. Getting this backwards silently produces the
-    // opposite order while still "looking like" a working sort.
-    return dir === "desc" ? vb - va : va - vb;
-  });
+  return [...items].sort((a, b) => compareNullableNumbers(valueOf(a), valueOf(b), dir));
 }
 
 function buildHref(listId: string, sortKey: SortKey, dir: SortDir, streamingOnly: boolean) {
@@ -124,11 +117,7 @@ export default async function ListDetailPage({
   const coverSrc =
     personalCover ?? list.coverImage ?? posterUrl(list.items[0]?.posterPath ?? null, "w200");
 
-  const hasServicesConfigured = userProviderIds.size > 0;
-  // Owning a movie makes it watchable right now, same as a subscription
-  // service does — someone with no services but a few owned movies should
-  // still be able to use "On my streaming services" meaningfully.
-  const canFilterByAvailability = hasServicesConfigured || ownedTmdbIds.size > 0;
+  const canFilterByAvailability = hasStreamingAvailability(userProviderIds, ownedTmdbIds);
   const applyStreamingFilter = streamingOnly && canFilterByAvailability;
 
   const filteredItems = applyStreamingFilter
@@ -261,34 +250,13 @@ export default async function ListDetailPage({
           </div>
 
           {session?.user && (
-            <div className="flex flex-wrap items-center gap-1 text-xs">
-              <span className="mr-1 text-muted">Showing:</span>
-              <Link
-                href={buildHref(listId, sortKey, sortDir, false)}
-                className={`rounded-full px-2.5 py-1 transition-colors ${
-                  !streamingOnly ? "bg-accent-green text-black" : "text-muted hover:text-foreground"
-                }`}
-              >
-                All movies
-              </Link>
-              <Link
-                href={buildHref(listId, sortKey, sortDir, true)}
-                className={`rounded-full px-2.5 py-1 transition-colors ${
-                  streamingOnly ? "bg-accent-green text-black" : "text-muted hover:text-foreground"
-                }`}
-              >
-                On my streaming services
-              </Link>
-              {streamingOnly && !canFilterByAvailability && (
-                <span className="text-muted">
-                  You haven&apos;t added any services or marked anything as owned yet —{" "}
-                  <Link href="/streaming" className="text-accent-green hover:underline">
-                    add your services here
-                  </Link>
-                  .
-                </span>
-              )}
-            </div>
+            <AvailabilityFilterLinks
+              variant="xs"
+              allHref={buildHref(listId, sortKey, sortDir, false)}
+              streamingHref={buildHref(listId, sortKey, sortDir, true)}
+              streamingOnly={streamingOnly}
+              canFilterByAvailability={canFilterByAvailability}
+            />
           )}
         </div>
       )}

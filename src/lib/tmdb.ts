@@ -183,8 +183,19 @@ export function getUsCertification(details: TmdbMovieDetails): string | null {
   return cert || null;
 }
 
-export function getGenres() {
-  return tmdbFetch<{ genres: TmdbGenre[] }>("/genre/movie/list");
+// The genre list changes essentially never, and gets fetched on nearly every
+// page (home rows, Recommend Me, movie pages, ...) — an in-memory cache on
+// top of Next's per-URL fetch cache means a warm server instance serves it
+// from memory instead of re-hitting TMDB, including from Route Handlers
+// (like /api/recommend) where React's request-scoped `cache()` doesn't apply.
+let genreCache: { data: { genres: TmdbGenre[] }; expiresAt: number } | null = null;
+const GENRE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
+export async function getGenres() {
+  if (genreCache && genreCache.expiresAt > Date.now()) return genreCache.data;
+  const data = await tmdbFetch<{ genres: TmdbGenre[] }>("/genre/movie/list");
+  genreCache = { data, expiresAt: Date.now() + GENRE_CACHE_TTL_MS };
+  return data;
 }
 
 export function discoverMoviesByGenre(genreId: number, page = 1) {

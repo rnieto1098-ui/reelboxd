@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -9,11 +10,19 @@ import {
   profileUrl,
   type TmdbCastCredit,
   type TmdbCrewCredit,
+  type TmdbPersonDetails,
 } from "@/lib/tmdb";
 import { ensureMovieCached, getUserWatchlistedTmdbIds } from "@/lib/movies";
-import { filterMoviesByStreaming, getUserOwnedTmdbIds, getUserProviderIds } from "@/lib/streaming";
+import {
+  filterMoviesByStreaming,
+  getUserOwnedTmdbIds,
+  getUserProviderIds,
+  hasStreamingAvailability,
+} from "@/lib/streaming";
+import { compareNullableNumbers, type SortDir } from "@/lib/sortComparator";
 import { MovieCard } from "@/components/MovieCard";
 import { FadeWatchedControl } from "@/components/FadeWatchedControl";
+import { AvailabilityFilterLinks } from "@/components/AvailabilityFilterLinks";
 
 const DEPARTMENT_ORDER = [
   "Directing",
@@ -41,11 +50,7 @@ const SORT_OPTIONS = {
 } satisfies Record<string, { label: string }>;
 
 type SortKey = keyof typeof SORT_OPTIONS;
-type SortDir = "asc" | "desc";
 
-// Missing values always sort to the end regardless of direction, so
-// reversing never buries real data under a pile of movies TMDB has no
-// rating/runtime for yet — same convention as the list-detail page's sort.
 function compareCredits(
   a: Credit,
   b: Credit,
@@ -61,18 +66,14 @@ function compareCredits(
     if (sortKey === "yourRating") return ratingMap.get(c.id) ?? null;
     return runtimeMap.get(c.id) ?? null;
   }
-  const va = valueOf(a);
-  const vb = valueOf(b);
-  if (va == null && vb == null) return 0;
-  if (va == null) return 1;
-  if (vb == null) return -1;
-  // desc (highest first): comparator must be negative when va > vb, i.e.
-  // vb - va. asc flips that. Getting this backwards silently produces the
-  // opposite order while still "looking like" a working sort.
-  return (dir === "desc" ? vb - va : va - vb);
+  return compareNullableNumbers(valueOf(a), valueOf(b), dir);
 }
 
-const RUNTIME_LOOKUP_CONCURRENCY = 8;
+// Bumped from 8 — these are simple, cache-first GETs (ensureMovieCached hits
+// the local DB before ever touching TMDB), and higher concurrency shortens
+// the tail latency for prolific people (100+ credits) the most, which is
+// exactly the case that was slow.
+const RUNTIME_LOOKUP_CONCURRENCY = 16;
 
 // Runtime isn't in TMDB's person-credits response at all (only the full
 // per-movie details endpoint has it, same gap the Recommend Me runtime fix
@@ -100,6 +101,14 @@ function buildHref(personId: number, sortKey: SortKey, dir: SortDir, streamingOn
   return `/crew/person/${personId}${qs ? `?${qs}` : ""}`;
 }
 
+function dedupeById<T extends { id: number }>(items: T[]): T[] {
+  const seen = new Map<number, T>();
+  for (const item of items) {
+    if (!seen.has(item.id)) seen.set(item.id, item);
+  }
+  return [...seen.values()];
+}
+
 export default async function PersonPage({
   params,
   searchParams,
@@ -112,18 +121,106 @@ export default async function PersonPage({
   const personId = Number(personIdParam);
   if (!Number.isFinite(personId)) notFound();
 
-  const [details, credits] = await Promise.all([
-    getPersonDetails(personId).catch(() => null),
-    getPersonMovieCredits(personId).catch(() => ({ cast: [], crew: [] })),
-  ]);
-
+  // Only the fast, single-call data needed for the header lives in this
+  // top-level await — everything that needs the (potentially much slower,
+  // for prolific people with a runtime sort) full credits list is pushed
+  // into the Suspense boundary below so the header streams to the browser
+  // immediately instead of the whole page waiting on it.
+  const details = await getPersonDetails(personId).catch(() => null);
   if (!details) notFound();
 
+  const session = await auth();
+  const userId = session?.user?.id;
   const photo = profileUrl(details.profile_path, "w185");
+
+  return (
+    <div>
+      <div className="mb-8 flex items-start gap-4">
+        <div className="h-28 w-28 shrink-0 overflow-hidden rounded-lg border border-border bg-surface sm:h-36 sm:w-36">
+          {photo ? (
+            <Image
+              src={photo}
+              alt={details.name}
+              width={144}
+              height={144}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-2xl font-bold text-muted">
+              {details.name[0]}
+            </div>
+          )}
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold">{details.name}</h1>
+          {details.known_for_department && (
+            <p className="text-sm text-muted">{details.known_for_department}</p>
+          )}
+          {(details.birthday || details.place_of_birth) && (
+            <p className="mt-1 text-sm text-muted">
+              {details.birthday && `Born ${details.birthday}`}
+              {details.birthday && details.place_of_birth && " · "}
+              {details.place_of_birth}
+            </p>
+          )}
+          {details.biography && (
+            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted line-clamp-6">
+              {details.biography}
+            </p>
+          )}
+        </div>
+      </div>
+
+      <Suspense
+        key={`${personId}-${sortKey}-${sortDir}-${streamingOnly}`}
+        fallback={<PersonCreditsSkeleton />}
+      >
+        <PersonCredits
+          personId={personId}
+          details={details}
+          sortKey={sortKey}
+          sortDir={sortDir}
+          streamingOnly={streamingOnly}
+          userId={userId}
+        />
+      </Suspense>
+    </div>
+  );
+}
+
+function PersonCreditsSkeleton() {
+  return (
+    <div className="animate-pulse space-y-6">
+      <div className="h-6 w-24 rounded-full bg-surface" />
+      <div className="grid grid-cols-3 gap-4 sm:grid-cols-4 md:grid-cols-6">
+        {Array.from({ length: 12 }).map((_, i) => (
+          <div key={i} className="aspect-[2/3] rounded-md bg-surface" />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+async function PersonCredits({
+  personId,
+  details,
+  sortKey,
+  sortDir,
+  streamingOnly,
+  userId,
+}: {
+  personId: number;
+  details: TmdbPersonDetails;
+  sortKey: SortKey;
+  sortDir: SortDir;
+  streamingOnly: boolean;
+  userId: string | undefined;
+}) {
+  const credits = await getPersonMovieCredits(personId).catch(() => ({ cast: [], crew: [] }));
 
   // Deduped only for now — the actual sort (which needs ratingMap and
   // possibly runtimeMap, fetched further down) is applied once those are
-  // available, replacing what used to be a fixed popularity sort here.
+  // available.
   const actingCredits = dedupeById(credits.cast);
 
   const crewByDepartment = new Map<string, TmdbCrewCredit[]>();
@@ -161,9 +258,6 @@ export default async function PersonPage({
       ? new Set(primaryDeptCredits.map((c) => c.id))
       : allCreditIds;
 
-  const session = await auth();
-  const userId = session?.user?.id;
-
   const [ratingMap, ownedIds, watchlistIds, userProviderIds] = await Promise.all([
     userId && allCreditIds.size > 0
       ? prisma.rating
@@ -183,10 +277,7 @@ export default async function PersonPage({
       ? await getRuntimeMap([...allCreditIds])
       : new Map<number, number>();
 
-  // Owning a movie makes it watchable right now, same as a subscription
-  // service does — same convention as everywhere else this filter appears.
-  const hasServicesConfigured = userProviderIds.size > 0;
-  const canFilterByAvailability = hasServicesConfigured || ownedIds.size > 0;
+  const canFilterByAvailability = hasStreamingAvailability(userProviderIds, ownedIds);
   const applyStreamingFilter = streamingOnly && canFilterByAvailability;
 
   const watchedCount = [...primaryCreditIds].filter((id) => ratingMap.has(id)).length;
@@ -255,60 +346,25 @@ export default async function PersonPage({
   );
 
   return (
-    <div>
-      <div className="mb-8 flex items-start gap-4">
-        <div className="h-28 w-28 shrink-0 overflow-hidden rounded-lg border border-border bg-surface sm:h-36 sm:w-36">
-          {photo ? (
-            <Image
-              src={photo}
-              alt={details.name}
-              width={144}
-              height={144}
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center text-2xl font-bold text-muted">
-              {details.name[0]}
-            </div>
-          )}
+    <>
+      {watchedPercent != null && (
+        <div className="mb-4 inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-2.5 py-1 text-xs text-muted">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            className="h-3.5 w-3.5 text-accent-green"
+          >
+            <path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12Z" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+          <span>
+            {watchedPercent}% of {primaryDepartment ?? "their"} credits watched ({watchedCount}/
+            {primaryCreditIds.size})
+          </span>
         </div>
-        <div>
-          <h1 className="text-2xl font-bold">{details.name}</h1>
-          {details.known_for_department && (
-            <p className="text-sm text-muted">{details.known_for_department}</p>
-          )}
-          {(details.birthday || details.place_of_birth) && (
-            <p className="mt-1 text-sm text-muted">
-              {details.birthday && `Born ${details.birthday}`}
-              {details.birthday && details.place_of_birth && " · "}
-              {details.place_of_birth}
-            </p>
-          )}
-          {details.biography && (
-            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted line-clamp-6">
-              {details.biography}
-            </p>
-          )}
-          {watchedPercent != null && (
-            <div className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-2.5 py-1 text-xs text-muted">
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                className="h-3.5 w-3.5 text-accent-green"
-              >
-                <path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12Z" />
-                <circle cx="12" cy="12" r="3" />
-              </svg>
-              <span>
-                {watchedPercent}% of {primaryDepartment ?? "their"} credits watched ({watchedCount}/
-                {primaryCreditIds.size})
-              </span>
-            </div>
-          )}
-        </div>
-      </div>
+      )}
 
       {allCreditIds.size > 1 && (
         <div className="mb-4 flex flex-wrap items-center gap-1 text-xs">
@@ -337,34 +393,13 @@ export default async function PersonPage({
       )}
 
       {userId && allCreditIds.size > 0 && (
-        <div className="mb-6 flex flex-wrap items-center gap-3 text-sm">
-          <span className="text-muted">Showing:</span>
-          <Link
-            href={buildHref(personId, sortKey, sortDir, false)}
-            className={`rounded-full px-3 py-1 transition-colors ${
-              !streamingOnly ? "bg-accent-green text-black" : "text-muted hover:text-foreground"
-            }`}
-          >
-            All movies
-          </Link>
-          <Link
-            href={buildHref(personId, sortKey, sortDir, true)}
-            className={`rounded-full px-3 py-1 transition-colors ${
-              streamingOnly ? "bg-accent-green text-black" : "text-muted hover:text-foreground"
-            }`}
-          >
-            On my streaming services
-          </Link>
-          {streamingOnly && !canFilterByAvailability && (
-            <span className="text-xs text-muted">
-              You haven&apos;t added any services or marked anything as owned yet —{" "}
-              <Link href="/streaming" className="text-accent-green hover:underline">
-                add your services here
-              </Link>
-              .
-            </span>
-          )}
-        </div>
+        <AvailabilityFilterLinks
+          className="mb-6"
+          allHref={buildHref(personId, sortKey, sortDir, false)}
+          streamingHref={buildHref(personId, sortKey, sortDir, true)}
+          streamingOnly={streamingOnly}
+          canFilterByAvailability={canFilterByAvailability}
+        />
       )}
 
       {actingCredits.length === 0 && orderedDepartments.length === 0 ? (
@@ -376,7 +411,7 @@ export default async function PersonPage({
       ) : (
         sections
       )}
-    </div>
+    </>
   );
 }
 
@@ -418,12 +453,4 @@ function CreditSection({
       </div>
     </section>
   );
-}
-
-function dedupeById<T extends { id: number }>(items: T[]): T[] {
-  const seen = new Map<number, T>();
-  for (const item of items) {
-    if (!seen.has(item.id)) seen.set(item.id, item);
-  }
-  return [...seen.values()];
 }

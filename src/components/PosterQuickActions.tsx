@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -50,10 +50,19 @@ export function PosterQuickActions({
 
   // initialOwned/initialInWatchlist can change out from under this component
   // after a router.refresh() triggered elsewhere on the page (e.g. the same
-  // movie's card appears in two rows) — useState's initial value only
-  // applies on mount, so this re-syncs when the server-provided prop changes.
-  useEffect(() => setOwned(initialOwned), [initialOwned]);
-  useEffect(() => setInWatchlist(initialInWatchlist), [initialInWatchlist]);
+  // movie's card appears in two rows) — adjusted during render (React's
+  // documented pattern for "adjusting state when a prop changes") rather
+  // than in a useEffect, so the stale value never paints even for a frame.
+  const [prevInitialOwned, setPrevInitialOwned] = useState(initialOwned);
+  if (initialOwned !== prevInitialOwned) {
+    setPrevInitialOwned(initialOwned);
+    setOwned(initialOwned);
+  }
+  const [prevInitialInWatchlist, setPrevInitialInWatchlist] = useState(initialInWatchlist);
+  if (initialInWatchlist !== prevInitialInWatchlist) {
+    setPrevInitialInWatchlist(initialInWatchlist);
+    setInWatchlist(initialInWatchlist);
+  }
 
   async function runAction(
     e: React.MouseEvent,

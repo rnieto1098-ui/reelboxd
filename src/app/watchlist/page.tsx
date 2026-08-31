@@ -6,6 +6,7 @@ import {
   getFlatrateProviders,
   getUserOwnedTmdbIds,
   getUserProviderIds,
+  hasStreamingAvailability,
   isAvailableOnServices,
 } from "@/lib/streaming";
 import type { TmdbWatchProvider } from "@/lib/tmdb";
@@ -86,10 +87,7 @@ export default async function WatchlistPage({ searchParams }: PageProps<"/watchl
   );
 
   const hasServicesConfigured = userProviderIds.size > 0;
-  // Owning a movie makes it watchable right now, same as a subscription
-  // service does — someone with no services but a few owned movies should
-  // still get a meaningful split instead of the flat "add your services" view.
-  const canSplit = hasServicesConfigured || ownedTmdbIds.size > 0;
+  const canSplit = hasStreamingAvailability(userProviderIds, ownedTmdbIds);
   const isAvailable = ({ providers, owned }: { providers: TmdbWatchProvider[]; owned: boolean }) =>
     owned || isAvailableOnServices(providers, userProviderIds);
   const streamingNow = withAvailability.filter(isAvailable);

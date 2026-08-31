@@ -305,6 +305,7 @@ export type TmdbCastCredit = {
   poster_path: string | null;
   release_date: string;
   popularity?: number;
+  vote_average?: number;
 };
 
 export type TmdbCrewCredit = {
@@ -315,6 +316,7 @@ export type TmdbCrewCredit = {
   poster_path: string | null;
   release_date: string;
   popularity?: number;
+  vote_average?: number;
 };
 
 export function getPersonMovieCredits(personId: number) {

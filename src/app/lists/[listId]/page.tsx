@@ -54,14 +54,16 @@ function sortItems(
   // Highest first by default; items missing the sorted-on value always sort
   // to the end regardless of direction, so reversing never buries real data
   // under a pile of unrated/unpopular-data movies.
-  const sign = dir === "asc" ? 1 : -1;
   return [...items].sort((a, b) => {
     const va = valueOf(a);
     const vb = valueOf(b);
     if (va == null && vb == null) return 0;
     if (va == null) return 1;
     if (vb == null) return -1;
-    return (vb - va) * sign;
+    // desc (highest first): comparator must be negative when va > vb, i.e.
+    // vb - va. asc flips that. Getting this backwards silently produces the
+    // opposite order while still "looking like" a working sort.
+    return dir === "desc" ? vb - va : va - vb;
   });
 }
 

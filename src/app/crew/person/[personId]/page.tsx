@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -9,8 +10,8 @@ import {
   type TmdbCastCredit,
   type TmdbCrewCredit,
 } from "@/lib/tmdb";
-import { getUserWatchlistedTmdbIds } from "@/lib/movies";
-import { getUserOwnedTmdbIds } from "@/lib/streaming";
+import { ensureMovieCached, getUserWatchlistedTmdbIds } from "@/lib/movies";
+import { filterMoviesByStreaming, getUserOwnedTmdbIds, getUserProviderIds } from "@/lib/streaming";
 import { MovieCard } from "@/components/MovieCard";
 import { FadeWatchedControl } from "@/components/FadeWatchedControl";
 
@@ -29,10 +30,85 @@ const DEPARTMENT_ORDER = [
 
 const MAX_PER_SECTION = 24;
 
+type Credit = TmdbCastCredit | TmdbCrewCredit;
+
+const SORT_OPTIONS = {
+  popularity: { label: "Popularity" },
+  release: { label: "Release Date" },
+  rating: { label: "TMDB Rating" },
+  yourRating: { label: "Your Rating" },
+  runtime: { label: "Runtime" },
+} satisfies Record<string, { label: string }>;
+
+type SortKey = keyof typeof SORT_OPTIONS;
+type SortDir = "asc" | "desc";
+
+// Missing values always sort to the end regardless of direction, so
+// reversing never buries real data under a pile of movies TMDB has no
+// rating/runtime for yet — same convention as the list-detail page's sort.
+function compareCredits(
+  a: Credit,
+  b: Credit,
+  sortKey: SortKey,
+  dir: SortDir,
+  ratingMap: Map<number, number>,
+  runtimeMap: Map<number, number>
+): number {
+  function valueOf(c: Credit): number | null {
+    if (sortKey === "popularity") return c.popularity ?? null;
+    if (sortKey === "release") return c.release_date ? new Date(c.release_date).getTime() : null;
+    if (sortKey === "rating") return c.vote_average ?? null;
+    if (sortKey === "yourRating") return ratingMap.get(c.id) ?? null;
+    return runtimeMap.get(c.id) ?? null;
+  }
+  const va = valueOf(a);
+  const vb = valueOf(b);
+  if (va == null && vb == null) return 0;
+  if (va == null) return 1;
+  if (vb == null) return -1;
+  // desc (highest first): comparator must be negative when va > vb, i.e.
+  // vb - va. asc flips that. Getting this backwards silently produces the
+  // opposite order while still "looking like" a working sort.
+  return (dir === "desc" ? vb - va : va - vb);
+}
+
+const RUNTIME_LOOKUP_CONCURRENCY = 8;
+
+// Runtime isn't in TMDB's person-credits response at all (only the full
+// per-movie details endpoint has it, same gap the Recommend Me runtime fix
+// hit) — only fetched when the runtime sort is actually selected, via the
+// same local-cache helper every rating/watchlist/owned action already warms.
+async function getRuntimeMap(tmdbIds: number[]): Promise<Map<number, number>> {
+  const map = new Map<number, number>();
+  for (let i = 0; i < tmdbIds.length; i += RUNTIME_LOOKUP_CONCURRENCY) {
+    const batch = tmdbIds.slice(i, i + RUNTIME_LOOKUP_CONCURRENCY);
+    const movies = await Promise.all(batch.map((id) => ensureMovieCached(id).catch(() => null)));
+    batch.forEach((id, idx) => {
+      const runtime = movies[idx]?.runtime;
+      if (runtime != null) map.set(id, runtime);
+    });
+  }
+  return map;
+}
+
+function buildHref(personId: number, sortKey: SortKey, dir: SortDir, streamingOnly: boolean) {
+  const params = new URLSearchParams();
+  if (sortKey !== "popularity") params.set("sort", sortKey);
+  if (dir !== "desc") params.set("dir", dir);
+  if (streamingOnly) params.set("streaming", "1");
+  const qs = params.toString();
+  return `/crew/person/${personId}${qs ? `?${qs}` : ""}`;
+}
+
 export default async function PersonPage({
   params,
+  searchParams,
 }: PageProps<"/crew/person/[personId]">) {
   const { personId: personIdParam } = await params;
+  const { streaming, sort, dir } = await searchParams;
+  const streamingOnly = streaming === "1";
+  const sortKey: SortKey = typeof sort === "string" && sort in SORT_OPTIONS ? (sort as SortKey) : "popularity";
+  const sortDir: SortDir = dir === "asc" ? "asc" : "desc";
   const personId = Number(personIdParam);
   if (!Number.isFinite(personId)) notFound();
 
@@ -45,7 +121,10 @@ export default async function PersonPage({
 
   const photo = profileUrl(details.profile_path, "w185");
 
-  const actingCredits = dedupeById(credits.cast).sort(byPopularity);
+  // Deduped only for now — the actual sort (which needs ratingMap and
+  // possibly runtimeMap, fetched further down) is applied once those are
+  // available, replacing what used to be a fixed popularity sort here.
+  const actingCredits = dedupeById(credits.cast);
 
   const crewByDepartment = new Map<string, TmdbCrewCredit[]>();
   for (const credit of credits.crew) {
@@ -54,7 +133,7 @@ export default async function PersonPage({
     crewByDepartment.set(credit.department, list);
   }
   for (const [dept, list] of crewByDepartment) {
-    crewByDepartment.set(dept, dedupeById(list).sort(byPopularity));
+    crewByDepartment.set(dept, dedupeById(list));
   }
 
   const orderedDepartments = [
@@ -68,10 +147,24 @@ export default async function PersonPage({
     for (const credit of list) allCreditIds.add(credit.id);
   }
 
+  // "Watched" should reflect this person's actual craft — an actor's
+  // percentage means the movies they acted in, not every movie they ever
+  // touched in any capacity (a director's one-off cameo shouldn't count the
+  // same as their directing work). TMDB's own known_for_department is the
+  // person's primary job; falls back to every credit only if that
+  // department is missing or (rare data gap) has no credits here at all.
+  const primaryDepartment = details.known_for_department;
+  const primaryDeptCredits =
+    primaryDepartment === "Acting" ? actingCredits : crewByDepartment.get(primaryDepartment ?? "");
+  const primaryCreditIds =
+    primaryDeptCredits && primaryDeptCredits.length > 0
+      ? new Set(primaryDeptCredits.map((c) => c.id))
+      : allCreditIds;
+
   const session = await auth();
   const userId = session?.user?.id;
 
-  const [ratingMap, ownedIds, watchlistIds] = await Promise.all([
+  const [ratingMap, ownedIds, watchlistIds, userProviderIds] = await Promise.all([
     userId && allCreditIds.size > 0
       ? prisma.rating
           .findMany({
@@ -82,22 +175,45 @@ export default async function PersonPage({
       : Promise.resolve(new Map<number, number>()),
     getUserOwnedTmdbIds(userId),
     getUserWatchlistedTmdbIds(userId),
+    getUserProviderIds(userId),
   ]);
 
+  const runtimeMap =
+    sortKey === "runtime" && allCreditIds.size > 0
+      ? await getRuntimeMap([...allCreditIds])
+      : new Map<number, number>();
+
+  // Owning a movie makes it watchable right now, same as a subscription
+  // service does — same convention as everywhere else this filter appears.
+  const hasServicesConfigured = userProviderIds.size > 0;
+  const canFilterByAvailability = hasServicesConfigured || ownedIds.size > 0;
+  const applyStreamingFilter = streamingOnly && canFilterByAvailability;
+
+  const watchedCount = [...primaryCreditIds].filter((id) => ratingMap.has(id)).length;
   const watchedPercent =
-    userId && allCreditIds.size > 0
-      ? Math.round((ratingMap.size / allCreditIds.size) * 100)
-      : null;
+    userId && primaryCreditIds.size > 0 ? Math.round((watchedCount / primaryCreditIds.size) * 100) : null;
+
+  const sortedActingCredits = [...actingCredits].sort((a, b) =>
+    compareCredits(a, b, sortKey, sortDir, ratingMap, runtimeMap)
+  );
+  for (const [dept, list] of crewByDepartment) {
+    crewByDepartment.set(
+      dept,
+      [...list].sort((a, b) => compareCredits(a, b, sortKey, sortDir, ratingMap, runtimeMap))
+    );
+  }
 
   // Order departments so a person's primary job leads and Acting only comes
   // first when that IS their primary job — a director shouldn't have their
   // (often minor) acting cameos outrank their actual filmography.
-  const actingSection = actingCredits.length > 0 ? { key: "Acting", credits: actingCredits } : null;
-  const departmentSections = orderedDepartments.map((department) => ({
-    key: department,
-    credits: crewByDepartment.get(department) ?? [],
-  }));
-  const primaryDepartment = details.known_for_department;
+  const actingSection: { key: string; credits: Credit[] } | null =
+    sortedActingCredits.length > 0 ? { key: "Acting", credits: sortedActingCredits } : null;
+  const departmentSections: { key: string; credits: Credit[] }[] = orderedDepartments.map(
+    (department) => ({
+      key: department,
+      credits: crewByDepartment.get(department) ?? [],
+    })
+  );
   const primaryIsCrew =
     !!primaryDepartment && primaryDepartment !== "Acting" && crewByDepartment.has(primaryDepartment);
 
@@ -109,9 +225,23 @@ export default async function PersonPage({
       ]
     : [...(actingSection ? [actingSection] : []), ...departmentSections];
 
+  // Filtering happens on the full per-department list, before the
+  // MAX_PER_SECTION slice inside CreditSection — otherwise a prolific
+  // person's section could slice down to 24 credits and then filter most of
+  // those away, showing far fewer than what's actually available.
+  const filteredSections = applyStreamingFilter
+    ? await Promise.all(
+        orderedSections.map(async (section) => ({
+          ...section,
+          credits: await filterMoviesByStreaming(section.credits, userProviderIds, ownedIds),
+        }))
+      )
+    : orderedSections;
+  const hasAnyFilteredCredits = filteredSections.some((s) => s.credits.length > 0);
+
   const sections = (
     <div className="space-y-10">
-      {orderedSections.map((section) => (
+      {filteredSections.map((section) => (
         <CreditSection
           key={section.key}
           title={section.key}
@@ -172,15 +302,75 @@ export default async function PersonPage({
                 <circle cx="12" cy="12" r="3" />
               </svg>
               <span>
-                {watchedPercent}% watched ({ratingMap.size}/{allCreditIds.size})
+                {watchedPercent}% of {primaryDepartment ?? "their"} credits watched ({watchedCount}/
+                {primaryCreditIds.size})
               </span>
             </div>
           )}
         </div>
       </div>
 
+      {allCreditIds.size > 1 && (
+        <div className="mb-4 flex flex-wrap items-center gap-1 text-xs">
+          <span className="mr-1 text-muted">Sort:</span>
+          {(Object.keys(SORT_OPTIONS) as SortKey[])
+            .filter((key) => key !== "yourRating" || userId)
+            .map((key) => {
+              const isActive = sortKey === key;
+              // Clicking the already-active sort flips its direction;
+              // clicking a different one starts it at the default direction.
+              const nextDir: SortDir = isActive ? (sortDir === "desc" ? "asc" : "desc") : "desc";
+              return (
+                <Link
+                  key={key}
+                  href={buildHref(personId, key, nextDir, streamingOnly)}
+                  className={`rounded-full px-2.5 py-1 transition-colors ${
+                    isActive ? "bg-accent-green text-black" : "text-muted hover:text-foreground"
+                  }`}
+                >
+                  {SORT_OPTIONS[key].label}
+                  {isActive && <span className="ml-1">{sortDir === "asc" ? "↑" : "↓"}</span>}
+                </Link>
+              );
+            })}
+        </div>
+      )}
+
+      {userId && allCreditIds.size > 0 && (
+        <div className="mb-6 flex flex-wrap items-center gap-3 text-sm">
+          <span className="text-muted">Showing:</span>
+          <Link
+            href={buildHref(personId, sortKey, sortDir, false)}
+            className={`rounded-full px-3 py-1 transition-colors ${
+              !streamingOnly ? "bg-accent-green text-black" : "text-muted hover:text-foreground"
+            }`}
+          >
+            All movies
+          </Link>
+          <Link
+            href={buildHref(personId, sortKey, sortDir, true)}
+            className={`rounded-full px-3 py-1 transition-colors ${
+              streamingOnly ? "bg-accent-green text-black" : "text-muted hover:text-foreground"
+            }`}
+          >
+            On my streaming services
+          </Link>
+          {streamingOnly && !canFilterByAvailability && (
+            <span className="text-xs text-muted">
+              You haven&apos;t added any services or marked anything as owned yet —{" "}
+              <Link href="/streaming" className="text-accent-green hover:underline">
+                add your services here
+              </Link>
+              .
+            </span>
+          )}
+        </div>
+      )}
+
       {actingCredits.length === 0 && orderedDepartments.length === 0 ? (
         <p className="text-muted">No movie credits found.</p>
+      ) : applyStreamingFilter && !hasAnyFilteredCredits ? (
+        <p className="text-muted">None of this person&apos;s movies are on your streaming services or owned right now.</p>
       ) : userId ? (
         <FadeWatchedControl>{sections}</FadeWatchedControl>
       ) : (
@@ -203,6 +393,8 @@ function CreditSection({
   ownedIds: Set<number>;
   watchlistIds: Set<number>;
 }) {
+  if (credits.length === 0) return null;
+
   const shown = credits.slice(0, MAX_PER_SECTION);
 
   return (
@@ -234,8 +426,4 @@ function dedupeById<T extends { id: number }>(items: T[]): T[] {
     if (!seen.has(item.id)) seen.set(item.id, item);
   }
   return [...seen.values()];
-}
-
-function byPopularity(a: { popularity?: number }, b: { popularity?: number }) {
-  return (b.popularity ?? 0) - (a.popularity ?? 0);
 }

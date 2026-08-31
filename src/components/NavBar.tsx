@@ -2,16 +2,32 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { SignOutButton } from "@/components/SignOutButton";
 import { SearchBox } from "@/components/SearchBox";
+import { MobileNav, type MobileNavItem } from "@/components/MobileNav";
 
 export async function NavBar() {
   const session = await auth();
 
+  const mobileNavItems: MobileNavItem[] = [
+    { href: "/", label: "Home" },
+    ...(session?.user
+      ? [
+          { href: "/recommend", label: "Recommend Me" },
+          { href: "/lists", label: "Lists" },
+          { href: "/watchlist", label: "Watchlist" },
+        ]
+      : [{ href: "/lists", label: "Lists" }]),
+    { href: "/crew", label: "Crew" },
+  ];
+
   return (
     <header className="border-b border-border bg-surface">
       <div className="relative mx-auto max-w-[1600px] px-4 py-3 flex items-center justify-between gap-6">
-        <Link href="/" className="shrink-0 text-xl font-bold tracking-tight text-accent-green">
-          reelboxd
-        </Link>
+        <div className="flex shrink-0 items-center gap-2">
+          <MobileNav items={mobileNavItems} />
+          <Link href="/" className="text-xl font-bold tracking-tight text-accent-green">
+            reelboxd
+          </Link>
+        </div>
 
         <div className="flex items-center gap-6 sm:absolute sm:left-1/2 sm:-translate-x-1/2">
           <nav className="hidden sm:flex items-center gap-6 text-sm text-muted">

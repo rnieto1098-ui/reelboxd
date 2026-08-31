@@ -3,10 +3,27 @@ import "./globals.css";
 import { NavBar } from "@/components/NavBar";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { SITE_URL } from "@/lib/siteUrl";
+
+const TITLE = "reelboxd";
+const DESCRIPTION = "Track films you've watched. Discover what to watch next.";
 
 export const metadata: Metadata = {
-  title: "reelboxd",
-  description: "Track films you've watched. Discover what to watch next.",
+  metadataBase: new URL(SITE_URL),
+  title: TITLE,
+  description: DESCRIPTION,
+  openGraph: {
+    title: TITLE,
+    description: DESCRIPTION,
+    url: SITE_URL,
+    siteName: TITLE,
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: TITLE,
+    description: DESCRIPTION,
+  },
 };
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {

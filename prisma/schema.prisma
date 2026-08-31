@@ -262,6 +262,19 @@ model CustomListCover {
   @@unique([userId, listId])
 }
 
+// Backs a simple DB-backed rate limiter (signup, login, forgot-password) —
+// one row per attempt, counted within a caller-chosen time window. Vercel's
+// serverless functions are stateless between invocations, so an in-memory
+// counter wouldn't actually limit anything in production; this is the
+// lightest thing that works without adding a new service (e.g. Redis).
+model RateLimitHit {
+  id        String   @id @default(cuid())
+  key       String
+  createdAt DateTime @default(now())
+
+  @@index([key, createdAt])
+}
+
 model ListItem {
   id          String   @id @default(cuid())
   tmdbId      Int

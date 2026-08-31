@@ -20,9 +20,9 @@ import {
   hasStreamingAvailability,
 } from "@/lib/streaming";
 import { compareNullableNumbers, type SortDir } from "@/lib/sortComparator";
-import { MovieCard } from "@/components/MovieCard";
 import { FadeWatchedControl } from "@/components/FadeWatchedControl";
 import { AvailabilityFilterLinks } from "@/components/AvailabilityFilterLinks";
+import { CreditGrid, type CreditDisplay } from "@/components/CreditGrid";
 
 const DEPARTMENT_ORDER = [
   "Directing",
@@ -36,8 +36,6 @@ const DEPARTMENT_ORDER = [
   "Visual Effects",
   "Crew",
 ];
-
-const MAX_PER_SECTION = 24;
 
 type Credit = TmdbCastCredit | TmdbCrewCredit;
 
@@ -330,17 +328,28 @@ async function PersonCredits({
     : orderedSections;
   const hasAnyFilteredCredits = filteredSections.some((s) => s.credits.length > 0);
 
+  // Resolved to plain, primitive-only objects here (server-side, where the
+  // Maps/Sets live) rather than passed across into the client CreditGrid —
+  // same boundary discipline as MovieCard/MovieRow elsewhere in this app.
+  const displaySections = filteredSections.map((section) => ({
+    key: section.key,
+    credits: section.credits.map(
+      (credit): CreditDisplay => ({
+        id: credit.id,
+        title: credit.title,
+        posterPath: credit.poster_path,
+        year: credit.release_date?.slice(0, 4),
+        owned: ownedIds.has(credit.id),
+        inWatchlist: watchlistIds.has(credit.id),
+        watched: ratingMap.has(credit.id),
+      })
+    ),
+  }));
+
   const sections = (
     <div className="space-y-10">
-      {filteredSections.map((section) => (
-        <CreditSection
-          key={section.key}
-          title={section.key}
-          credits={section.credits}
-          ratingMap={ratingMap}
-          ownedIds={ownedIds}
-          watchlistIds={watchlistIds}
-        />
+      {displaySections.map((section) => (
+        <CreditGrid key={section.key} title={section.key} credits={section.credits} />
       ))}
     </div>
   );
@@ -415,42 +424,3 @@ async function PersonCredits({
   );
 }
 
-function CreditSection({
-  title,
-  credits,
-  ratingMap,
-  ownedIds,
-  watchlistIds,
-}: {
-  title: string;
-  credits: (TmdbCastCredit | TmdbCrewCredit)[];
-  ratingMap: Map<number, number>;
-  ownedIds: Set<number>;
-  watchlistIds: Set<number>;
-}) {
-  if (credits.length === 0) return null;
-
-  const shown = credits.slice(0, MAX_PER_SECTION);
-
-  return (
-    <section>
-      <h2 className="mb-3 text-lg font-semibold">
-        {title} <span className="text-sm font-normal text-muted">({credits.length})</span>
-      </h2>
-      <div className="grid grid-cols-3 gap-4 sm:grid-cols-4 md:grid-cols-6">
-        {shown.map((credit) => (
-          <div key={credit.id} data-watched={ratingMap.has(credit.id)}>
-            <MovieCard
-              tmdbId={credit.id}
-              title={credit.title}
-              posterPath={credit.poster_path}
-              year={credit.release_date?.slice(0, 4)}
-              owned={ownedIds.has(credit.id)}
-              inWatchlist={watchlistIds.has(credit.id)}
-            />
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}

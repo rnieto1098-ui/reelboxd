@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { MovieCard } from "@/components/MovieCard";
 import type { TmdbMovieSummary } from "@/lib/tmdb";
 import type { ParsedPrompt } from "@/lib/promptRecommender";
@@ -66,6 +67,8 @@ function Chip({
 }
 
 export function RecommendForm() {
+  const router = useRouter();
+  const [surprising, setSurprising] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [selectedGenres, setSelectedGenres] = useState<Set<string>>(new Set());
   const [selectedRuntimes, setSelectedRuntimes] = useState<Set<number>>(new Set());
@@ -167,8 +170,43 @@ export function RecommendForm() {
     setData(body);
   }
 
+  // Ignores every filter — the point is "surprise me," not "surprise me
+  // within these constraints." Reuses the same pipeline as a normal submit
+  // (a short placeholder prompt just satisfies the API's minimum-criteria
+  // check) rather than a separate endpoint, then jumps straight to a
+  // random pick from the results instead of showing a list to choose from.
+  async function handleSurpriseMe() {
+    setSurprising(true);
+    setError(null);
+
+    const res = await fetch("/api/recommend", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt: "surprise me" }),
+    });
+    const body = await res.json();
+
+    if (!res.ok || !body.results?.length) {
+      setSurprising(false);
+      setError(body.error ?? "Couldn't find anything — try again?");
+      return;
+    }
+
+    const pick = body.results[Math.floor(Math.random() * body.results.length)];
+    router.push(`/movie/${pick.id}`);
+  }
+
   return (
     <div>
+      <button
+        type="button"
+        onClick={handleSurpriseMe}
+        disabled={surprising}
+        className="mb-6 w-full rounded-md border border-border py-2 text-sm font-medium text-foreground hover:border-accent-green disabled:opacity-50"
+      >
+        {surprising ? "Picking something..." : "🎲 Surprise me"}
+      </button>
+
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <p className="mb-2 text-xs text-muted">Genre</p>

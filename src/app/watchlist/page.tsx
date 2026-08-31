@@ -13,6 +13,7 @@ import type { TmdbWatchProvider } from "@/lib/tmdb";
 import { MovieCard } from "@/components/MovieCard";
 import { ProviderLogos } from "@/components/ProviderLogos";
 import { WatchlistImportForm } from "@/components/WatchlistImportForm";
+import { WatchlistShuffleButton } from "@/components/WatchlistShuffleButton";
 import type { Prisma } from "@prisma/client";
 
 const TABS = {
@@ -99,6 +100,7 @@ export default async function WatchlistPage({ searchParams }: PageProps<"/watchl
       <div className="mb-4 flex items-center justify-between gap-4">
         <h1 className="text-2xl font-bold">Your Watchlist</h1>
         <div className="flex items-center gap-4">
+          <WatchlistShuffleButton tmdbIds={items.map((item) => item.movie.tmdbId)} />
           <WatchlistImportForm />
           <Link
             href="/streaming"

@@ -113,6 +113,25 @@ export function RecommendForm() {
     });
   }
 
+  // Shared by both the form submit and Surprise Me, so Surprise Me picks
+  // from the same filtered pool instead of ignoring the chips/prompt
+  // entirely. Falls back to a placeholder prompt only when nothing at all
+  // is selected, so Surprise Me still works with zero filters (satisfying
+  // the API's minimum-criteria check) exactly like before.
+  function buildPayload(promptOverride?: string) {
+    // Multiple runtime chips can be selected at once — take the most
+    // restrictive (smallest) cap among them.
+    const maxRuntimeMinutes = selectedRuntimes.size > 0 ? Math.min(...selectedRuntimes) : null;
+    return {
+      prompt: promptOverride ?? prompt,
+      genres: [...selectedGenres],
+      maxRuntimeMinutes,
+      onlyWatchlist,
+      onlyStreaming,
+      allowR: !restrictToPG13,
+    };
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!hasSelection) return;
@@ -121,36 +140,19 @@ export function RecommendForm() {
     setError(null);
     setData(null);
 
-    // Multiple runtime chips can be selected at once — take the most
-    // restrictive (smallest) cap among them.
-    const maxRuntimeMinutes = selectedRuntimes.size > 0 ? Math.min(...selectedRuntimes) : null;
+    const payload = buildPayload();
 
     // Same criteria as the last submit — a genuine "click again" — so ask
     // the server to leave out what it just showed. Anything different
     // (including the very first submit) starts a fresh exclusion history.
-    const criteria = JSON.stringify({
-      prompt: prompt.trim(),
-      genres: [...selectedGenres].sort(),
-      maxRuntimeMinutes,
-      onlyWatchlist,
-      onlyStreaming,
-      restrictToPG13,
-    });
+    const criteria = JSON.stringify({ ...payload, prompt: payload.prompt.trim(), genres: [...payload.genres].sort() });
     const isRepeat = criteria === lastCriteriaRef.current;
     const excludeIds = isRepeat ? shownIdsRef.current : [];
 
     const res = await fetch("/api/recommend", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        prompt,
-        genres: [...selectedGenres],
-        maxRuntimeMinutes,
-        onlyWatchlist,
-        onlyStreaming,
-        allowR: !restrictToPG13,
-        excludeIds,
-      }),
+      body: JSON.stringify({ ...payload, excludeIds }),
     });
     const body = await res.json();
     setLoading(false);
@@ -170,19 +172,20 @@ export function RecommendForm() {
     setData(body);
   }
 
-  // Ignores every filter — the point is "surprise me," not "surprise me
-  // within these constraints." Reuses the same pipeline as a normal submit
-  // (a short placeholder prompt just satisfies the API's minimum-criteria
-  // check) rather than a separate endpoint, then jumps straight to a
-  // random pick from the results instead of showing a list to choose from.
+  // Adheres to whatever filters/prompt are currently selected — "surprise
+  // me" means a random pick from that pool, not "ignore everything I
+  // picked." Reuses the same pipeline as a normal submit, then jumps
+  // straight to a random result instead of showing a list to choose from.
   async function handleSurpriseMe() {
     setSurprising(true);
     setError(null);
 
+    const payload = buildPayload(hasSelection ? prompt : "surprise me");
+
     const res = await fetch("/api/recommend", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt: "surprise me" }),
+      body: JSON.stringify({ ...payload, excludeIds: [] }),
     });
     const body = await res.json();
 

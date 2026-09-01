@@ -51,7 +51,11 @@ export async function POST(request: Request, context: { params: Promise<{ listId
   });
 
   const filename = `list-covers/${userId}-${listId}-${Date.now()}.${extension}`;
-  const blob = await put(filename, file, { access: "public" });
+  // Explicit token — see profile/image/route.ts for why.
+  const blob = await put(filename, file, {
+    access: "public",
+    token: process.env.BLOB_READ_WRITE_TOKEN,
+  });
 
   await prisma.customListCover.upsert({
     where: { userId_listId: { userId, listId } },

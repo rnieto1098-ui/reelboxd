@@ -50,7 +50,11 @@ export async function POST(request: Request, context: { params: Promise<{ listId
   // Timestamp baked into the filename (not a query string) so a fresh
   // upload gets a brand-new path — same reasoning as profile image uploads.
   const filename = `list-covers/${listId}-${Date.now()}.${extension}`;
-  const blob = await put(filename, file, { access: "public" });
+  // Explicit token — see profile/image/route.ts for why.
+  const blob = await put(filename, file, {
+    access: "public",
+    token: process.env.BLOB_READ_WRITE_TOKEN,
+  });
 
   await prisma.list.update({ where: { id: listId }, data: { coverImage: blob.url } });
 

@@ -56,7 +56,14 @@ export async function POST(request: Request) {
   // query strings to be pre-registered exactly in next.config, which won't
   // work for a value that's different on every upload.
   const filename = `${folderFor(type)}/${session.user.id}-${Date.now()}.${extension}`;
-  const blob = await put(filename, file, { access: "public" });
+  // Explicit rather than relying on the SDK's automatic env detection —
+  // Vercel now prefers a VERCEL_OIDC_TOKEN over BLOB_READ_WRITE_TOKEN when
+  // both are present, so a stale/misconfigured OIDC token could silently
+  // shadow a perfectly good read-write token.
+  const blob = await put(filename, file, {
+    access: "public",
+    token: process.env.BLOB_READ_WRITE_TOKEN,
+  });
 
   await prisma.user.update({
     where: { id: session.user.id },

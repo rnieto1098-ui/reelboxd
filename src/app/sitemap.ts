@@ -6,7 +6,7 @@ import { SITE_URL } from "@/lib/siteUrl";
 // numerous enough that a real sitemap for them would need to page through
 // the DB; not worth it yet for a project this size.
 export default function sitemap(): MetadataRoute.Sitemap {
-  const routes = ["", "/crew", "/login", "/signup"];
+  const routes = ["", "/crew", "/login", "/signup", "/terms", "/privacy"];
   return routes.map((route) => ({
     url: `${SITE_URL}${route}`,
     lastModified: new Date(),

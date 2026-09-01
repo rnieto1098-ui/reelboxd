@@ -86,6 +86,17 @@ export default function SignupPage() {
         >
           {loading ? "Creating account..." : "Sign up"}
         </button>
+        <p className="text-xs text-muted">
+          By signing up, you agree to our{" "}
+          <Link href="/terms" className="text-accent-green hover:underline">
+            Terms of Service
+          </Link>{" "}
+          and{" "}
+          <Link href="/privacy" className="text-accent-green hover:underline">
+            Privacy Policy
+          </Link>
+          .
+        </p>
       </form>
       <p className="mt-4 text-sm text-muted">
         Already have an account?{" "}

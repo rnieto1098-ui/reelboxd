@@ -4,16 +4,26 @@
 export function Footer() {
   return (
     <footer className="border-t border-border px-4 py-6 text-center text-xs text-muted">
-      This product uses the TMDB API but is not endorsed or certified by{" "}
-      <a
-        href="https://www.themoviedb.org/"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-accent-green hover:underline"
-      >
-        TMDB
-      </a>
-      .
+      <p>
+        This product uses the TMDB API but is not endorsed or certified by{" "}
+        <a
+          href="https://www.themoviedb.org/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-accent-green hover:underline"
+        >
+          TMDB
+        </a>
+        .
+      </p>
+      <p className="mt-2 flex justify-center gap-3">
+        <a href="/terms" className="hover:text-foreground hover:underline">
+          Terms of Service
+        </a>
+        <a href="/privacy" className="hover:text-foreground hover:underline">
+          Privacy Policy
+        </a>
+      </p>
     </footer>
   );
 }

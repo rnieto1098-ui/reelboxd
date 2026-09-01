@@ -10,26 +10,37 @@ import { getUserOwnedTmdbIds } from "@/lib/streaming";
 import { MovieCard } from "@/components/MovieCard";
 import { ProfileImageUpload } from "@/components/ProfileImageUpload";
 import { HorizontalScroller } from "@/components/HorizontalScroller";
-import type { Prisma } from "@prisma/client";
+import { compareNullableNumbers, type SortDir } from "@/lib/sortComparator";
+import type { Movie } from "@prisma/client";
 
 const SORT_OPTIONS = {
-  recent: { label: "Recently Rated", orderBy: (dir: Prisma.SortOrder) => ({ createdAt: dir }) },
-  rating: { label: "Your Rating", orderBy: (dir: Prisma.SortOrder) => ({ score: dir }) },
-  release: {
-    label: "Release Date",
-    orderBy: (dir: Prisma.SortOrder) => ({ movie: { releaseDate: dir } }),
-  },
-  popularity: {
-    label: "Popularity",
-    orderBy: (dir: Prisma.SortOrder) => ({ movie: { popularity: dir } }),
-  },
-} satisfies Record<
-  string,
-  { label: string; orderBy: (dir: Prisma.SortOrder) => Prisma.RatingOrderByWithRelationInput }
->;
+  recent: { label: "Recently Logged" },
+  rating: { label: "Your Rating" },
+  release: { label: "Release Date" },
+  popularity: { label: "Popularity" },
+} satisfies Record<string, { label: string }>;
 
 type SortKey = keyof typeof SORT_OPTIONS;
-type SortDir = "asc" | "desc";
+
+// A movie can be rated, logged (diary), or both — this merges the two into
+// one row per movie so "Recently Logged" reflects everything you've watched,
+// not just what you got around to rating.
+type RecentEntry = {
+  movie: Movie;
+  score: number | null;
+  logCount: number;
+  lastActivityAt: number;
+};
+
+function sortEntries(entries: RecentEntry[], sortKey: SortKey, dir: SortDir): RecentEntry[] {
+  const valueOf = (e: RecentEntry): number | null => {
+    if (sortKey === "recent") return e.lastActivityAt;
+    if (sortKey === "rating") return e.score;
+    if (sortKey === "release") return e.movie.releaseDate ? Date.parse(e.movie.releaseDate) : null;
+    return e.movie.popularity;
+  };
+  return [...entries].sort((a, b) => compareNullableNumbers(valueOf(a), valueOf(b), dir));
+}
 
 function buildHref(username: string, key: SortKey, dir: SortDir) {
   const params = new URLSearchParams();
@@ -85,11 +96,8 @@ export default async function ProfilePage({
   const user = await prisma.user.findUnique({
     where: { username },
     include: {
-      ratings: {
-        include: { movie: true },
-        orderBy: SORT_OPTIONS[sortKey].orderBy(sortDir),
-        take: 24,
-      },
+      ratings: { include: { movie: true } },
+      diaryEntries: { include: { movie: true } },
       owned: {
         include: { movie: true },
         orderBy: { addedAt: "desc" },
@@ -103,13 +111,41 @@ export default async function ProfilePage({
 
   if (!user) notFound();
 
+  const byMovie = new Map<string, RecentEntry>();
+  for (const r of user.ratings) {
+    const activityAt = r.createdAt.getTime();
+    const existing = byMovie.get(r.movieId);
+    if (existing) {
+      existing.score = r.score;
+      existing.lastActivityAt = Math.max(existing.lastActivityAt, activityAt);
+    } else {
+      byMovie.set(r.movieId, { movie: r.movie, score: r.score, logCount: 0, lastActivityAt: activityAt });
+    }
+  }
+  for (const d of user.diaryEntries) {
+    const activityAt = d.watchedDate.getTime();
+    const existing = byMovie.get(d.movieId);
+    if (existing) {
+      existing.logCount++;
+      existing.lastActivityAt = Math.max(existing.lastActivityAt, activityAt);
+    } else {
+      byMovie.set(d.movieId, {
+        movie: d.movie,
+        score: null,
+        logCount: 1,
+        lastActivityAt: activityAt,
+      });
+    }
+  }
+  const recentEntries = sortEntries([...byMovie.values()], sortKey, sortDir).slice(0, 24);
+
   // Use the viewer's own poster choices, not the profile owner's — a custom
   // poster is a personal preference that follows you wherever a film shows up.
   // Same reasoning for owned/watchlist highlighting below: it reflects
   // whoever is looking, not necessarily this profile's owner.
   const [posterOverrides, viewerOwnedIds, viewerWatchlistIds] = await Promise.all([
     getCustomPosterMap(session?.user?.id, [
-      ...user.ratings.map((r) => r.movie.tmdbId),
+      ...recentEntries.map((e) => e.movie.tmdbId),
       ...user.owned.map((o) => o.movie.tmdbId),
     ]),
     getUserOwnedTmdbIds(session?.user?.id),
@@ -206,7 +242,7 @@ export default async function ProfilePage({
       )}
 
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-lg font-semibold">Recently rated</h2>
+        <h2 className="text-lg font-semibold">Recently logged</h2>
         <div className="flex gap-1 text-xs">
           {(Object.keys(SORT_OPTIONS) as SortKey[]).map((key) => {
             const isActive = sortKey === key;
@@ -230,20 +266,23 @@ export default async function ProfilePage({
       </div>
 
       <HorizontalScroller
-        isEmpty={user.ratings.length === 0}
-        emptyMessage="No ratings yet."
+        isEmpty={recentEntries.length === 0}
+        emptyMessage="Nothing logged or rated yet."
       >
-        {user.ratings.map((r) => (
-          <div key={r.id} className="w-24 flex-shrink-0 sm:w-28">
+        {recentEntries.map((e) => (
+          <div key={e.movie.id} className="w-24 flex-shrink-0 sm:w-28">
             <MovieCard
-              tmdbId={r.movie.tmdbId}
-              title={r.movie.title}
-              posterPath={posterOverrides.get(r.movie.tmdbId) ?? r.movie.posterPath}
-              year={r.movie.releaseDate?.slice(0, 4)}
-              owned={viewerOwnedIds.has(r.movie.tmdbId)}
-              inWatchlist={viewerWatchlistIds.has(r.movie.tmdbId)}
+              tmdbId={e.movie.tmdbId}
+              title={e.movie.title}
+              posterPath={posterOverrides.get(e.movie.tmdbId) ?? e.movie.posterPath}
+              year={e.movie.releaseDate?.slice(0, 4)}
+              owned={viewerOwnedIds.has(e.movie.tmdbId)}
+              inWatchlist={viewerWatchlistIds.has(e.movie.tmdbId)}
             />
-            <p className="mt-1 text-xs text-accent-green">{r.score.toFixed(1)} ★</p>
+            <p className="mt-1 text-xs text-accent-green">
+              {e.score != null ? `${e.score.toFixed(1)} ★` : "Logged"}
+              {e.logCount > 1 ? ` · ${e.logCount}×` : ""}
+            </p>
           </div>
         ))}
       </HorizontalScroller>

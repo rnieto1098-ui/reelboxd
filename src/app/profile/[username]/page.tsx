@@ -8,7 +8,6 @@ import { getCustomPosterMap } from "@/lib/customPosters";
 import { getUserWatchlistedTmdbIds } from "@/lib/movies";
 import { getUserOwnedTmdbIds } from "@/lib/streaming";
 import { MovieCard } from "@/components/MovieCard";
-import { ProfileImageUpload } from "@/components/ProfileImageUpload";
 import { HorizontalScroller } from "@/components/HorizontalScroller";
 import { compareNullableNumbers, type SortDir } from "@/lib/sortComparator";
 import type { Movie } from "@prisma/client";
@@ -223,23 +222,6 @@ export default async function ProfilePage({
           </div>
         )}
       </div>
-
-      {isOwnProfile && (
-        <div className="mb-8 flex flex-wrap gap-4 rounded-lg border border-border bg-surface p-4">
-          <div>
-            <p className="mb-1.5 text-xs text-muted">Profile picture</p>
-            <ProfileImageUpload type="avatar" label="Upload photo" hasImage={!!user.image} />
-          </div>
-          <div>
-            <p className="mb-1.5 text-xs text-muted">Site background</p>
-            <ProfileImageUpload
-              type="background"
-              label="Upload background"
-              hasImage={!!user.backgroundImage}
-            />
-          </div>
-        </div>
-      )}
 
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-lg font-semibold">Recently logged</h2>

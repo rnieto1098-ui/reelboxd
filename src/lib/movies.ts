@@ -30,11 +30,7 @@ export async function ensureMovieCached(tmdbId: number) {
   if (existing) return existing;
 
   const details = await getMovieDetails(tmdbId);
-  const director = details.credits?.crew.find((c) => c.job === "Director");
-  // TMDB returns cast already in billing order; top 5 is plenty of signal
-  // for "movies with people you seem to like" without over-weighting a film
-  // that just happens to have a huge ensemble.
-  const topCastIds = details.credits?.cast.slice(0, 5).map((c) => c.id).join(",") ?? null;
+  const credits = creditsFromDetails(details);
 
   return prisma.movie.create({
     data: {
@@ -48,8 +44,58 @@ export async function ensureMovieCached(tmdbId: number) {
       genres: details.genres.map((g) => g.name).join(", "),
       voteAverage: details.vote_average,
       popularity: details.popularity ?? null,
-      directorId: director?.id ?? null,
-      topCastIds: topCastIds || null,
+      ...credits,
     },
   });
+}
+
+// Shared by ensureMovieCached (first-time caching) and the stats
+// backfill (rows cached before director/cast/cinematographer names were
+// tracked) — both need the exact same TMDB details -> Movie-column mapping.
+function creditsFromDetails(details: Awaited<ReturnType<typeof getMovieDetails>>) {
+  const director = details.credits?.crew.find((c) => c.job === "Director");
+  const cinematographer = details.credits?.crew.find((c) => c.job === "Director of Photography");
+  // TMDB returns cast already in billing order; top 5 is plenty of signal
+  // for "movies with people you seem to like" without over-weighting a film
+  // that just happens to have a huge ensemble.
+  const topCast = details.credits?.cast.slice(0, 5) ?? [];
+
+  return {
+    directorId: director?.id ?? null,
+    directorName: director?.name ?? null,
+    topCastIds: topCast.length > 0 ? topCast.map((c) => c.id).join(",") : null,
+    topCastNames: topCast.length > 0 ? topCast.map((c) => c.name).join(",") : null,
+    cinematographerId: cinematographer?.id ?? null,
+    cinematographerName: cinematographer?.name ?? null,
+  };
+}
+
+export type MovieCreditFields = {
+  id: string;
+  tmdbId: number;
+  directorId: number | null;
+  directorName: string | null;
+  topCastIds: string | null;
+  topCastNames: string | null;
+  cinematographerId: number | null;
+  cinematographerName: string | null;
+};
+
+// Self-heals rows cached before credit names were tracked. topCastIds and
+// topCastNames are always written together (see creditsFromDetails), so
+// topCastIds present with topCastNames still null reliably means "cached
+// before this field existed" — unlike directorId/cinematographerId, which
+// are legitimately null for plenty of real movies (documentaries, shorts)
+// and can't be used as the "needs backfill" signal. Only refetches from
+// TMDB when actually missing, so this is a no-op after the first pass.
+// Typed to always return the same MovieCreditFields shape on both the
+// early-return and refetched paths, so callers get one consistent type.
+export async function backfillMovieCredits(
+  movie: MovieCreditFields
+): Promise<MovieCreditFields> {
+  if (movie.topCastIds == null || movie.topCastNames != null) return movie;
+
+  const details = await getMovieDetails(movie.tmdbId);
+  const credits = creditsFromDetails(details);
+  return prisma.movie.update({ where: { id: movie.id }, data: credits });
 }

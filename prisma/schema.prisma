@@ -88,7 +88,11 @@ model Movie {
   voteAverage Float?
   popularity  Float?
   directorId  Int? // TMDB person id of the credited director, if any
+  directorName String?
   topCastIds  String? // comma-separated TMDB person ids, billing order, top 5
+  topCastNames String? // comma-separated names, same order as topCastIds
+  cinematographerId   Int? // TMDB person id credited "Director of Photography", if any
+  cinematographerName String?
   cachedAt    DateTime @default(now())
 
   ratings       Rating[]

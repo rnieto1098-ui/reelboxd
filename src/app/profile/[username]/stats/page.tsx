@@ -2,15 +2,24 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { getUserStats, formatWatchTime } from "@/lib/stats";
+import {
+  getUserStats,
+  getReleaseYearDistribution,
+  getYearMovieLists,
+  formatWatchTime,
+} from "@/lib/stats";
+import { getTopPeopleStats } from "@/lib/peopleStats";
 import { getGoalProgress } from "@/lib/goals";
 import { WatchGoalWidget } from "@/components/WatchGoalWidget";
+import { ReleaseYearChart } from "@/components/ReleaseYearChart";
+import { PersonRankList } from "@/components/PersonRankList";
+import { YearMovieList } from "@/components/YearMovieList";
 
 function StatTile({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="rounded-lg border border-border bg-surface p-4">
-      <p className="text-2xl font-bold text-accent-green">{value}</p>
-      <p className="text-xs text-muted">{label}</p>
+    <div className="rounded-lg border border-border bg-surface p-5 text-center">
+      <p className="text-3xl font-bold text-accent-green sm:text-4xl">{value}</p>
+      <p className="mt-1 text-xs text-muted">{label}</p>
     </div>
   );
 }
@@ -28,9 +37,12 @@ export default async function StatsPage({ params }: PageProps<"/profile/[usernam
   const isOwnProfile = session?.user?.id === user.id;
   const currentYear = new Date().getFullYear();
 
-  const [stats, goal] = await Promise.all([
+  const [stats, goal, topPeople, releaseYears, yearMovies] = await Promise.all([
     getUserStats(user.id),
     getGoalProgress(user.id, currentYear),
+    getTopPeopleStats(user.id),
+    getReleaseYearDistribution(user.id),
+    getYearMovieLists(user.id, currentYear),
   ]);
   const maxBucketCount = Math.max(1, ...stats.ratingDistribution.map((b) => b.count));
   const maxGenreCount = Math.max(1, ...stats.topGenres.map((g) => g.count));
@@ -43,7 +55,7 @@ export default async function StatsPage({ params }: PageProps<"/profile/[usernam
       >
         ← {username}
       </Link>
-      <h1 className="mt-1 mb-8 text-2xl font-bold">{username}&apos;s Stats</h1>
+      <h1 className="mt-1 mb-8 text-3xl font-bold">{username}&apos;s Stats</h1>
 
       <div className="mb-8">
         <WatchGoalWidget
@@ -113,6 +125,49 @@ export default async function StatsPage({ params }: PageProps<"/profile/[usernam
               </div>
             </section>
           )}
+
+          {releaseYears.length > 0 && (
+            <section>
+              <h2 className="mb-3 text-lg font-semibold">Movies by release year</h2>
+              <ReleaseYearChart buckets={releaseYears} />
+            </section>
+          )}
+
+          {(yearMovies.mostWatched.length > 0 || yearMovies.highestRated.length > 0) && (
+            <section>
+              <h2 className="mb-3 text-lg font-semibold">{currentYear} in movies</h2>
+              <div className="grid gap-6 sm:grid-cols-2">
+                <YearMovieList
+                  title="Most watched"
+                  entries={yearMovies.mostWatched}
+                  badgeFor={(e) => `${e.watchCount}×`}
+                  emptyMessage="Nothing logged this year yet."
+                />
+                <YearMovieList
+                  title="Highest rated"
+                  entries={yearMovies.highestRated}
+                  badgeFor={(e) => `${(e.rating as number).toFixed(1)}★`}
+                  emptyMessage="Nothing rated this year yet."
+                />
+              </div>
+            </section>
+          )}
+
+          <PersonRankList
+            title="Directors"
+            mostWatched={topPeople.directors.mostWatched}
+            highestRated={topPeople.directors.highestRated}
+          />
+          <PersonRankList
+            title="Actors"
+            mostWatched={topPeople.actors.mostWatched}
+            highestRated={topPeople.actors.highestRated}
+          />
+          <PersonRankList
+            title="Cinematographers"
+            mostWatched={topPeople.cinematographers.mostWatched}
+            highestRated={topPeople.cinematographers.highestRated}
+          />
         </div>
       )}
     </div>

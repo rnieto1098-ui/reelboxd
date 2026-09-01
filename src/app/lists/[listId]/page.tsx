@@ -15,8 +15,7 @@ import {
 } from "@/lib/streaming";
 import { getUserWatchlistedTmdbIds } from "@/lib/movies";
 import { compareNullableNumbers, type SortDir } from "@/lib/sortComparator";
-import { MovieCard } from "@/components/MovieCard";
-import { RemoveFromListButton } from "@/components/RemoveFromListButton";
+import { ListMovieGrid } from "@/components/ListMovieGrid";
 import { DeleteListButton } from "@/components/DeleteListButton";
 import { FadeWatchedControl } from "@/components/FadeWatchedControl";
 import { ListCoverUpload } from "@/components/ListCoverUpload";
@@ -179,21 +178,20 @@ export default async function ListDetailPage({
   );
 
   const grid = (
-    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-6">
-      {sortedItems.map((item) => (
-        <div key={item.id} data-watched={ratingMap.has(item.tmdbId)}>
-          <MovieCard
-            tmdbId={item.tmdbId}
-            title={item.title}
-            posterPath={posterOverrides.get(item.tmdbId) ?? item.posterPath}
-            year={item.releaseDate?.slice(0, 4)}
-            owned={ownedTmdbIds.has(item.tmdbId)}
-            inWatchlist={watchlistTmdbIds.has(item.tmdbId)}
-          />
-          {isOwner && <RemoveFromListButton listId={list.id} tmdbId={item.tmdbId} />}
-        </div>
-      ))}
-    </div>
+    <ListMovieGrid
+      listId={list.id}
+      isOwner={isOwner}
+      entries={sortedItems.map((item) => ({
+        id: item.id,
+        tmdbId: item.tmdbId,
+        title: item.title,
+        posterPath: posterOverrides.get(item.tmdbId) ?? item.posterPath,
+        year: item.releaseDate?.slice(0, 4),
+        owned: ownedTmdbIds.has(item.tmdbId),
+        inWatchlist: watchlistTmdbIds.has(item.tmdbId),
+        watched: ratingMap.has(item.tmdbId),
+      }))}
+    />
   );
 
   return (

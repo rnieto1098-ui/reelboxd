@@ -10,10 +10,8 @@ import {
   isAvailableOnServices,
 } from "@/lib/streaming";
 import type { TmdbWatchProvider } from "@/lib/tmdb";
-import { MovieCard } from "@/components/MovieCard";
-import { ProviderLogos } from "@/components/ProviderLogos";
+import { WatchlistGrid } from "@/components/WatchlistGrid";
 import { WatchlistImportForm } from "@/components/WatchlistImportForm";
-import { WatchlistShuffleButton } from "@/components/WatchlistShuffleButton";
 import type { Prisma } from "@prisma/client";
 
 const TABS = {
@@ -100,7 +98,6 @@ export default async function WatchlistPage({ searchParams }: PageProps<"/watchl
       <div className="mb-4 flex items-center justify-between gap-4">
         <h1 className="text-2xl font-bold">Your Watchlist</h1>
         <div className="flex items-center gap-4">
-          <WatchlistShuffleButton tmdbIds={items.map((item) => item.movie.tmdbId)} />
           <WatchlistImportForm />
           <Link
             href="/streaming"
@@ -188,49 +185,6 @@ export default async function WatchlistPage({ searchParams }: PageProps<"/watchl
           )}
         </div>
       )}
-    </div>
-  );
-}
-
-function WatchlistGrid({
-  entries,
-}: {
-  entries: {
-    item: {
-      id: string;
-      movie: {
-        tmdbId: number;
-        title: string;
-        posterPath: string | null;
-        releaseDate: string | null;
-        customPosters: { posterPath: string }[];
-      };
-    };
-    providers: { provider_id: number; provider_name: string; logo_path: string }[];
-    owned?: boolean;
-  }[];
-}) {
-  return (
-    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-      {entries.map(({ item, providers, owned }) => (
-        <div key={item.id}>
-          <MovieCard
-            tmdbId={item.movie.tmdbId}
-            title={item.movie.title}
-            posterPath={item.movie.customPosters[0]?.posterPath ?? item.movie.posterPath}
-            year={item.movie.releaseDate?.slice(0, 4)}
-            owned={owned}
-            inWatchlist
-          />
-          {owned ? (
-            <span className="mt-1 inline-block rounded-full border border-accent-green px-2 py-0.5 text-xs text-accent-green">
-              Owned
-            </span>
-          ) : (
-            <ProviderLogos providers={providers} />
-          )}
-        </div>
-      ))}
     </div>
   );
 }

@@ -54,6 +54,10 @@ const BASE_ROW_PAGES = 3; // ~60 movies unfiltered
 const STREAMING_ROW_PAGES = 8; // ~160 movies to filter down when narrowed
 const BASE_RECOMMEND_COUNT = 12;
 const STREAMING_RECOMMEND_COUNT = 36;
+// Highest Rated and the genre rows barely shift hour to hour, unlike
+// Popular/Trending — a longer cache window here cuts TMDB request volume
+// without the rows feeling stale.
+const SLOW_ROW_CACHE_SECONDS = 6 * 60 * 60; // 6 hours
 
 export default async function HomePage({ searchParams }: PageProps<"/">) {
   const { streaming } = await searchParams;
@@ -158,11 +162,17 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
     // masterpiece" territory (Shawshank, The Godfather, ...) — the default
     // floor of 100 lets small-but-devoted-fanbase obscurities with a handful
     // of 10/10s outrank real consensus classics.
-    discoverMoviesMultiPage({ sortBy: "vote_average.desc", minVoteCount: 10000 }, rowPages),
+    discoverMoviesMultiPage(
+      { sortBy: "vote_average.desc", minVoteCount: 10000, revalidateSeconds: SLOW_ROW_CACHE_SECONDS },
+      rowPages
+    ),
     ...GENRE_ROWS.map((row) => {
       const genreId = genreIdByName.get(row.genreName);
       return genreId
-        ? discoverMoviesMultiPage({ genreIds: [genreId] }, rowPages)
+        ? discoverMoviesMultiPage(
+            { genreIds: [genreId], revalidateSeconds: SLOW_ROW_CACHE_SECONDS },
+            rowPages
+          )
         : Promise.resolve([] as TmdbMovieSummary[]);
     }),
   ]);

@@ -119,7 +119,8 @@ const MAX_RETRIES = 3;
 
 async function tmdbFetch<T>(
   path: string,
-  params: Record<string, string | number | undefined> = {}
+  params: Record<string, string | number | undefined> = {},
+  revalidateSeconds = 60 * 60
 ): Promise<T> {
   const apiKey = process.env.TMDB_API_KEY;
   if (!apiKey) {
@@ -138,7 +139,7 @@ async function tmdbFetch<T>(
   try {
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       const res = await fetch(url.toString(), {
-        next: { revalidate: 60 * 60 }, // cache TMDB responses for an hour
+        next: { revalidate: revalidateSeconds },
       });
 
       if (res.ok) return res.json() as Promise<T>;
@@ -314,22 +315,32 @@ export function discoverMovies(params: {
   // alongside it for the filter to take effect.
   certificationCountry?: string;
   maxCertification?: string;
+  // Homepage rows like "Highest Rated" and the genre rows barely shift
+  // hour to hour — letting those sit in cache longer than the default 1hr
+  // cuts TMDB request volume without the data feeling stale. Callers where
+  // freshness actually matters (search, recommend, crew filmography) just
+  // don't pass this and get the default.
+  revalidateSeconds?: number;
 }) {
-  return tmdbFetch<TmdbListResponse>("/discover/movie", {
-    with_genres:
-      params.genreIds && params.genreIds.length > 0 ? params.genreIds.join(",") : undefined,
-    "vote_average.gte": params.minVoteAverage,
-    "vote_count.gte": params.minVoteCount ?? 100,
-    "with_runtime.gte": params.minRuntime,
-    "with_runtime.lte": params.maxRuntime,
-    primary_release_year: params.year,
-    sort_by: params.sortBy ?? "popularity.desc",
-    page: params.page ?? 1,
-    with_cast: params.castId,
-    with_crew: params.crewId,
-    certification_country: params.certificationCountry,
-    "certification.lte": params.maxCertification,
-  });
+  return tmdbFetch<TmdbListResponse>(
+    "/discover/movie",
+    {
+      with_genres:
+        params.genreIds && params.genreIds.length > 0 ? params.genreIds.join(",") : undefined,
+      "vote_average.gte": params.minVoteAverage,
+      "vote_count.gte": params.minVoteCount ?? 100,
+      "with_runtime.gte": params.minRuntime,
+      "with_runtime.lte": params.maxRuntime,
+      primary_release_year: params.year,
+      sort_by: params.sortBy ?? "popularity.desc",
+      page: params.page ?? 1,
+      with_cast: params.castId,
+      with_crew: params.crewId,
+      certification_country: params.certificationCountry,
+      "certification.lte": params.maxCertification,
+    },
+    params.revalidateSeconds
+  );
 }
 
 export async function discoverMoviesMultiPage(

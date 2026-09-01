@@ -15,7 +15,7 @@ export function SearchBox() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-xs">
+    <form onSubmit={handleSubmit} className="min-w-[110px] max-w-xs flex-1 sm:flex-none">
       <input
         type="text"
         value={query}

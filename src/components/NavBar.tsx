@@ -17,6 +17,11 @@ export async function NavBar() {
         ]
       : [{ href: "/lists", label: "Lists" }]),
     { href: "/crew", label: "Crew" },
+    // The header hides the username link below sm to make room for the
+    // search box — this is mobile's only other way back to your profile.
+    ...(session?.user
+      ? [{ href: `/profile/${session.user.name}`, label: `${session.user.name} (Profile)` }]
+      : []),
   ];
 
   return (
@@ -67,7 +72,7 @@ export async function NavBar() {
           {session?.user && (
             <Link
               href={`/profile/${session.user.name}`}
-              className="text-sm font-medium hover:text-accent-green transition-colors"
+              className="hidden text-sm font-medium hover:text-accent-green transition-colors sm:inline-flex"
             >
               {session.user.name}
             </Link>

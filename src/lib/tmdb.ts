@@ -86,6 +86,37 @@ export type TmdbListResponse = {
   total_results: number;
 };
 
+// A single homepage load can fan out into dozens of TMDB calls at once
+// (multi-page rows, genre rows, recommendations, ...) — without a cap,
+// concurrent real users multiply that into a burst big enough to trip
+// TMDB's rate limit. This gates ALL tmdbFetch calls through one queue
+// (per server instance) so at most MAX_CONCURRENT are ever in flight,
+// regardless of how many callers fire at once.
+const MAX_CONCURRENT_REQUESTS = 6;
+let activeRequests = 0;
+const requestQueue: (() => void)[] = [];
+
+function acquireSlot(): Promise<void> {
+  if (activeRequests < MAX_CONCURRENT_REQUESTS) {
+    activeRequests++;
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => {
+    requestQueue.push(() => {
+      activeRequests++;
+      resolve();
+    });
+  });
+}
+
+function releaseSlot(): void {
+  activeRequests--;
+  const next = requestQueue.shift();
+  if (next) next();
+}
+
+const MAX_RETRIES = 3;
+
 async function tmdbFetch<T>(
   path: string,
   params: Record<string, string | number | undefined> = {}
@@ -103,15 +134,35 @@ async function tmdbFetch<T>(
     if (value !== undefined) url.searchParams.set(key, String(value));
   }
 
-  const res = await fetch(url.toString(), {
-    next: { revalidate: 60 * 60 }, // cache TMDB responses for an hour
-  });
+  await acquireSlot();
+  try {
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      const res = await fetch(url.toString(), {
+        next: { revalidate: 60 * 60 }, // cache TMDB responses for an hour
+      });
 
-  if (!res.ok) {
-    throw new Error(`TMDB request failed (${res.status}): ${path}`);
+      if (res.ok) return res.json() as Promise<T>;
+
+      // 429 is the only status worth retrying — TMDB tells us exactly how
+      // long to back off via Retry-After; anything else (400/401/404/5xx)
+      // won't be fixed by waiting, so fail immediately.
+      if (res.status === 429 && attempt < MAX_RETRIES) {
+        const retryAfterSeconds = Number(res.headers.get("retry-after"));
+        const waitMs = Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0
+          ? retryAfterSeconds * 1000
+          : 500 * 2 ** attempt; // 500ms, 1s, 2s if TMDB doesn't say
+        await new Promise((resolve) => setTimeout(resolve, waitMs));
+        continue;
+      }
+
+      throw new Error(`TMDB request failed (${res.status}): ${path}`);
+    }
+    // Unreachable — the loop above always returns or throws — but keeps
+    // TypeScript satisfied that every path returns T.
+    throw new Error(`TMDB request failed after ${MAX_RETRIES} retries: ${path}`);
+  } finally {
+    releaseSlot();
   }
-
-  return res.json() as Promise<T>;
 }
 
 export function posterUrl(path: string | null, size: "w200" | "w342" | "w500" = "w342") {

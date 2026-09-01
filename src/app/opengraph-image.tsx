@@ -21,7 +21,7 @@ export default function OpengraphImage() {
         }}
       >
         <div style={{ display: "flex", fontSize: 120, fontWeight: 700, color: "#00e054" }}>
-          reelboxd
+          Flixtally
         </div>
         <div style={{ display: "flex", fontSize: 36, color: "#e7e9eb", marginTop: 16 }}>
           Track films you&apos;ve watched. Discover what to watch next.

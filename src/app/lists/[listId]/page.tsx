@@ -89,7 +89,7 @@ export async function generateMetadata({
   const title = list.title;
   const description =
     list.description ??
-    (list.isSystem ? `Curated by reelboxd.` : `By ${list.owner?.username} on reelboxd.`);
+    (list.isSystem ? `Curated by Flixtally.` : `By ${list.owner?.username} on Flixtally.`);
   // coverImage is already a full URL (Vercel Blob) if set — unlike a list
   // item's posterPath, which is a raw TMDB path that still needs posterUrl().
   const image = list.coverImage ?? posterUrl(list.items[0]?.posterPath ?? null, "w500");
@@ -216,7 +216,7 @@ export default async function ListDetailPage({
           <div>
             <h1 className="text-2xl font-bold">{list.title}</h1>
             <p className="text-sm text-muted">
-              {list.isSystem ? "Curated by reelboxd" : `By ${list.owner?.username}`} ·{" "}
+              {list.isSystem ? "Curated by Flixtally" : `By ${list.owner?.username}`} ·{" "}
               {list.items.length} movie{list.items.length === 1 ? "" : "s"}
             </p>
             {list.description && (

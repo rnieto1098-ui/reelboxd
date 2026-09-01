@@ -2,7 +2,7 @@ import JSZip from "jszip";
 import { prisma } from "@/lib/prisma";
 
 // Mirrors the columns letterboxdImport.ts reads (Name, Year, Rating) — an
-// export can be re-imported straight back into reelboxd, and uses the same
+// export can be re-imported straight back into Flixtally, and uses the same
 // header names Letterboxd's own export uses, so it's a reasonable stand-in
 // there too even though full compatibility with Letterboxd's own importer
 // isn't guaranteed.

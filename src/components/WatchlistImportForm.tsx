@@ -73,7 +73,7 @@ export function WatchlistImportForm() {
             >
               letterboxd.com/user/exportdata
             </a>
-            ), or a watchlist.csv you exported from reelboxd — everything in it gets added straight
+            ), or a watchlist.csv you exported from Flixtally — everything in it gets added straight
             to your watchlist. Ratings and other data are ignored; use{" "}
             <a href="/import" className="text-accent-green hover:underline">
               full import

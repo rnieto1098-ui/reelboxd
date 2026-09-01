@@ -25,7 +25,7 @@ export async function NavBar() {
         <div className="flex shrink-0 items-center gap-2">
           <MobileNav items={mobileNavItems} />
           <Link href="/" className="text-xl font-bold tracking-tight text-accent-green">
-            reelboxd
+            Flixtally
           </Link>
         </div>
 

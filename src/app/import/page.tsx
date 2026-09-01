@@ -25,7 +25,7 @@ export default async function ImportPage() {
         automatically; we&apos;ll list anything we couldn&apos;t find.
       </p>
       <p className="mb-6 text-sm text-muted">
-        Want to back up or move your reelboxd data instead? You can{" "}
+        Want to back up or move your Flixtally data instead? You can{" "}
         <a href="/api/export" className="text-accent-green hover:underline">
           export it
         </a>{" "}

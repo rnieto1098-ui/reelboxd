@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-const STORAGE_KEY = "reelboxd:onboarding-dismissed";
+const STORAGE_KEY = "flixtally:onboarding-dismissed";
 
 export type ChecklistItem = { key: string; label: string; href: string; done: boolean };
 
@@ -30,7 +30,7 @@ export function OnboardingChecklist({ items }: { items: ChecklistItem[] }) {
   return (
     <div className="rounded-lg border border-border bg-surface p-4">
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-sm font-semibold">Get more out of reelboxd</h2>
+        <h2 className="text-sm font-semibold">Get more out of Flixtally</h2>
         <button type="button" onClick={dismiss} className="text-xs text-muted hover:text-foreground">
           Dismiss
         </button>

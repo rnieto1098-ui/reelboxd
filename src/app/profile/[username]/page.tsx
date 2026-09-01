@@ -49,8 +49,8 @@ export async function generateMetadata({
   });
   if (!user) return {};
 
-  const title = `${username} on reelboxd`;
-  const description = `${user._count.ratings} film${user._count.ratings === 1 ? "" : "s"} rated on reelboxd.`;
+  const title = `${username} on Flixtally`;
+  const description = `${user._count.ratings} film${user._count.ratings === 1 ? "" : "s"} rated on Flixtally.`;
 
   return {
     title,

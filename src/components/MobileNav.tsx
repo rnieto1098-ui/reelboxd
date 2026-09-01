@@ -48,7 +48,7 @@ export function MobileNav({ items }: { items: MobileNavItem[] }) {
           />
           <nav className="absolute inset-y-0 left-0 flex w-64 max-w-[80%] flex-col gap-1 border-r border-border bg-surface p-4">
             <div className="mb-4 flex items-center justify-between">
-              <span className="text-lg font-bold tracking-tight text-accent-green">reelboxd</span>
+              <span className="text-lg font-bold tracking-tight text-accent-green">Flixtally</span>
               <button
                 type="button"
                 onClick={() => setOpen(false)}

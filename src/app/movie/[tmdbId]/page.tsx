@@ -42,7 +42,7 @@ export async function generateMetadata({
 
   const year = details.release_date?.slice(0, 4);
   const title = year ? `${details.title} (${year})` : details.title;
-  const description = details.overview || `${details.title} on reelboxd.`;
+  const description = details.overview || `${details.title} on Flixtally.`;
   const poster = posterUrl(details.poster_path, "w500");
 
   return {

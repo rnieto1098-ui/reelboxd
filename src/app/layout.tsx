@@ -7,7 +7,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { SITE_URL } from "@/lib/siteUrl";
 
-const TITLE = "reelboxd";
+const TITLE = "Flixtally";
 const DESCRIPTION = "Track films you've watched. Discover what to watch next.";
 
 export const metadata: Metadata = {

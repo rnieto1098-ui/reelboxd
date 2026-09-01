@@ -9,7 +9,7 @@ export async function GET() {
   }
 
   const zipBuffer = await exportUserDataZip(session.user.id);
-  const filename = `reelboxd-export-${new Date().toISOString().slice(0, 10)}.zip`;
+  const filename = `flixtally-export-${new Date().toISOString().slice(0, 10)}.zip`;
 
   // NextResponse's BodyInit type doesn't accept a Node Buffer directly
   // (even though Buffer is a Uint8Array at runtime) — wrap it.

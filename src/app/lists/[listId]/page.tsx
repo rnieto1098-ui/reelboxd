@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Image from "next/image";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -20,6 +19,7 @@ import { DeleteListButton } from "@/components/DeleteListButton";
 import { FadeWatchedControl } from "@/components/FadeWatchedControl";
 import { ListCoverUpload } from "@/components/ListCoverUpload";
 import { AvailabilityFilterLinks } from "@/components/AvailabilityFilterLinks";
+import { SortChips } from "@/components/SortChips";
 
 const SORT_OPTIONS = {
   order: { label: "List Order" },
@@ -266,29 +266,14 @@ export default async function ListDetailPage({
 
       {list.items.length > 0 && (
         <div className="mb-6 flex flex-wrap items-center gap-x-6 gap-y-3">
-          <div className="flex flex-wrap items-center gap-1 text-xs">
-            <span className="mr-1 text-muted">Sort:</span>
-            {(Object.keys(SORT_OPTIONS) as SortKey[])
+          <SortChips
+            options={(Object.keys(SORT_OPTIONS) as SortKey[])
               .filter((key) => key !== "rating" || userId)
-              .map((key) => {
-                const isActive = sortKey === key;
-                // Clicking the already-active sort flips its direction;
-                // clicking a different one starts it at the default direction.
-                const nextDir: SortDir = isActive ? (sortDir === "desc" ? "asc" : "desc") : "desc";
-                return (
-                  <Link
-                    key={key}
-                    href={buildHref(listId, key, nextDir, streamingOnly)}
-                    className={`rounded-full px-2.5 py-1 transition-colors ${
-                      isActive ? "bg-accent-green text-black" : "text-muted hover:text-foreground"
-                    }`}
-                  >
-                    {SORT_OPTIONS[key].label}
-                    {isActive && <span className="ml-1">{sortDir === "asc" ? "↑" : "↓"}</span>}
-                  </Link>
-                );
-              })}
-          </div>
+              .map((key) => ({ key, label: SORT_OPTIONS[key].label }))}
+            activeKey={sortKey}
+            activeDir={sortDir}
+            hrefFor={(key, nextDir) => buildHref(listId, key, nextDir, streamingOnly)}
+          />
 
           {session?.user && (
             <AvailabilityFilterLinks

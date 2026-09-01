@@ -4,11 +4,13 @@ import { useRef, type ReactNode } from "react";
 
 export function HorizontalScroller({
   title,
+  headerAction,
   isEmpty,
   emptyMessage,
   children,
 }: {
   title?: string;
+  headerAction?: ReactNode;
   isEmpty: boolean;
   emptyMessage?: ReactNode;
   children: ReactNode;
@@ -24,7 +26,12 @@ export function HorizontalScroller({
 
   return (
     <section>
-      {title && <h2 className="mb-3 text-lg font-semibold">{title}</h2>}
+      {(title || headerAction) && (
+        <div className="mb-3 flex items-center justify-between gap-4">
+          {title && <h2 className="text-lg font-semibold">{title}</h2>}
+          {headerAction}
+        </div>
+      )}
       {isEmpty && emptyMessage ? (
         <p className="text-sm text-muted">{emptyMessage}</p>
       ) : (

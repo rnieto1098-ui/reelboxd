@@ -2,14 +2,24 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useToast } from "@/components/Toast";
 
 export function DeleteDiaryEntryButton({ entryId }: { entryId: string }) {
   const router = useRouter();
+  const showToast = useToast();
   const [removing, setRemoving] = useState(false);
 
   async function handleRemove() {
     setRemoving(true);
-    await fetch(`/api/diary/${entryId}`, { method: "DELETE" });
+    const res = await fetch(`/api/diary/${entryId}`, { method: "DELETE" });
+    setRemoving(false);
+
+    if (!res.ok) {
+      showToast("Couldn't remove that entry — try again.", "error");
+      return;
+    }
+
+    showToast("Diary entry removed");
     router.refresh();
   }
 

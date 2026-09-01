@@ -275,6 +275,11 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
     "Nothing you own or have streaming matches your taste yet — check back soon."
   );
 
+  // MovieRow is a Client Component (shuffle needs local state) — Set isn't
+  // serializable across that boundary, so these cross it as plain arrays.
+  const ownedIdsArray = [...ownedTmdbIds];
+  const watchlistIdsArray = [...watchlistTmdbIds];
+
   return (
     <div className="space-y-10">
       {session?.user && (
@@ -308,14 +313,14 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
       <MovieRow
         title="Popular right now"
         movies={popularWithPosters}
-        ownedIds={ownedTmdbIds}
-        watchlistIds={watchlistTmdbIds}
+        ownedIds={ownedIdsArray}
+        watchlistIds={watchlistIdsArray}
       />
       <MovieRow
         title="Trending this week"
         movies={trendingWithPosters}
-        ownedIds={ownedTmdbIds}
-        watchlistIds={watchlistTmdbIds}
+        ownedIds={ownedIdsArray}
+        watchlistIds={watchlistIdsArray}
       />
       <ListRow title="Lists" lists={listCards} />
       {session?.user && (
@@ -323,8 +328,8 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
           title="For You"
           movies={recommendedWithPosters}
           emptyMessage="Rate a few movies you liked and we'll start recommending things you haven't seen."
-          ownedIds={ownedTmdbIds}
-          watchlistIds={watchlistTmdbIds}
+          ownedIds={ownedIdsArray}
+          watchlistIds={watchlistIdsArray}
         />
       )}
       {comingSoonWithPosters.length > 0 && (
@@ -338,8 +343,8 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
           title="Discover"
           movies={discoverWithPosters}
           emptyMessage={discoverEmptyMessage}
-          ownedIds={ownedTmdbIds}
-          watchlistIds={watchlistTmdbIds}
+          ownedIds={ownedIdsArray}
+          watchlistIds={watchlistIdsArray}
         />
       )}
       {session?.user && watchlistMoviesRaw.length > 0 && (
@@ -347,8 +352,8 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
           title="Rent or Buy"
           movies={rentBuyWithPosters}
           emptyMessage="Nothing on your watchlist currently needs to be rented or bought."
-          ownedIds={ownedTmdbIds}
-          watchlistIds={watchlistTmdbIds}
+          ownedIds={ownedIdsArray}
+          watchlistIds={watchlistIdsArray}
         />
       )}
       {session?.user && upcomingReleasesWithPosters.length > 0 && (
@@ -357,16 +362,16 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
       <MovieRow
         title="Highest Rated"
         movies={highestRatedWithPosters}
-        ownedIds={ownedTmdbIds}
-        watchlistIds={watchlistTmdbIds}
+        ownedIds={ownedIdsArray}
+        watchlistIds={watchlistIdsArray}
       />
       {genreRowsWithPosters.map((row) => (
         <MovieRow
           key={row.title}
           title={row.title}
           movies={row.movies}
-          ownedIds={ownedTmdbIds}
-          watchlistIds={watchlistTmdbIds}
+          ownedIds={ownedIdsArray}
+          watchlistIds={watchlistIdsArray}
         />
       ))}
     </div>

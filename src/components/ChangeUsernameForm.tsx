@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { signOut } from "next-auth/react";
+import { useToast } from "@/components/Toast";
 
 export function ChangeUsernameForm({ currentUsername }: { currentUsername: string }) {
+  const showToast = useToast();
   const [username, setUsername] = useState(currentUsername);
-  const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
 
@@ -13,7 +14,6 @@ export function ChangeUsernameForm({ currentUsername }: { currentUsername: strin
     e.preventDefault();
     if (username === currentUsername) return;
     setSaving(true);
-    setError(null);
 
     const res = await fetch("/api/account/username", {
       method: "POST",
@@ -23,7 +23,7 @@ export function ChangeUsernameForm({ currentUsername }: { currentUsername: strin
     const data = await res.json();
 
     if (!res.ok) {
-      setError(data.error ?? "Something went wrong");
+      showToast(data.error ?? "Something went wrong", "error");
       setSaving(false);
       return;
     }
@@ -60,7 +60,6 @@ export function ChangeUsernameForm({ currentUsername }: { currentUsername: strin
       >
         {saving ? "Saving..." : "Save username"}
       </button>
-      {error && <p className="w-full text-sm text-red-400">{error}</p>}
     </form>
   );
 }

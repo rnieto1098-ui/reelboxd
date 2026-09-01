@@ -4,7 +4,7 @@ import { searchMovies } from "@/lib/tmdb";
 import { applyPosterOverrides, getCustomPosterMap } from "@/lib/customPosters";
 import { getUserWatchlistedTmdbIds } from "@/lib/movies";
 import { getUserOwnedTmdbIds } from "@/lib/streaming";
-import { MovieCard } from "@/components/MovieCard";
+import { SearchResultsGrid } from "@/components/SearchResultsGrid";
 
 // TMDB never returns more than 500 pages for any query, regardless of total_results.
 const MAX_PAGE = 500;
@@ -44,19 +44,11 @@ export default async function SearchPage({
         <p className="text-muted">No movies found.</p>
       )}
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-        {movies.map((movie) => (
-          <MovieCard
-            key={movie.id}
-            tmdbId={movie.id}
-            title={movie.title}
-            posterPath={movie.poster_path}
-            year={movie.release_date?.slice(0, 4)}
-            owned={ownedIds.has(movie.id)}
-            inWatchlist={watchlistIds.has(movie.id)}
-          />
-        ))}
-      </div>
+      <SearchResultsGrid
+        movies={movies}
+        ownedIds={[...ownedIds]}
+        watchlistIds={[...watchlistIds]}
+      />
 
       {results && totalPages > 1 && (
         <div className="mt-8 flex items-center justify-center gap-4 text-sm">

@@ -2,15 +2,25 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useToast } from "@/components/Toast";
 
 export function DeleteListButton({ listId }: { listId: string }) {
   const router = useRouter();
+  const showToast = useToast();
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   async function handleDelete() {
     setDeleting(true);
-    await fetch(`/api/lists/${listId}`, { method: "DELETE" });
+    const res = await fetch(`/api/lists/${listId}`, { method: "DELETE" });
+    setDeleting(false);
+
+    if (!res.ok) {
+      showToast("Couldn't delete that list — try again.", "error");
+      return;
+    }
+
+    showToast("List deleted");
     router.push("/lists");
     router.refresh();
   }

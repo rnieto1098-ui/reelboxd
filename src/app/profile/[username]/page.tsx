@@ -7,9 +7,11 @@ import { prisma } from "@/lib/prisma";
 import { getCustomPosterMap } from "@/lib/customPosters";
 import { getUserWatchlistedTmdbIds } from "@/lib/movies";
 import { getUserOwnedTmdbIds } from "@/lib/streaming";
-import { MovieCard } from "@/components/MovieCard";
-import { HorizontalScroller } from "@/components/HorizontalScroller";
+import { MovieRow } from "@/components/MovieRow";
+import { RecentlyLoggedRow } from "@/components/RecentlyLoggedRow";
+import { SortChips } from "@/components/SortChips";
 import { compareNullableNumbers, type SortDir } from "@/lib/sortComparator";
+import type { TmdbMovieSummary } from "@/lib/tmdb";
 import type { Movie } from "@prisma/client";
 
 const SORT_OPTIONS = {
@@ -225,69 +227,49 @@ export default async function ProfilePage({
 
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-lg font-semibold">Recently logged</h2>
-        <div className="flex gap-1 text-xs">
-          {(Object.keys(SORT_OPTIONS) as SortKey[]).map((key) => {
-            const isActive = sortKey === key;
-            // Clicking the already-active sort flips its direction;
-            // clicking a different one starts it at the default direction.
-            const nextDir: SortDir = isActive ? (sortDir === "desc" ? "asc" : "desc") : "desc";
-            return (
-              <Link
-                key={key}
-                href={buildHref(username, key, nextDir)}
-                className={`rounded-full px-2.5 py-1 transition-colors ${
-                  isActive ? "bg-accent-green text-black" : "text-muted hover:text-foreground"
-                }`}
-              >
-                {SORT_OPTIONS[key].label}
-                {isActive && <span className="ml-1">{sortDir === "asc" ? "↑" : "↓"}</span>}
-              </Link>
-            );
-          })}
-        </div>
+        <SortChips
+          options={(Object.keys(SORT_OPTIONS) as SortKey[]).map((key) => ({
+            key,
+            label: SORT_OPTIONS[key].label,
+          }))}
+          activeKey={sortKey}
+          activeDir={sortDir}
+          hrefFor={(key, nextDir) => buildHref(username, key, nextDir)}
+        />
       </div>
 
-      <HorizontalScroller
-        isEmpty={recentEntries.length === 0}
-        emptyMessage="Nothing logged or rated yet."
-      >
-        {recentEntries.map((e) => (
-          <div key={e.movie.id} className="w-24 flex-shrink-0 sm:w-28">
-            <MovieCard
-              tmdbId={e.movie.tmdbId}
-              title={e.movie.title}
-              posterPath={posterOverrides.get(e.movie.tmdbId) ?? e.movie.posterPath}
-              year={e.movie.releaseDate?.slice(0, 4)}
-              owned={viewerOwnedIds.has(e.movie.tmdbId)}
-              inWatchlist={viewerWatchlistIds.has(e.movie.tmdbId)}
-            />
-            <p className="mt-1 text-xs text-accent-green">
-              {e.score != null ? `${e.score.toFixed(1)} ★` : "Logged"}
-              {e.logCount > 1 ? ` · ${e.logCount}×` : ""}
-            </p>
-          </div>
-        ))}
-      </HorizontalScroller>
+      <RecentlyLoggedRow
+        entries={recentEntries.map((e) => ({
+          id: e.movie.id,
+          tmdbId: e.movie.tmdbId,
+          title: e.movie.title,
+          posterPath: posterOverrides.get(e.movie.tmdbId) ?? e.movie.posterPath,
+          year: e.movie.releaseDate?.slice(0, 4),
+          score: e.score,
+          logCount: e.logCount,
+          owned: viewerOwnedIds.has(e.movie.tmdbId),
+          inWatchlist: viewerWatchlistIds.has(e.movie.tmdbId),
+        }))}
+      />
 
       <div className="mt-10">
-        <HorizontalScroller
+        <MovieRow
           title="Owned movies"
-          isEmpty={user.owned.length === 0}
           emptyMessage="No owned movies marked yet."
-        >
-          {user.owned.map((o) => (
-            <div key={o.id} className="w-24 flex-shrink-0 sm:w-28">
-              <MovieCard
-                tmdbId={o.movie.tmdbId}
-                title={o.movie.title}
-                posterPath={posterOverrides.get(o.movie.tmdbId) ?? o.movie.posterPath}
-                year={o.movie.releaseDate?.slice(0, 4)}
-                owned={viewerOwnedIds.has(o.movie.tmdbId)}
-                inWatchlist={viewerWatchlistIds.has(o.movie.tmdbId)}
-              />
-            </div>
-          ))}
-        </HorizontalScroller>
+          ownedIds={[...viewerOwnedIds]}
+          watchlistIds={[...viewerWatchlistIds]}
+          movies={user.owned.map(
+            (o): TmdbMovieSummary => ({
+              id: o.movie.tmdbId,
+              title: o.movie.title,
+              overview: "",
+              poster_path: posterOverrides.get(o.movie.tmdbId) ?? o.movie.posterPath,
+              backdrop_path: null,
+              release_date: o.movie.releaseDate ?? "",
+              vote_average: 0,
+            })
+          )}
+        />
       </div>
     </div>
   );

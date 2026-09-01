@@ -1,6 +1,10 @@
-import type { ReactNode } from "react";
+"use client";
+
+import { useMemo, type ReactNode } from "react";
 import { MovieCard } from "@/components/MovieCard";
 import { HorizontalScroller } from "@/components/HorizontalScroller";
+import { ShuffleButton } from "@/components/ShuffleButton";
+import { useShuffle } from "@/lib/useShuffle";
 import type { TmdbMovieSummary } from "@/lib/tmdb";
 
 export function MovieRow({
@@ -13,20 +17,33 @@ export function MovieRow({
   title: string;
   movies: TmdbMovieSummary[];
   emptyMessage?: ReactNode;
-  ownedIds?: Set<number>;
-  watchlistIds?: Set<number>;
+  // Plain arrays, not Set — Set isn't serializable across the Server-to-
+  // Client Component boundary this component now sits behind.
+  ownedIds?: number[];
+  watchlistIds?: number[];
 }) {
+  const { order, shuffle } = useShuffle(movies);
+  const ownedSet = useMemo(() => new Set(ownedIds), [ownedIds]);
+  const watchlistSet = useMemo(() => new Set(watchlistIds), [watchlistIds]);
+
   return (
-    <HorizontalScroller title={title} isEmpty={movies.length === 0} emptyMessage={emptyMessage}>
-      {movies.map((movie) => (
+    <HorizontalScroller
+      title={title}
+      headerAction={
+        movies.length > 1 && <ShuffleButton onClick={shuffle} />
+      }
+      isEmpty={movies.length === 0}
+      emptyMessage={emptyMessage}
+    >
+      {order.map((movie) => (
         <div key={movie.id} className="w-24 flex-shrink-0 sm:w-28">
           <MovieCard
             tmdbId={movie.id}
             title={movie.title}
             posterPath={movie.poster_path}
             year={movie.release_date?.slice(0, 4)}
-            owned={ownedIds?.has(movie.id)}
-            inWatchlist={watchlistIds?.has(movie.id)}
+            owned={ownedSet.has(movie.id)}
+            inWatchlist={watchlistSet.has(movie.id)}
           />
         </div>
       ))}

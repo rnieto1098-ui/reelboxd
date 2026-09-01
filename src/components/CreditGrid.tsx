@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { MovieCard } from "@/components/MovieCard";
+import { ShuffleButton } from "@/components/ShuffleButton";
+import { useShuffle } from "@/lib/useShuffle";
 
 const INITIAL_SHOWN = 24;
 
@@ -15,15 +17,6 @@ export type CreditDisplay = {
   watched: boolean;
 };
 
-function shuffled<T>(list: T[]): T[] {
-  const result = [...list];
-  for (let i = result.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [result[i], result[j]] = [result[j], result[i]];
-  }
-  return result;
-}
-
 // Client component so "Show all" can expand in place — the section header
 // always showed the true count (e.g. "Directing (247)") even though only
 // the first 24 ever rendered, with no way to see the rest. Takes plain,
@@ -32,15 +25,7 @@ function shuffled<T>(list: T[]): T[] {
 // as MovieCard/MovieRow elsewhere in this app.
 export function CreditGrid({ title, credits }: { title: string; credits: CreditDisplay[] }) {
   const [expanded, setExpanded] = useState(false);
-  const [order, setOrder] = useState(credits);
-  // credits is a new array whenever this department's data actually
-  // changes (a different person's page) — reset to that order instead of
-  // carrying a stale shuffle across it.
-  const [prevCredits, setPrevCredits] = useState(credits);
-  if (credits !== prevCredits) {
-    setPrevCredits(credits);
-    setOrder(credits);
-  }
+  const { order, shuffle } = useShuffle(credits);
 
   if (credits.length === 0) return null;
 
@@ -53,14 +38,7 @@ export function CreditGrid({ title, credits }: { title: string; credits: CreditD
         <h2 className="text-lg font-semibold">
           {title} <span className="text-sm font-normal text-muted">({credits.length})</span>
         </h2>
-        <button
-          type="button"
-          onClick={() => setOrder(shuffled(credits))}
-          disabled={credits.length < 2}
-          className="rounded-full border border-border px-2.5 py-1 text-xs text-muted transition-colors hover:text-foreground hover:border-accent-green disabled:opacity-50 disabled:hover:text-muted disabled:hover:border-border"
-        >
-          🔀 Shuffle
-        </button>
+        <ShuffleButton onClick={shuffle} disabled={credits.length < 2} />
       </div>
       <div className="grid grid-cols-3 gap-4 sm:grid-cols-4 md:grid-cols-6">
         {shown.map((credit) => (

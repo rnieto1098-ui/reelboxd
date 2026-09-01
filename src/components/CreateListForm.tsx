@@ -2,21 +2,21 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useToast } from "@/components/Toast";
 
 export function CreateListForm() {
   const router = useRouter();
+  const showToast = useToast();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) return;
 
     setSaving(true);
-    setError(null);
 
     const res = await fetch("/api/lists", {
       method: "POST",
@@ -27,7 +27,7 @@ export function CreateListForm() {
     setSaving(false);
 
     if (!res.ok) {
-      setError(body.error ?? "Couldn't create that list");
+      showToast(body.error ?? "Couldn't create that list", "error");
       return;
     }
 
@@ -66,7 +66,6 @@ export function CreateListForm() {
         rows={2}
         className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm placeholder:text-muted focus:outline-none focus:border-accent-green"
       />
-      {error && <p className="text-sm text-red-400">{error}</p>}
       <div className="flex gap-2">
         <button
           type="submit"

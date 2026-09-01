@@ -1,21 +1,20 @@
 "use client";
 
 import { useState } from "react";
+import { useToast } from "@/components/Toast";
 
 export function ChangePasswordForm() {
+  const showToast = useToast();
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [done, setDone] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
 
     if (newPassword !== confirmPassword) {
-      setError("New passwords don't match");
+      showToast("New passwords don't match", "error");
       return;
     }
 
@@ -29,15 +28,14 @@ export function ChangePasswordForm() {
     setSaving(false);
 
     if (!res.ok) {
-      setError(data.error ?? "Something went wrong");
+      showToast(data.error ?? "Something went wrong", "error");
       return;
     }
 
     setCurrentPassword("");
     setNewPassword("");
     setConfirmPassword("");
-    setDone(true);
-    setTimeout(() => setDone(false), 3000);
+    showToast("Password updated");
   }
 
   return (
@@ -71,17 +69,13 @@ export function ChangePasswordForm() {
           />
         </div>
       </div>
-      <div className="flex items-center gap-3">
-        <button
-          type="submit"
-          disabled={saving || !currentPassword || !newPassword}
-          className="w-fit rounded-md bg-accent-green px-3 py-1.5 text-sm font-medium text-black hover:opacity-90 transition-opacity disabled:opacity-50"
-        >
-          {saving ? "Saving..." : "Change password"}
-        </button>
-        {done && <span className="text-sm text-accent-green">Password updated.</span>}
-      </div>
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      <button
+        type="submit"
+        disabled={saving || !currentPassword || !newPassword}
+        className="w-fit rounded-md bg-accent-green px-3 py-1.5 text-sm font-medium text-black hover:opacity-90 transition-opacity disabled:opacity-50"
+      >
+        {saving ? "Saving..." : "Change password"}
+      </button>
     </form>
   );
 }

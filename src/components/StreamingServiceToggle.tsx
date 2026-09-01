@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { logoUrl } from "@/lib/tmdb";
+import { useToast } from "@/components/Toast";
 
 export function StreamingServiceToggle({
   providerId,
@@ -17,6 +18,7 @@ export function StreamingServiceToggle({
   initialSelected: boolean;
 }) {
   const router = useRouter();
+  const showToast = useToast();
   const [selected, setSelected] = useState(initialSelected);
   const [saving, setSaving] = useState(false);
 
@@ -24,18 +26,27 @@ export function StreamingServiceToggle({
     setSaving(true);
     const next = !selected;
 
-    if (next) {
-      await fetch(`/api/streaming-services/${providerId}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ providerName, logoPath }),
-      });
-    } else {
-      await fetch(`/api/streaming-services/${providerId}`, { method: "DELETE" });
+    const res = next
+      ? await fetch(`/api/streaming-services/${providerId}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ providerName, logoPath }),
+        })
+      : await fetch(`/api/streaming-services/${providerId}`, { method: "DELETE" });
+
+    setSaving(false);
+
+    // No success toast here on purpose — this grid is usually clicked
+    // several times in a row while setting up services, and a toast per
+    // tile would pile up. The ring highlight is the success feedback;
+    // failure still needs a toast since the toggle would otherwise look
+    // like it worked.
+    if (!res.ok) {
+      showToast(`Couldn't update ${providerName} — try again.`, "error");
+      return;
     }
 
     setSelected(next);
-    setSaving(false);
     router.refresh();
   }
 

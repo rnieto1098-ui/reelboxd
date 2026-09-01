@@ -12,14 +12,10 @@ import {
 import type { TmdbWatchProvider } from "@/lib/tmdb";
 import { WatchlistGrid } from "@/components/WatchlistGrid";
 import { WatchlistImportForm } from "@/components/WatchlistImportForm";
+import { AvailabilityFilterLinks } from "@/components/AvailabilityFilterLinks";
+import { SortChips } from "@/components/SortChips";
+import type { SortDir } from "@/lib/sortComparator";
 import type { Prisma } from "@prisma/client";
-
-const TABS = {
-  available: { label: "Streaming on your services" },
-  unavailable: { label: "Not on your services yet" },
-} satisfies Record<string, { label: string }>;
-
-type TabKey = keyof typeof TABS;
 
 const SORT_OPTIONS = {
   added: { label: "Date Added", orderBy: (dir: Prisma.SortOrder) => ({ addedAt: dir }) },
@@ -42,13 +38,12 @@ const SORT_OPTIONS = {
 >;
 
 type SortKey = keyof typeof SORT_OPTIONS;
-type SortDir = "asc" | "desc";
 
-function buildHref(sortKey: SortKey, dir: SortDir, tab: TabKey) {
+function buildHref(sortKey: SortKey, dir: SortDir, streamingOnly: boolean) {
   const params = new URLSearchParams();
   if (sortKey !== "added") params.set("sort", sortKey);
   if (dir !== "desc") params.set("dir", dir);
-  if (tab !== "available") params.set("tab", tab);
+  if (streamingOnly) params.set("streaming", "1");
   const qs = params.toString();
   return `/watchlist${qs ? `?${qs}` : ""}`;
 }
@@ -57,8 +52,8 @@ export default async function WatchlistPage({ searchParams }: PageProps<"/watchl
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
-  const { tab, sort, dir } = await searchParams;
-  const activeTab: TabKey = tab === "unavailable" ? "unavailable" : "available";
+  const { streaming, sort, dir } = await searchParams;
+  const streamingOnly = streaming === "1";
   const sortKey: SortKey = typeof sort === "string" && sort in SORT_OPTIONS ? (sort as SortKey) : "added";
   const sortDir: SortDir = dir === "asc" ? "asc" : "desc";
 
@@ -87,11 +82,13 @@ export default async function WatchlistPage({ searchParams }: PageProps<"/watchl
   );
 
   const hasServicesConfigured = userProviderIds.size > 0;
-  const canSplit = hasStreamingAvailability(userProviderIds, ownedTmdbIds);
+  const canFilterByAvailability = hasStreamingAvailability(userProviderIds, ownedTmdbIds);
+  const applyStreamingFilter = streamingOnly && canFilterByAvailability;
   const isAvailable = ({ providers, owned }: { providers: TmdbWatchProvider[]; owned: boolean }) =>
     owned || isAvailableOnServices(providers, userProviderIds);
-  const streamingNow = withAvailability.filter(isAvailable);
-  const notStreaming = withAvailability.filter((entry) => !isAvailable(entry));
+  const visibleEntries = applyStreamingFilter
+    ? withAvailability.filter(isAvailable)
+    : withAvailability;
 
   return (
     <div>
@@ -108,27 +105,27 @@ export default async function WatchlistPage({ searchParams }: PageProps<"/watchl
         </div>
       </div>
 
+      {items.length > 0 && (
+        <AvailabilityFilterLinks
+          allHref={buildHref(sortKey, sortDir, false)}
+          streamingHref={buildHref(sortKey, sortDir, true)}
+          streamingOnly={streamingOnly}
+          canFilterByAvailability={canFilterByAvailability}
+          className="mb-6"
+        />
+      )}
+
       {items.length > 1 && (
-        <div className="mb-6 flex flex-wrap items-center gap-1 text-xs">
-          <span className="mr-1 text-muted">Sort:</span>
-          {(Object.keys(SORT_OPTIONS) as SortKey[]).map((key) => {
-            const isActive = sortKey === key;
-            // Clicking the already-active sort flips its direction;
-            // clicking a different one starts it at the default direction.
-            const nextDir: SortDir = isActive ? (sortDir === "desc" ? "asc" : "desc") : "desc";
-            return (
-              <Link
-                key={key}
-                href={buildHref(key, nextDir, activeTab)}
-                className={`rounded-full px-2.5 py-1 transition-colors ${
-                  isActive ? "bg-accent-green text-black" : "text-muted hover:text-foreground"
-                }`}
-              >
-                {SORT_OPTIONS[key].label}
-                {isActive && <span className="ml-1">{sortDir === "asc" ? "↑" : "↓"}</span>}
-              </Link>
-            );
-          })}
+        <div className="mb-6">
+          <SortChips
+            options={(Object.keys(SORT_OPTIONS) as SortKey[]).map((key) => ({
+              key,
+              label: SORT_OPTIONS[key].label,
+            }))}
+            activeKey={sortKey}
+            activeDir={sortDir}
+            hrefFor={(key, nextDir) => buildHref(key, nextDir, streamingOnly)}
+          />
         </div>
       )}
 
@@ -136,54 +133,12 @@ export default async function WatchlistPage({ searchParams }: PageProps<"/watchl
         <p className="text-muted">
           Nothing here yet. Find a movie and click &ldquo;+ Watchlist&rdquo; to add it.
         </p>
-      ) : !canSplit ? (
-        <>
-          <p className="mb-6 text-sm text-muted">
-            <Link href="/streaming" className="text-accent-green hover:underline">
-              Add the streaming services you subscribe to
-            </Link>{" "}
-            (or mark movies as owned) and we&apos;ll split this list into what you can watch right
-            now and what you can&apos;t.
-          </p>
-          <WatchlistGrid entries={withAvailability} />
-        </>
+      ) : visibleEntries.length === 0 ? (
+        <p className="text-sm text-muted">
+          None of your watchlist is currently on your services or owned.
+        </p>
       ) : (
-        <div>
-          <div className="mb-8 flex justify-center">
-            <div className="inline-flex rounded-full border border-border bg-surface p-1">
-              {(Object.keys(TABS) as TabKey[]).map((key) => {
-                const count = key === "available" ? streamingNow.length : notStreaming.length;
-                return (
-                  <Link
-                    key={key}
-                    href={buildHref(sortKey, sortDir, key)}
-                    className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-                      activeTab === key
-                        ? "bg-accent-green text-black"
-                        : "text-muted hover:text-foreground"
-                    }`}
-                  >
-                    {TABS[key].label} <span className="opacity-70">({count})</span>
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-
-          {activeTab === "available" ? (
-            streamingNow.length === 0 ? (
-              <p className="text-sm text-muted">
-                None of your watchlist is currently on your services or owned.
-              </p>
-            ) : (
-              <WatchlistGrid entries={streamingNow} />
-            )
-          ) : notStreaming.length === 0 ? (
-            <p className="text-sm text-muted">Everything on your watchlist is covered.</p>
-          ) : (
-            <WatchlistGrid entries={notStreaming} />
-          )}
-        </div>
+        <WatchlistGrid entries={visibleEntries} />
       )}
     </div>
   );

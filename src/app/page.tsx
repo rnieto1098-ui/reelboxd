@@ -20,12 +20,14 @@ import {
   hasStreamingAvailability,
 } from "@/lib/streaming";
 import { getHomepageListCards, getCuratedListsProgress } from "@/lib/systemLists";
+import { getGoalProgress } from "@/lib/goals";
 import { MovieRow } from "@/components/MovieRow";
 import { ListRow } from "@/components/ListRow";
 import { UpcomingReleasesRow } from "@/components/UpcomingReleasesRow";
 import { CuratedListsProgress } from "@/components/CuratedListsProgress";
 import { AvailabilityFilterLinks } from "@/components/AvailabilityFilterLinks";
 import { OnboardingChecklist, type ChecklistItem } from "@/components/OnboardingChecklist";
+import { WatchGoalWidget } from "@/components/WatchGoalWidget";
 
 const WELCOME_PHRASES = [
   "Here's what we think you'll love next.",
@@ -65,6 +67,8 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
   // eslint-disable-next-line react-hooks/purity -- intentional per-request randomness in a Server Component
   const welcomePhrase = WELCOME_PHRASES[Math.floor(Math.random() * WELCOME_PHRASES.length)];
 
+  const currentYear = new Date().getFullYear();
+
   const [
     comingSoonRaw,
     watchedIds,
@@ -73,6 +77,7 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
     ownedTmdbIds,
     watchlistTmdbIds,
     listCards,
+    goal,
     watchlistRows,
   ] = await Promise.all([
       getUpcomingMovies(),
@@ -82,6 +87,7 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
       getUserOwnedTmdbIds(userId),
       getUserWatchlistedTmdbIds(userId),
       getHomepageListCards(userId),
+      userId ? getGoalProgress(userId, currentYear) : Promise.resolve(null),
       userId
         ? prisma.watchlistItem.findMany({
             where: { userId },
@@ -266,6 +272,16 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
           <h1 className="text-2xl font-bold">Welcome back, {session.user.name}.</h1>
           <p className="mt-1 text-muted">{welcomePhrase}</p>
         </div>
+      )}
+
+      {session?.user && goal && (
+        <WatchGoalWidget
+          year={goal.year}
+          target={goal.target}
+          count={goal.count}
+          percent={goal.percent}
+          isOwner
+        />
       )}
 
       {session?.user && (

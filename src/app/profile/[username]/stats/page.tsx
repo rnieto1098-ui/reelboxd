@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import {
   getUserStats,
@@ -9,8 +8,6 @@ import {
   formatWatchTime,
 } from "@/lib/stats";
 import { getTopPeopleStats } from "@/lib/peopleStats";
-import { getGoalProgress } from "@/lib/goals";
-import { WatchGoalWidget } from "@/components/WatchGoalWidget";
 import { ReleaseYearChart } from "@/components/ReleaseYearChart";
 import { PersonRankList } from "@/components/PersonRankList";
 import { YearMovieList } from "@/components/YearMovieList";
@@ -26,7 +23,6 @@ function StatTile({ label, value }: { label: string; value: string | number }) {
 
 export default async function StatsPage({ params }: PageProps<"/profile/[username]/stats">) {
   const { username } = await params;
-  const session = await auth();
 
   const user = await prisma.user.findUnique({
     where: { username },
@@ -34,12 +30,10 @@ export default async function StatsPage({ params }: PageProps<"/profile/[usernam
   });
   if (!user) notFound();
 
-  const isOwnProfile = session?.user?.id === user.id;
   const currentYear = new Date().getFullYear();
 
-  const [stats, goal, topPeople, releaseYears, yearMovies] = await Promise.all([
+  const [stats, topPeople, releaseYears, yearMovies] = await Promise.all([
     getUserStats(user.id),
-    getGoalProgress(user.id, currentYear),
     getTopPeopleStats(user.id),
     getReleaseYearDistribution(user.id),
     getYearMovieLists(user.id, currentYear),
@@ -56,16 +50,6 @@ export default async function StatsPage({ params }: PageProps<"/profile/[usernam
         ← {username}
       </Link>
       <h1 className="mt-1 mb-8 text-3xl font-bold">{username}&apos;s Stats</h1>
-
-      <div className="mb-8">
-        <WatchGoalWidget
-          year={goal.year}
-          target={goal.target}
-          count={goal.count}
-          percent={goal.percent}
-          isOwner={isOwnProfile}
-        />
-      </div>
 
       {stats.totalLogged === 0 ? (
         <p className="text-muted">Nothing logged yet — stats will show up here once you do.</p>

@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { ensureMovieCached } from "@/lib/movies";
 import { createDiaryEntry } from "@/lib/diary";
+import { checkNewlyCompletedChallenges, type ChallengeCompletion } from "@/lib/challenges";
+import { checkGoalJustCompleted } from "@/lib/goals";
 
 // Letterboxd blocks requests without a browser-like User-Agent (a bare
 // Node fetch gets a 403), so this has to look like an actual browser.
@@ -87,6 +89,8 @@ export type LetterboxdSyncSummary = {
   ratingsImported: number;
   likesImported: number;
   skipped: number;
+  completedChallenges: ChallengeCompletion[];
+  completedGoal: { year: number; target: number } | null;
 };
 
 // Pulls the user's Letterboxd diary RSS and creates any log entries that
@@ -97,9 +101,11 @@ export type LetterboxdSyncSummary = {
 // data instead of a click. One-way only: nothing here ever writes back to
 // Letterboxd.
 //
-// Deliberately skips the challenge/goal "just completed" checks that a live
-// diary log triggers — those are cheap for one click, not for a sync that
-// can import dozens of entries in a single run (worse on a first sync).
+// Runs the same challenge/goal "just completed" checks a live diary log
+// triggers, so a Letterboxd watch counts toward challenges and the yearly
+// goal exactly like logging in Flixtally directly would. Rewatches can't
+// newly satisfy a challenge (those count distinct movies, already counted
+// on the first watch) but can still push the yearly goal over.
 export async function syncLetterboxdDiary(
   userId: string,
   username: string
@@ -117,7 +123,10 @@ export async function syncLetterboxdDiary(
     ratingsImported: 0,
     likesImported: 0,
     skipped: 0,
+    completedChallenges: [],
+    completedGoal: null,
   };
+  const seenChallengeIds = new Set<string>();
 
   for (const entry of entries) {
     if (seenGuids.has(entry.guid)) continue;
@@ -133,10 +142,12 @@ export async function syncLetterboxdDiary(
       continue;
     }
 
+    const watchedDate = new Date(`${entry.watchedDate}T00:00:00.000Z`);
+
     await createDiaryEntry({
       userId,
       movieId: movie.id,
-      watchedDate: new Date(`${entry.watchedDate}T00:00:00.000Z`),
+      watchedDate,
       rewatch: entry.rewatch,
     });
     summary.imported++;
@@ -160,6 +171,17 @@ export async function syncLetterboxdDiary(
     }
 
     await prisma.letterboxdSyncItem.create({ data: { userId, guid: entry.guid } });
+
+    const [newlyCompleted, justCompletedGoal] = await Promise.all([
+      entry.rewatch ? Promise.resolve([]) : checkNewlyCompletedChallenges(userId, movie, watchedDate),
+      checkGoalJustCompleted(userId, watchedDate),
+    ]);
+    for (const c of newlyCompleted) {
+      if (seenChallengeIds.has(c.id)) continue;
+      seenChallengeIds.add(c.id);
+      summary.completedChallenges.push(c);
+    }
+    if (justCompletedGoal) summary.completedGoal = justCompletedGoal;
   }
 
   await prisma.user.update({ where: { id: userId }, data: { letterboxdSyncedAt: new Date() } });

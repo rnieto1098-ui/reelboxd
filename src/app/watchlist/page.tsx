@@ -108,9 +108,12 @@ export default async function WatchlistPage({ searchParams }: PageProps<"/watchl
     ? withAvailability.filter(isAvailable)
     : withAvailability;
 
+  const onServicesCount = withAvailability.filter(isAvailable).length;
+  const offServicesCount = items.length - onServicesCount;
+
   return (
     <div>
-      <div className="mb-4 flex items-center justify-between gap-4">
+      <div className="mb-1 flex items-center justify-between gap-4">
         <h1 className="text-2xl font-bold">Your Watchlist</h1>
         <div className="flex items-center gap-4">
           <WatchlistImportForm />
@@ -122,6 +125,17 @@ export default async function WatchlistPage({ searchParams }: PageProps<"/watchl
           </Link>
         </div>
       </div>
+
+      {items.length > 0 && (
+        <p className="mb-4 text-sm text-muted">
+          {items.length} movie{items.length === 1 ? "" : "s"}
+          {canFilterByAvailability && (
+            <>
+              {" "}· {onServicesCount} on your services · {offServicesCount} off
+            </>
+          )}
+        </p>
+      )}
 
       {items.length > 0 && (
         <AvailabilityFilterLinks

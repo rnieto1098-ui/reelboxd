@@ -237,6 +237,111 @@ export async function deleteChallenge(userId: string, id: string) {
   await prisma.challenge.deleteMany({ where: { id, userId } });
 }
 
+function pickWeighted<T>(candidates: { item: T; weight: number }[]): T | null {
+  const total = candidates.reduce((sum, c) => sum + c.weight, 0);
+  if (total <= 0) return null;
+  let roll = Math.random() * total;
+  for (const { item, weight } of candidates) {
+    roll -= weight;
+    if (roll <= 0) return item;
+  }
+  return candidates[candidates.length - 1].item;
+}
+
+export type RandomChallengeInput =
+  | { type: "GENRE"; genreName: string; target: number }
+  | { type: "TIMEFRAME"; startDate: Date; endDate: Date; target: number }
+  | { type: "CREW"; personId: number; personName: string; department: string | null };
+
+const RECENT_WINDOW_DAYS = 30;
+
+// Builds a challenge tailored to what the user actually watches, rather
+// than a blank form: a genre they already gravitate toward (challenged to
+// watch a handful more than they already have), a director they keep
+// coming back to (turned into a completionist goal, same idea as "watch
+// all of Scorsese's movies"), or — always available, even for a brand new
+// account with no diary history yet — a "match your own recent pace over
+// the next 30 days" time-frame goal. One candidate is picked per call,
+// weighted by how strongly it shows up in their diary, so clicking again
+// can surface something different each time.
+export async function generateRandomChallenge(userId: string): Promise<RandomChallengeInput> {
+  const [entries, existing, recentCount] = await Promise.all([
+    prisma.diaryEntry.findMany({
+      where: { userId },
+      select: { movie: { select: { genres: true, directorId: true, directorName: true } } },
+      distinct: ["movieId"],
+    }),
+    prisma.challenge.findMany({
+      where: { userId },
+      select: { type: true, genreName: true, personId: true, department: true },
+    }),
+    timeframeCount(
+      userId,
+      new Date(Date.now() - RECENT_WINDOW_DAYS * 24 * 60 * 60 * 1000),
+      new Date()
+    ),
+  ]);
+
+  const existingGenreNames = new Set(
+    existing.filter((c) => c.type === "GENRE").map((c) => c.genreName)
+  );
+  const existingCrewKeys = new Set(
+    existing.filter((c) => c.type === "CREW").map((c) => `${c.personId}:${c.department}`)
+  );
+
+  const genreCounts: Record<string, number> = {};
+  const directorCounts = new Map<number, { name: string; count: number }>();
+  for (const entry of entries) {
+    for (const genre of parseGenres(entry.movie.genres)) {
+      genreCounts[genre] = (genreCounts[genre] ?? 0) + 1;
+    }
+    if (entry.movie.directorId != null && entry.movie.directorName) {
+      const existingDirector = directorCounts.get(entry.movie.directorId);
+      if (existingDirector) existingDirector.count++;
+      else directorCounts.set(entry.movie.directorId, { name: entry.movie.directorName, count: 1 });
+    }
+  }
+
+  const genreCandidates = Object.entries(genreCounts)
+    .filter(([name]) => !existingGenreNames.has(name))
+    .map(([name, count]) => ({ item: name, weight: count }));
+
+  // Only directors the user has watched more than once — one-off credits
+  // don't say much about taste, and a size-1 filmography quota would be a
+  // trivially "complete" challenge from the moment it's created.
+  const crewCandidates = [...directorCounts.entries()]
+    .filter(([id, d]) => d.count >= 2 && !existingCrewKeys.has(`${id}:Directing`))
+    .map(([id, d]) => ({ item: { personId: id, personName: d.name }, weight: d.count }));
+
+  const typeChoices: { item: "GENRE" | "CREW" | "TIMEFRAME"; weight: number }[] = [
+    ...(genreCandidates.length > 0 ? [{ item: "GENRE" as const, weight: 2 }] : []),
+    ...(crewCandidates.length > 0 ? [{ item: "CREW" as const, weight: 2 }] : []),
+    { item: "TIMEFRAME" as const, weight: 1 },
+  ];
+
+  const chosenType = pickWeighted(typeChoices) ?? "TIMEFRAME";
+
+  if (chosenType === "GENRE") {
+    const genreName = pickWeighted(genreCandidates)!;
+    const target = genreCounts[genreName] + 3 + Math.floor(Math.random() * 4); // a few more than they've already logged
+    return { type: "GENRE", genreName, target };
+  }
+
+  if (chosenType === "CREW") {
+    const person = pickWeighted(crewCandidates)!;
+    return {
+      type: "CREW",
+      personId: person.personId,
+      personName: person.personName,
+      department: "Directing",
+    };
+  }
+
+  const startDate = new Date();
+  const endDate = new Date(startDate.getTime() + RECENT_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+  return { type: "TIMEFRAME", startDate, endDate, target: Math.max(3, recentCount) };
+}
+
 const SUGGESTION_COUNT = 12;
 
 // Popular movies that would actually count toward a GENRE or TIMEFRAME

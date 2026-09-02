@@ -6,6 +6,7 @@ import { getChallengesWithProgress, type ChallengeSummary } from "@/lib/challeng
 import { getGenres } from "@/lib/tmdb";
 import { WatchGoalWidget } from "@/components/WatchGoalWidget";
 import { NewChallengeForm } from "@/components/NewChallengeForm";
+import { RandomChallengeButton } from "@/components/RandomChallengeButton";
 import { DeleteChallengeButton } from "@/components/DeleteChallengeButton";
 
 const TYPE_LABEL: Record<ChallengeSummary["type"], string> = {
@@ -83,8 +84,9 @@ export default async function ChallengesPage() {
 
       <section>
         <h2 className="mb-3 text-lg font-semibold">Custom challenges</h2>
-        <div className="mb-4">
+        <div className="mb-4 flex flex-wrap items-start gap-2">
           <NewChallengeForm genres={genreNames} />
+          <RandomChallengeButton />
         </div>
 
         {challenges.length === 0 ? (

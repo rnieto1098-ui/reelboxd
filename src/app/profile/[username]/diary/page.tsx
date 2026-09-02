@@ -5,10 +5,16 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { posterUrl } from "@/lib/tmdb";
 import { getCustomPosterMap } from "@/lib/customPosters";
+import { getGoalProgress } from "@/lib/goals";
+import { yearBounds } from "@/lib/dates";
 import { DeleteDiaryEntryButton } from "@/components/DeleteDiaryEntryButton";
 
-export default async function DiaryPage({ params }: PageProps<"/profile/[username]/diary">) {
+export default async function DiaryPage({
+  params,
+  searchParams,
+}: PageProps<"/profile/[username]/diary">) {
   const { username } = await params;
+  const { year: yearParam } = await searchParams;
   const session = await auth();
 
   const user = await prisma.user.findUnique({
@@ -19,9 +25,18 @@ export default async function DiaryPage({ params }: PageProps<"/profile/[usernam
 
   const isOwnProfile = session?.user?.id === user.id;
 
+  const year =
+    typeof yearParam === "string" && Number.isFinite(Number(yearParam))
+      ? Number(yearParam)
+      : null;
+  const goal = year != null ? await getGoalProgress(user.id, year) : null;
+  const bounds = year != null ? yearBounds(year) : null;
+
   const [entries, ratings] = await Promise.all([
     prisma.diaryEntry.findMany({
-      where: { userId: user.id },
+      where: bounds
+        ? { userId: user.id, watchedDate: { gte: bounds.start, lt: bounds.end } }
+        : { userId: user.id },
       include: { movie: true },
       orderBy: { watchedDate: "desc" },
     }),
@@ -55,13 +70,28 @@ export default async function DiaryPage({ params }: PageProps<"/profile/[usernam
       >
         ← {username}
       </Link>
-      <h1 className="mt-1 text-2xl font-bold">{username}&apos;s Diary</h1>
-      <p className="mb-8 text-sm text-muted">
-        {entries.length} logged watch{entries.length === 1 ? "" : "es"}
-      </p>
+      <h1 className="mt-1 text-2xl font-bold">
+        {username}&apos;s Diary{year != null && ` — ${year} Challenge`}
+      </h1>
+      <div className="mb-8">
+        <p className="text-sm text-muted">
+          {entries.length} logged watch{entries.length === 1 ? "" : "es"}
+          {goal?.target != null && ` toward the ${year} goal of ${goal.target}`}
+        </p>
+        {year != null && (
+          <Link
+            href={`/profile/${username}/diary`}
+            className="text-xs text-muted hover:text-foreground hover:underline"
+          >
+            Show entire diary
+          </Link>
+        )}
+      </div>
 
       {entries.length === 0 ? (
-        <p className="text-muted">No diary entries yet.</p>
+        <p className="text-muted">
+          {year != null ? `No entries logged in ${year} yet.` : "No diary entries yet."}
+        </p>
       ) : (
         <div className="space-y-8">
           {groups.map((group) => (

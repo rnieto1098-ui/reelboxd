@@ -128,6 +128,7 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
           count={goal.count}
           percent={goal.percent}
           isOwner
+          username={session.user.name ?? ""}
         />
       )}
 

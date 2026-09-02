@@ -34,6 +34,7 @@ model User {
   streamingServices StreamingService[]
   lists             List[]
   watchGoals        WatchGoal[]
+  challenges        Challenge[]
 }
 
 model Account {
@@ -277,6 +278,42 @@ model RateLimitHit {
   createdAt DateTime @default(now())
 
   @@index([key, createdAt])
+}
+
+// A user-created custom challenge, shown on the Challenges tab. The built-in
+// yearly challenge (homepage widget) stays on WatchGoal — this model is only
+// for the custom ones a user builds for themselves: a genre quota, a quota
+// within an arbitrary date range, or a "watch this person's whole
+// filmography" completionist goal. type is one of "GENRE" | "TIMEFRAME" |
+// "CREW" — plain String rather than a Prisma enum since the sqlite/libsql
+// connector doesn't support native enums. Only the fields relevant to the
+// challenge's type are populated; the rest stay null.
+model Challenge {
+  id        String   @id @default(cuid())
+  type      String
+  title     String
+  createdAt DateTime @default(now())
+
+  // GENRE / TIMEFRAME — number of films to log.
+  target Int?
+
+  // GENRE — TMDB genre name, matched against Movie.genres.
+  genreName String?
+
+  // TIMEFRAME — inclusive window of watchedDate to count within.
+  startDate DateTime?
+  endDate   DateTime?
+
+  // CREW — TMDB person to track a filmography against. department is the
+  // TMDB crew department to count (e.g. "Directing"); null means acting.
+  personId   Int?
+  personName String?
+  department String?
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model ListItem {

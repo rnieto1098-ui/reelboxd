@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export function WatchGoalWidget({
   year,
@@ -9,12 +10,14 @@ export function WatchGoalWidget({
   count,
   percent,
   isOwner,
+  username,
 }: {
   year: number;
   target: number | null;
   count: number;
   percent: number | null;
   isOwner: boolean;
+  username: string;
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
@@ -83,12 +86,14 @@ export function WatchGoalWidget({
     );
   }
 
+  const diaryHref = `/profile/${username}/diary?year=${year}`;
+
   return (
     <div className="rounded-lg border border-border bg-surface p-4">
       <div className="mb-2 flex items-center justify-between">
-        <p className="text-sm font-semibold">
+        <Link href={diaryHref} className="text-sm font-semibold hover:text-accent-green hover:underline">
           {year} Challenge: {count} / {target} films
-        </p>
+        </Link>
         {isOwner &&
           (editing ? (
             <div className="flex items-center gap-2">
@@ -135,17 +140,19 @@ export function WatchGoalWidget({
             </div>
           ))}
       </div>
-      <div className="h-3 overflow-hidden rounded-full bg-background">
-        <div
-          className="h-full rounded-full bg-accent-green transition-all"
-          style={{ width: `${percent ?? 0}%` }}
-        />
-      </div>
-      <p className="mt-1.5 text-xs text-muted">
-        {percent != null && percent >= 100
-          ? "Goal reached! 🎉"
-          : `${percent ?? 0}% of the way there`}
-      </p>
+      <Link href={diaryHref} className="block">
+        <div className="h-3 overflow-hidden rounded-full bg-background">
+          <div
+            className="h-full rounded-full bg-accent-green transition-all"
+            style={{ width: `${percent ?? 0}%` }}
+          />
+        </div>
+        <p className="mt-1.5 text-xs text-muted hover:text-foreground">
+          {percent != null && percent >= 100
+            ? "Goal reached! 🎉"
+            : `${percent ?? 0}% of the way there`}
+        </p>
+      </Link>
     </div>
   );
 }

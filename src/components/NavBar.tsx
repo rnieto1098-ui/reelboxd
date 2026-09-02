@@ -14,6 +14,7 @@ export async function NavBar() {
           { href: "/recommend", label: "Recommend Me" },
           { href: "/lists", label: "Lists" },
           { href: "/watchlist", label: "Watchlist" },
+          { href: "/challenges", label: "Challenges" },
         ]
       : [{ href: "/lists", label: "Lists" }]),
     { href: "/crew", label: "Crew" },
@@ -49,6 +50,9 @@ export async function NavBar() {
                 </Link>
                 <Link href="/watchlist" className="hover:text-foreground transition-colors">
                   Watchlist
+                </Link>
+                <Link href="/challenges" className="hover:text-foreground transition-colors">
+                  Challenges
                 </Link>
               </>
             )}

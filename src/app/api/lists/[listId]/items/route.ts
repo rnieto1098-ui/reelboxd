@@ -3,6 +3,7 @@ import { z } from "zod";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { ensureMovieCached } from "@/lib/movies";
+import { revalidateListCache } from "@/lib/listCache";
 
 const addItemSchema = z.object({
   tmdbId: z.number().int().positive(),
@@ -53,6 +54,7 @@ export async function POST(
       position: list._count.items,
     },
   });
+  revalidateListCache();
 
   return NextResponse.json(item, { status: 201 });
 }

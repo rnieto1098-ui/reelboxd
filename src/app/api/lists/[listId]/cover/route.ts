@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { del, put } from "@vercel/blob";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { revalidateListCache } from "@/lib/listCache";
 
 const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
 
@@ -57,6 +58,7 @@ export async function POST(request: Request, context: { params: Promise<{ listId
   });
 
   await prisma.list.update({ where: { id: listId }, data: { coverImage: blob.url } });
+  revalidateListCache();
 
   // Delete the old blob only after the new one is safely stored and saved.
   if (existing?.coverImage) await del(existing.coverImage).catch(() => null);
@@ -77,6 +79,7 @@ export async function DELETE(_request: Request, context: { params: Promise<{ lis
 
   const existing = await prisma.list.findUnique({ where: { id: listId }, select: { coverImage: true } });
   await prisma.list.update({ where: { id: listId }, data: { coverImage: null } });
+  revalidateListCache();
   if (existing?.coverImage) await del(existing.coverImage).catch(() => null);
 
   return NextResponse.json({ ok: true });

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { revalidateListCache } from "@/lib/listCache";
 
 export async function DELETE(
   _request: Request,
@@ -19,6 +20,7 @@ export async function DELETE(
   }
 
   await prisma.list.delete({ where: { id: listId } });
+  revalidateListCache();
 
   return NextResponse.json({ ok: true });
 }

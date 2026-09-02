@@ -20,6 +20,7 @@ import { FadeWatchedControl } from "@/components/FadeWatchedControl";
 import { ListCoverUpload } from "@/components/ListCoverUpload";
 import { AvailabilityFilterLinks } from "@/components/AvailabilityFilterLinks";
 import { SortChips } from "@/components/SortChips";
+import { getCachedList } from "@/lib/listCache";
 
 const SORT_OPTIONS = {
   order: { label: "List Order" },
@@ -124,13 +125,7 @@ export default async function ListDetailPage({
   const session = await auth();
   const userId = session?.user?.id;
 
-  const list = await prisma.list.findUnique({
-    where: { id: listId },
-    include: {
-      owner: { select: { username: true } },
-      items: { orderBy: { position: "asc" } },
-    },
-  });
+  const list = await getCachedList(listId);
 
   if (!list) notFound();
 

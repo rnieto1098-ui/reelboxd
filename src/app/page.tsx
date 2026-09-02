@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -28,6 +29,7 @@ import { CuratedListsProgress } from "@/components/CuratedListsProgress";
 import { AvailabilityFilterLinks } from "@/components/AvailabilityFilterLinks";
 import { OnboardingChecklist, type ChecklistItem } from "@/components/OnboardingChecklist";
 import { WatchGoalWidget } from "@/components/WatchGoalWidget";
+import { HomeRowsSkeleton } from "@/components/HomeRowsSkeleton";
 
 const WELCOME_PHRASES = [
   "Here's what we think you'll love next.",
@@ -73,50 +75,138 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
 
   const currentYear = new Date().getFullYear();
 
-  const [
-    comingSoonRaw,
-    watchedIds,
-    genreCatalog,
-    userProviderIds,
-    ownedTmdbIds,
-    watchlistTmdbIds,
-    listCards,
-    goal,
-    watchlistRows,
-  ] = await Promise.all([
-      getUpcomingMovies(),
-      getWatchedTmdbIds(userId),
-      getGenres(),
-      getUserProviderIds(userId),
-      getUserOwnedTmdbIds(userId),
-      getUserWatchlistedTmdbIds(userId),
-      getHomepageListCards(userId),
-      userId ? getGoalProgress(userId, currentYear) : Promise.resolve(null),
-      userId
-        ? prisma.watchlistItem.findMany({
-            where: { userId },
-            select: {
-              movie: {
-                select: {
-                  tmdbId: true,
-                  title: true,
-                  overview: true,
-                  posterPath: true,
-                  backdropPath: true,
-                  releaseDate: true,
-                  voteAverage: true,
-                },
+  // Everything the page shell (header, goal widget, availability toggle,
+  // onboarding checklist) needs is a cheap DB-only lookup — fetched here,
+  // outside the Suspense boundary below, so the shell paints immediately
+  // instead of waiting on the much heavier TMDB row-fetching chain.
+  const [watchedIds, userProviderIds, ownedTmdbIds, watchlistTmdbIds, goal] = await Promise.all([
+    getWatchedTmdbIds(userId),
+    getUserProviderIds(userId),
+    getUserOwnedTmdbIds(userId),
+    getUserWatchlistedTmdbIds(userId),
+    userId ? getGoalProgress(userId, currentYear) : Promise.resolve(null),
+  ]);
+
+  const canFilterByAvailability = hasStreamingAvailability(userProviderIds, ownedTmdbIds);
+
+  // Reuses data already fetched above — no extra queries just to know
+  // whether these are done.
+  const onboardingItems: ChecklistItem[] = [
+    {
+      key: "streaming",
+      label: "Add your streaming services (or mark a movie as owned)",
+      href: "/streaming",
+      done: canFilterByAvailability,
+    },
+    {
+      key: "rate",
+      label: "Rate a few movies you've seen",
+      href: "/search",
+      done: watchedIds.size >= 3,
+    },
+    {
+      key: "watchlist",
+      label: "Add something to your watchlist",
+      href: "/search",
+      done: watchlistTmdbIds.size >= 1,
+    },
+  ];
+
+  return (
+    <div className="space-y-10">
+      {session?.user && (
+        <div>
+          <h1 className="text-2xl font-bold">Welcome back, {session.user.name}.</h1>
+          <p className="mt-1 text-muted">{welcomePhrase}</p>
+        </div>
+      )}
+
+      {session?.user && goal && (
+        <WatchGoalWidget
+          year={goal.year}
+          target={goal.target}
+          count={goal.count}
+          percent={goal.percent}
+          isOwner
+        />
+      )}
+
+      {session?.user && (
+        <AvailabilityFilterLinks
+          allHref="/"
+          streamingHref="/?streaming=1"
+          streamingOnly={streamingOnly}
+          canFilterByAvailability={canFilterByAvailability}
+        />
+      )}
+
+      {session?.user && <OnboardingChecklist items={onboardingItems} />}
+
+      <Suspense fallback={<HomeRowsSkeleton />}>
+        <HomeMovieRows
+          userId={userId}
+          isSignedIn={!!session?.user}
+          streamingOnly={streamingOnly}
+          watchedIds={watchedIds}
+          userProviderIds={userProviderIds}
+          ownedTmdbIds={ownedTmdbIds}
+          watchlistTmdbIds={watchlistTmdbIds}
+          canFilterByAvailability={canFilterByAvailability}
+        />
+      </Suspense>
+    </div>
+  );
+}
+
+// Split out from HomePage so the shell above (header, goal widget,
+// onboarding) can paint before this — the much heavier part — resolves.
+// Everything in here still runs as one unit: the rows have real
+// cross-dependencies (Popular excludes what's already in For You, poster
+// overrides are looked up once for everything together) that aren't worth
+// untangling just to stream each row independently.
+async function HomeMovieRows({
+  userId,
+  isSignedIn,
+  streamingOnly,
+  watchedIds,
+  userProviderIds,
+  ownedTmdbIds,
+  watchlistTmdbIds,
+  canFilterByAvailability,
+}: {
+  userId: string | undefined;
+  isSignedIn: boolean;
+  streamingOnly: boolean;
+  watchedIds: Set<number>;
+  userProviderIds: Set<number>;
+  ownedTmdbIds: Set<number>;
+  watchlistTmdbIds: Set<number>;
+  canFilterByAvailability: boolean;
+}) {
+  const [comingSoonRaw, genreCatalog, listCards, watchlistRows] = await Promise.all([
+    getUpcomingMovies(),
+    getGenres(),
+    getHomepageListCards(userId),
+    userId
+      ? prisma.watchlistItem.findMany({
+          where: { userId },
+          select: {
+            movie: {
+              select: {
+                tmdbId: true,
+                title: true,
+                overview: true,
+                posterPath: true,
+                backdropPath: true,
+                releaseDate: true,
+                voteAverage: true,
               },
             },
-          })
-        : Promise.resolve([]),
-    ]);
+          },
+        })
+      : Promise.resolve([]),
+  ]);
 
-  // Known before the paginated rows are fetched, so the pool sizes below can
-  // react to it — canFilterByAvailability governs the always-on "Discover"
-  // filter, applyStreamingFilter (below) governs the "Showing: My services"
-  // toggle on the plain rows.
-  const canFilterByAvailability = hasStreamingAvailability(userProviderIds, ownedTmdbIds);
   const applyStreamingFilter = streamingOnly && canFilterByAvailability;
   const rowPages = applyStreamingFilter ? STREAMING_ROW_PAGES : BASE_ROW_PAGES;
   const recommendCount = canFilterByAvailability ? STREAMING_RECOMMEND_COUNT : BASE_RECOMMEND_COUNT;
@@ -239,29 +329,6 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
     movies: applyPosterOverrides(row.movies, posterOverrides),
   }));
 
-  // Reuses data already fetched above for the page's own rows/filters —
-  // no extra queries just to know whether these are done.
-  const onboardingItems: ChecklistItem[] = [
-    {
-      key: "streaming",
-      label: "Add your streaming services (or mark a movie as owned)",
-      href: "/streaming",
-      done: canFilterByAvailability,
-    },
-    {
-      key: "rate",
-      label: "Rate a few movies you've seen",
-      href: "/search",
-      done: watchedIds.size >= 3,
-    },
-    {
-      key: "watchlist",
-      label: "Add something to your watchlist",
-      href: "/search",
-      done: watchlistTmdbIds.size >= 1,
-    },
-  ];
-
   const discoverEmptyMessage = !canFilterByAvailability ? (
     <>
       <Link href="/streaming" className="text-accent-green hover:underline">
@@ -282,34 +349,6 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
 
   return (
     <div className="space-y-10">
-      {session?.user && (
-        <div>
-          <h1 className="text-2xl font-bold">Welcome back, {session.user.name}.</h1>
-          <p className="mt-1 text-muted">{welcomePhrase}</p>
-        </div>
-      )}
-
-      {session?.user && goal && (
-        <WatchGoalWidget
-          year={goal.year}
-          target={goal.target}
-          count={goal.count}
-          percent={goal.percent}
-          isOwner
-        />
-      )}
-
-      {session?.user && (
-        <AvailabilityFilterLinks
-          allHref="/"
-          streamingHref="/?streaming=1"
-          streamingOnly={streamingOnly}
-          canFilterByAvailability={canFilterByAvailability}
-        />
-      )}
-
-      {session?.user && <OnboardingChecklist items={onboardingItems} />}
-
       <MovieRow
         title="Popular right now"
         movies={popularWithPosters}
@@ -323,7 +362,7 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
         watchlistIds={watchlistIdsArray}
       />
       <ListRow title="Lists" lists={listCards} />
-      {session?.user && (
+      {isSignedIn && (
         <MovieRow
           title="For You"
           movies={recommendedWithPosters}
@@ -335,10 +374,8 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
       {comingSoonWithPosters.length > 0 && (
         <UpcomingReleasesRow title="Coming Soon" movies={comingSoonWithPosters} ownedIds={ownedTmdbIds} />
       )}
-      {session?.user && listsProgress.length > 0 && (
-        <CuratedListsProgress lists={listsProgress} />
-      )}
-      {session?.user && (
+      {isSignedIn && listsProgress.length > 0 && <CuratedListsProgress lists={listsProgress} />}
+      {isSignedIn && (
         <MovieRow
           title="Discover"
           movies={discoverWithPosters}
@@ -347,7 +384,7 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
           watchlistIds={watchlistIdsArray}
         />
       )}
-      {session?.user && watchlistMoviesRaw.length > 0 && (
+      {isSignedIn && watchlistMoviesRaw.length > 0 && (
         <MovieRow
           title="Rent or Buy"
           movies={rentBuyWithPosters}
@@ -356,7 +393,7 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
           watchlistIds={watchlistIdsArray}
         />
       )}
-      {session?.user && upcomingReleasesWithPosters.length > 0 && (
+      {isSignedIn && upcomingReleasesWithPosters.length > 0 && (
         <UpcomingReleasesRow movies={upcomingReleasesWithPosters} ownedIds={ownedTmdbIds} />
       )}
       <MovieRow

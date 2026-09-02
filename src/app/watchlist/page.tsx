@@ -39,6 +39,13 @@ const SORT_OPTIONS = {
 
 type SortKey = keyof typeof SORT_OPTIONS;
 
+// TMDB has no batch watch-providers endpoint, so this is one request per
+// non-owned item — chunked (rather than one giant Promise.all) so a large
+// watchlist doesn't create hundreds of pending promises at once. The actual
+// network throttling happens one level down, in tmdbFetch's own concurrency
+// queue; this just keeps this page's own fan-out sane on top of that.
+const PROVIDER_LOOKUP_CONCURRENCY = 6;
+
 function buildHref(sortKey: SortKey, dir: SortDir, streamingOnly: boolean) {
   const params = new URLSearchParams();
   if (sortKey !== "added") params.set("sort", sortKey);
@@ -71,15 +78,26 @@ export default async function WatchlistPage({ searchParams }: PageProps<"/watchl
     getUserOwnedTmdbIds(session.user.id),
   ]);
 
-  const withAvailability = await Promise.all(
-    items.map(async (item) => ({
-      item,
-      providers: ownedTmdbIds.has(item.movie.tmdbId)
-        ? []
-        : await getFlatrateProviders(item.movie.tmdbId),
-      owned: ownedTmdbIds.has(item.movie.tmdbId),
-    }))
-  );
+  const withAvailability: {
+    item: (typeof items)[number];
+    providers: TmdbWatchProvider[];
+    owned: boolean;
+  }[] = [];
+  for (let i = 0; i < items.length; i += PROVIDER_LOOKUP_CONCURRENCY) {
+    const batch = items.slice(i, i + PROVIDER_LOOKUP_CONCURRENCY);
+    const providerLists = await Promise.all(
+      batch.map((item) =>
+        ownedTmdbIds.has(item.movie.tmdbId) ? Promise.resolve([]) : getFlatrateProviders(item.movie.tmdbId)
+      )
+    );
+    batch.forEach((item, idx) => {
+      withAvailability.push({
+        item,
+        providers: providerLists[idx],
+        owned: ownedTmdbIds.has(item.movie.tmdbId),
+      });
+    });
+  }
 
   const hasServicesConfigured = userProviderIds.size > 0;
   const canFilterByAvailability = hasStreamingAvailability(userProviderIds, ownedTmdbIds);

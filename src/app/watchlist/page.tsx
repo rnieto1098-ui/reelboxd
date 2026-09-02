@@ -46,11 +46,13 @@ type SortKey = keyof typeof SORT_OPTIONS;
 // queue; this just keeps this page's own fan-out sane on top of that.
 const PROVIDER_LOOKUP_CONCURRENCY = 6;
 
-function buildHref(sortKey: SortKey, dir: SortDir, streamingOnly: boolean) {
+type AvailabilityMode = "all" | "on" | "off";
+
+function buildHref(sortKey: SortKey, dir: SortDir, mode: AvailabilityMode) {
   const params = new URLSearchParams();
   if (sortKey !== "added") params.set("sort", sortKey);
   if (dir !== "desc") params.set("dir", dir);
-  if (streamingOnly) params.set("streaming", "1");
+  if (mode !== "all") params.set("streaming", mode === "on" ? "1" : "0");
   const qs = params.toString();
   return `/watchlist${qs ? `?${qs}` : ""}`;
 }
@@ -61,6 +63,7 @@ export default async function WatchlistPage({ searchParams }: PageProps<"/watchl
 
   const { streaming, sort, dir } = await searchParams;
   const streamingOnly = streaming === "1";
+  const offOnly = streaming === "0";
   const sortKey: SortKey = typeof sort === "string" && sort in SORT_OPTIONS ? (sort as SortKey) : "added";
   const sortDir: SortDir = dir === "asc" ? "asc" : "desc";
 
@@ -101,12 +104,15 @@ export default async function WatchlistPage({ searchParams }: PageProps<"/watchl
 
   const hasServicesConfigured = userProviderIds.size > 0;
   const canFilterByAvailability = hasStreamingAvailability(userProviderIds, ownedTmdbIds);
-  const applyStreamingFilter = streamingOnly && canFilterByAvailability;
   const isAvailable = ({ providers, owned }: { providers: TmdbWatchProvider[]; owned: boolean }) =>
     owned || isAvailableOnServices(providers, userProviderIds);
-  const visibleEntries = applyStreamingFilter
-    ? withAvailability.filter(isAvailable)
-    : withAvailability;
+  const visibleEntries = !canFilterByAvailability
+    ? withAvailability
+    : streamingOnly
+      ? withAvailability.filter(isAvailable)
+      : offOnly
+        ? withAvailability.filter((e) => !isAvailable(e))
+        : withAvailability;
 
   const onServicesCount = withAvailability.filter(isAvailable).length;
   const offServicesCount = items.length - onServicesCount;
@@ -139,9 +145,11 @@ export default async function WatchlistPage({ searchParams }: PageProps<"/watchl
 
       {items.length > 0 && (
         <AvailabilityFilterLinks
-          allHref={buildHref(sortKey, sortDir, false)}
-          streamingHref={buildHref(sortKey, sortDir, true)}
+          allHref={buildHref(sortKey, sortDir, "all")}
+          streamingHref={buildHref(sortKey, sortDir, "on")}
           streamingOnly={streamingOnly}
+          offHref={buildHref(sortKey, sortDir, "off")}
+          offOnly={offOnly}
           canFilterByAvailability={canFilterByAvailability}
           className="mb-6"
         />
@@ -156,7 +164,9 @@ export default async function WatchlistPage({ searchParams }: PageProps<"/watchl
             }))}
             activeKey={sortKey}
             activeDir={sortDir}
-            hrefFor={(key, nextDir) => buildHref(key, nextDir, streamingOnly)}
+            hrefFor={(key, nextDir) =>
+              buildHref(key, nextDir, streamingOnly ? "on" : offOnly ? "off" : "all")
+            }
           />
         </div>
       )}
@@ -167,7 +177,9 @@ export default async function WatchlistPage({ searchParams }: PageProps<"/watchl
         </p>
       ) : visibleEntries.length === 0 ? (
         <p className="text-sm text-muted">
-          None of your watchlist is currently on your services or owned.
+          {offOnly
+            ? "Everything on your watchlist is on your services or owned."
+            : "None of your watchlist is currently on your services or owned."}
         </p>
       ) : (
         <WatchlistGrid entries={visibleEntries} />

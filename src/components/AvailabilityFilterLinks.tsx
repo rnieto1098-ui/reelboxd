@@ -28,6 +28,8 @@ export function AvailabilityFilterLinks({
   allHref,
   streamingHref,
   streamingOnly,
+  offHref,
+  offOnly = false,
   canFilterByAvailability,
   variant = "sm",
   className = "",
@@ -35,6 +37,10 @@ export function AvailabilityFilterLinks({
   allHref: string;
   streamingHref: string;
   streamingOnly: boolean;
+  // Optional third "not on my services" pill — omit offHref to keep the
+  // original two-way toggle (used by pages that don't need it).
+  offHref?: string;
+  offOnly?: boolean;
   canFilterByAvailability: boolean;
   variant?: Variant;
   className?: string;
@@ -46,7 +52,7 @@ export function AvailabilityFilterLinks({
       <Link
         href={allHref}
         className={`${c.link} ${
-          !streamingOnly ? "bg-accent-green text-black" : "text-muted hover:text-foreground"
+          !streamingOnly && !offOnly ? "bg-accent-green text-black" : "text-muted hover:text-foreground"
         }`}
       >
         All movies
@@ -59,7 +65,17 @@ export function AvailabilityFilterLinks({
       >
         On my streaming services
       </Link>
-      {streamingOnly && !canFilterByAvailability && (
+      {offHref && (
+        <Link
+          href={offHref}
+          className={`${c.link} ${
+            offOnly ? "bg-accent-green text-black" : "text-muted hover:text-foreground"
+          }`}
+        >
+          Not on my services
+        </Link>
+      )}
+      {(streamingOnly || offOnly) && !canFilterByAvailability && (
         <span className={c.hint}>
           You haven&apos;t added any services or marked anything as owned yet —{" "}
           <Link href="/streaming" className="text-accent-green hover:underline">

@@ -32,10 +32,37 @@ export async function PATCH(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
+  const newWatchedDate = parsed.data.watchedDate ? new Date(parsed.data.watchedDate) : undefined;
+
+  // Same one-per-day rule createDiaryEntry enforces on create — moving this
+  // entry's date onto a day that already has a log of the same movie would
+  // otherwise silently produce the duplicate the rule exists to prevent.
+  if (newWatchedDate) {
+    const dayStart = new Date(
+      Date.UTC(newWatchedDate.getUTCFullYear(), newWatchedDate.getUTCMonth(), newWatchedDate.getUTCDate())
+    );
+    const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+    const conflict = await prisma.diaryEntry.findFirst({
+      where: {
+        userId: session.user.id,
+        movieId: entry.movieId,
+        id: { not: entryId },
+        watchedDate: { gte: dayStart, lt: dayEnd },
+      },
+      select: { id: true },
+    });
+    if (conflict) {
+      return NextResponse.json(
+        { error: "This movie is already logged on that day." },
+        { status: 409 }
+      );
+    }
+  }
+
   const updated = await prisma.diaryEntry.update({
     where: { id: entryId },
     data: {
-      watchedDate: parsed.data.watchedDate ? new Date(parsed.data.watchedDate) : undefined,
+      watchedDate: newWatchedDate,
       rewatch: parsed.data.rewatch,
     },
   });

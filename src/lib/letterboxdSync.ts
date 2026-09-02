@@ -144,13 +144,17 @@ export async function syncLetterboxdDiary(
 
     const watchedDate = new Date(`${entry.watchedDate}T00:00:00.000Z`);
 
-    await createDiaryEntry({
+    // Letterboxd itself allows logging the same film twice in one day (two
+    // separate diary rows, two guids) — Flixtally doesn't, so the second one
+    // is a no-op here: still marked synced (so it's not retried forever),
+    // just doesn't produce a second entry or count toward challenges/goals.
+    const { created } = await createDiaryEntry({
       userId,
       movieId: movie.id,
       watchedDate,
       rewatch: entry.rewatch,
     });
-    summary.imported++;
+    if (created) summary.imported++;
 
     if (entry.rating != null) {
       await prisma.rating.upsert({
@@ -172,16 +176,18 @@ export async function syncLetterboxdDiary(
 
     await prisma.letterboxdSyncItem.create({ data: { userId, guid: entry.guid } });
 
-    const [newlyCompleted, justCompletedGoal] = await Promise.all([
-      entry.rewatch ? Promise.resolve([]) : checkNewlyCompletedChallenges(userId, movie, watchedDate),
-      checkGoalJustCompleted(userId, watchedDate),
-    ]);
-    for (const c of newlyCompleted) {
-      if (seenChallengeIds.has(c.id)) continue;
-      seenChallengeIds.add(c.id);
-      summary.completedChallenges.push(c);
+    if (created) {
+      const [newlyCompleted, justCompletedGoal] = await Promise.all([
+        entry.rewatch ? Promise.resolve([]) : checkNewlyCompletedChallenges(userId, movie, watchedDate),
+        checkGoalJustCompleted(userId, watchedDate),
+      ]);
+      for (const c of newlyCompleted) {
+        if (seenChallengeIds.has(c.id)) continue;
+        seenChallengeIds.add(c.id);
+        summary.completedChallenges.push(c);
+      }
+      if (justCompletedGoal) summary.completedGoal = justCompletedGoal;
     }
-    if (justCompletedGoal) summary.completedGoal = justCompletedGoal;
   }
 
   await prisma.user.update({ where: { id: userId }, data: { letterboxdSyncedAt: new Date() } });

@@ -29,6 +29,11 @@ export function LogWatchButton({ tmdbId, signedIn }: { tmdbId: number; signedIn:
     }
 
     const body = await res.json().catch(() => null);
+    if (body?.alreadyLogged) {
+      showToast("Already logged today");
+      router.refresh();
+      return;
+    }
     showToast("Logged as watched today");
     for (const challenge of body?.completedChallenges ?? []) {
       showToast(`🎉 Challenge complete: ${challenge.title}`);

@@ -90,6 +90,10 @@ export function PosterQuickActions({
     setTimeout(() => setDiaryState("idle"), 1500);
 
     const body = await res.json().catch(() => null);
+    if (body?.alreadyLogged) {
+      showToast("Already logged today");
+      return;
+    }
     for (const challenge of body?.completedChallenges ?? []) {
       showToast(`🎉 Challenge complete: ${challenge.title}`);
     }

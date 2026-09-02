@@ -182,16 +182,18 @@ export async function importLetterboxdZip(
       if (!movie) continue;
 
       const watchedDate = new Date(`${row.watchedDate}T00:00:00.000Z`);
-      const dayStart = new Date(watchedDate);
-      const dayEnd = new Date(watchedDate.getTime() + 24 * 60 * 60 * 1000);
 
-      const existing = await prisma.diaryEntry.findFirst({
-        where: { userId, movieId: movie.id, watchedDate: { gte: dayStart, lt: dayEnd } },
-        select: { id: true },
+      // createDiaryEntry itself enforces one log per movie per day — a
+      // duplicate CSV row (or a re-import of the same file) is a no-op,
+      // which also means it doesn't get counted as imported or re-checked
+      // against challenges/goals.
+      const { created } = await createDiaryEntry({
+        userId,
+        movieId: movie.id,
+        watchedDate,
+        rewatch: row.rewatch,
       });
-      if (existing) continue;
-
-      await createDiaryEntry({ userId, movieId: movie.id, watchedDate, rewatch: row.rewatch });
+      if (!created) continue;
       diaryImported++;
 
       const [newlyCompleted, justCompletedGoal] = await Promise.all([

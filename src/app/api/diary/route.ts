@@ -30,12 +30,21 @@ export async function POST(request: Request) {
   const movie = await ensureMovieCached(parsed.data.tmdbId);
   const watchedDate = parsed.data.watchedDate ? new Date(parsed.data.watchedDate) : new Date();
 
-  const entry = await createDiaryEntry({
+  const { entry, created } = await createDiaryEntry({
     userId: session.user.id,
     movieId: movie.id,
     watchedDate,
     rewatch: parsed.data.rewatch,
   });
+
+  // Already logged today — nothing new happened, so no watchlist/challenge/
+  // goal side effects and no second "logged!" toast.
+  if (!created) {
+    return NextResponse.json(
+      { ...entry, alreadyLogged: true, completedChallenges: [], completedGoal: null },
+      { status: 200 }
+    );
+  }
 
   // A rewatch can't newly satisfy a challenge (those count distinct movies,
   // already counted on the first watch) but can still push the yearly goal

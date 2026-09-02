@@ -1,4 +1,15 @@
 import { prisma } from "@/lib/prisma";
+import type { DiaryEntry } from "@prisma/client";
+
+// A movie can only be logged once per calendar day — a second log attempt
+// for the same movie on the same day is treated as if it never happened
+// (the existing entry is returned as-is, nothing new is created). Compared
+// in UTC to match how watchedDate is stored everywhere a date-only value
+// comes in (Letterboxd sync/import both write `T00:00:00.000Z`).
+function dayRangeUTC(date: Date): { start: Date; end: Date } {
+  const start = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  return { start, end: new Date(start.getTime() + 24 * 60 * 60 * 1000) };
+}
 
 /**
  * Logs one watch of a movie. `rewatch` is auto-detected (true if this user
@@ -11,6 +22,11 @@ import { prisma } from "@/lib/prisma";
  * Also drops the movie from the watchlist, same as rating one does — once
  * it's logged as watched it doesn't belong on a "want to watch" list
  * anymore. A no-op if it was never there.
+ *
+ * Returns `created: false` (with the pre-existing entry) if this movie was
+ * already logged today — callers should treat that as nothing having
+ * happened: no watchlist removal, no challenge/goal re-checks, no second
+ * "logged!" toast.
  */
 export async function createDiaryEntry({
   userId,
@@ -22,7 +38,17 @@ export async function createDiaryEntry({
   movieId: string;
   watchedDate?: Date;
   rewatch?: boolean;
-}) {
+}): Promise<{ entry: DiaryEntry; created: boolean }> {
+  const effectiveDate = watchedDate ?? new Date();
+  const { start, end } = dayRangeUTC(effectiveDate);
+
+  const existingToday = await prisma.diaryEntry.findFirst({
+    where: { userId, movieId, watchedDate: { gte: start, lt: end } },
+  });
+  if (existingToday) {
+    return { entry: existingToday, created: false };
+  }
+
   const isRewatch =
     rewatch ??
     (await prisma.diaryEntry.findFirst({
@@ -35,12 +61,12 @@ export async function createDiaryEntry({
       data: {
         userId,
         movieId,
-        watchedDate: watchedDate ?? new Date(),
+        watchedDate: effectiveDate,
         rewatch: isRewatch,
       },
     }),
     prisma.watchlistItem.deleteMany({ where: { userId, movieId } }),
   ]);
 
-  return entry;
+  return { entry, created: true };
 }

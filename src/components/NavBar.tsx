@@ -41,13 +41,20 @@ export async function NavBar() {
               Home
             </Link>
             {session?.user && (
+              <Link href="/recommend" className="hover:text-foreground transition-colors">
+                Recommend Me
+              </Link>
+            )}
+            <Link href="/lists" className="hover:text-foreground transition-colors">
+              Lists
+            </Link>
+          </nav>
+
+          <SearchBox />
+
+          <nav className="hidden sm:flex items-center gap-6 text-sm text-muted">
+            {session?.user && (
               <>
-                <Link href="/recommend" className="hover:text-foreground transition-colors">
-                  Recommend Me
-                </Link>
-                <Link href="/lists" className="hover:text-foreground transition-colors">
-                  Lists
-                </Link>
                 <Link href="/watchlist" className="hover:text-foreground transition-colors">
                   Watchlist
                 </Link>
@@ -56,16 +63,6 @@ export async function NavBar() {
                 </Link>
               </>
             )}
-            {!session?.user && (
-              <Link href="/lists" className="hover:text-foreground transition-colors">
-                Lists
-              </Link>
-            )}
-          </nav>
-
-          <SearchBox />
-
-          <nav className="hidden sm:flex items-center gap-6 text-sm text-muted">
             <Link href="/crew" className="hover:text-foreground transition-colors">
               Crew
             </Link>

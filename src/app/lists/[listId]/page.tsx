@@ -16,6 +16,7 @@ import { getUserWatchlistedTmdbIds } from "@/lib/movies";
 import { compareNullableNumbers, type SortDir } from "@/lib/sortComparator";
 import { ListMovieGrid } from "@/components/ListMovieGrid";
 import { DeleteListButton } from "@/components/DeleteListButton";
+import { AddListToWatchlistButton } from "@/components/AddListToWatchlistButton";
 import { FadeWatchedControl } from "@/components/FadeWatchedControl";
 import { ListCoverUpload } from "@/components/ListCoverUpload";
 import { AvailabilityFilterLinks } from "@/components/AvailabilityFilterLinks";
@@ -256,7 +257,10 @@ export default async function ListDetailPage({
             )}
           </div>
         </div>
-        {isOwner && <DeleteListButton listId={list.id} />}
+        <div className="flex shrink-0 flex-col items-end gap-2">
+          {userId && list.items.length > 0 && <AddListToWatchlistButton listId={list.id} />}
+          {isOwner && <DeleteListButton listId={list.id} />}
+        </div>
       </div>
 
       {list.items.length > 0 && (

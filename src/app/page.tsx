@@ -22,6 +22,7 @@ import {
 } from "@/lib/streaming";
 import { getHomepageListCards, getCuratedListsProgress } from "@/lib/systemLists";
 import { getGoalProgress } from "@/lib/goals";
+import { getRecentlyAddedForUser } from "@/lib/providerSnapshot";
 import { MovieRow } from "@/components/MovieRow";
 import { ListRow } from "@/components/ListRow";
 import { UpcomingReleasesRow } from "@/components/UpcomingReleasesRow";
@@ -184,7 +185,7 @@ async function HomeMovieRows({
   watchlistTmdbIds: Set<number>;
   canFilterByAvailability: boolean;
 }) {
-  const [comingSoonRaw, genreCatalog, listCards, watchlistRows] = await Promise.all([
+  const [comingSoonRaw, genreCatalog, listCards, watchlistRows, recentlyAddedRaw] = await Promise.all([
     getUpcomingMovies(),
     getGenres(),
     getHomepageListCards(userId),
@@ -206,6 +207,7 @@ async function HomeMovieRows({
           },
         })
       : Promise.resolve([]),
+    userId ? getRecentlyAddedForUser(userId, userProviderIds) : Promise.resolve([]),
   ]);
 
   const applyStreamingFilter = streamingOnly && canFilterByAvailability;
@@ -227,6 +229,16 @@ async function HomeMovieRows({
     backdrop_path: w.movie.backdropPath,
     release_date: w.movie.releaseDate ?? "",
     vote_average: w.movie.voteAverage ?? 0,
+  }));
+
+  const recentlyAdded: TmdbMovieSummary[] = recentlyAddedRaw.map((m) => ({
+    id: m.tmdbId,
+    title: m.title,
+    overview: m.overview ?? "",
+    poster_path: m.posterPath,
+    backdrop_path: m.backdropPath,
+    release_date: m.releaseDate ?? "",
+    vote_average: m.voteAverage ?? 0,
   }));
 
   // Watchlist items with a future release date, soonest first — cheap to
@@ -312,6 +324,7 @@ async function HomeMovieRows({
     ...highestRated.map((m) => m.id),
     ...discover.map((m) => m.id),
     ...rentBuy.map((m) => m.id),
+    ...recentlyAdded.map((m) => m.id),
     ...upcomingReleases.map((m) => m.id),
     ...comingSoonRaw.results.map((m) => m.id),
     ...genreRows.flatMap((row) => row.movies.map((m) => m.id)),
@@ -323,6 +336,7 @@ async function HomeMovieRows({
   const highestRatedWithPosters = applyPosterOverrides(highestRated, posterOverrides);
   const discoverWithPosters = applyPosterOverrides(discover, posterOverrides);
   const rentBuyWithPosters = applyPosterOverrides(rentBuy, posterOverrides);
+  const recentlyAddedWithPosters = applyPosterOverrides(recentlyAdded, posterOverrides);
   const upcomingReleasesWithPosters = applyPosterOverrides(upcomingReleases, posterOverrides);
   const comingSoonWithPosters = applyPosterOverrides(comingSoonRaw.results, posterOverrides);
   const genreRowsWithPosters = genreRows.map((row) => ({
@@ -381,6 +395,14 @@ async function HomeMovieRows({
           title="Discover"
           movies={discoverWithPosters}
           emptyMessage={discoverEmptyMessage}
+          ownedIds={ownedIdsArray}
+          watchlistIds={watchlistIdsArray}
+        />
+      )}
+      {isSignedIn && recentlyAddedWithPosters.length > 0 && (
+        <MovieRow
+          title="Recently Added to Your Services"
+          movies={recentlyAddedWithPosters}
           ownedIds={ownedIdsArray}
           watchlistIds={watchlistIdsArray}
         />

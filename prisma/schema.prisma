@@ -125,6 +125,40 @@ model Movie {
   owned         OwnedItem[]
   diaryEntries  DiaryEntry[]
   customPosters CustomPoster[]
+  providerSnapshot   MovieProviderSnapshot?
+  providerAdditions  ProviderAddition[]
+}
+
+// The daily provider-snapshot cron (see lib/providerSnapshot.ts) records
+// each scoped movie's last-known flatrate provider set here, then diffs
+// today's fetch against it to detect newly-added providers — TMDB has no
+// "date added" field of its own, so this is how the app builds that
+// history itself, starting from whenever the cron first ran (nothing
+// before that is knowable). Scope is every movie that's ever been on
+// someone's watchlist or owned list — not all of TMDB — to keep the daily
+// fetch volume bounded.
+model MovieProviderSnapshot {
+  id          String   @id @default(cuid())
+  providerIds String // comma-separated TMDB flatrate provider ids, most recent known snapshot
+  updatedAt   DateTime @updatedAt
+
+  movieId String @unique
+  movie   Movie  @relation(fields: [movieId], references: [id], onDelete: Cascade)
+}
+
+// One row per detected "this provider wasn't flatrate-available on this
+// movie yesterday, and is today" event.
+model ProviderAddition {
+  id           String   @id @default(cuid())
+  providerId   Int
+  providerName String
+  detectedAt   DateTime @default(now())
+
+  movieId String
+  movie   Movie  @relation(fields: [movieId], references: [id], onDelete: Cascade)
+
+  @@index([detectedAt])
+  @@index([movieId])
 }
 
 model Rating {

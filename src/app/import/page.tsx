@@ -21,8 +21,9 @@ export default async function ImportPage() {
         </a>{" "}
         (while signed into Letterboxd, this generates a .zip file of your data). Upload that .zip
         below — we&apos;ll match each film to our movie database by title and year, then import
-        your ratings and watchlist. Movies with unusual titles might not match
-        automatically; we&apos;ll list anything we couldn&apos;t find.
+        your diary (including rewatches), ratings, and watchlist — diary entries count toward
+        your challenges and yearly goal just like logging one directly. Movies with unusual
+        titles might not match automatically; we&apos;ll list anything we couldn&apos;t find.
       </p>
       <p className="mb-6 text-sm text-muted">
         Want to back up or move your Flixtally data instead? You can{" "}

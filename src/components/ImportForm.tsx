@@ -2,15 +2,20 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useToast } from "@/components/Toast";
 
 type ImportSummary = {
   ratingsImported: number;
   watchlistImported: number;
+  diaryImported: number;
   unmatched: { title: string; year: string }[];
+  completedChallenges: { id: string; title: string }[];
+  completedGoal: { year: number; target: number } | null;
 };
 
 export function ImportForm() {
   const router = useRouter();
+  const showToast = useToast();
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,6 +42,12 @@ export function ImportForm() {
     }
 
     setSummary(data);
+    for (const challenge of data.completedChallenges ?? []) {
+      showToast(`🎉 Challenge complete: ${challenge.title}`);
+    }
+    if (data.completedGoal) {
+      showToast(`🎉 ${data.completedGoal.year} watch goal complete!`);
+    }
     router.refresh();
   }
 
@@ -63,8 +74,10 @@ export function ImportForm() {
       {summary && (
         <div className="mt-6 space-y-3">
           <p className="text-sm">
-            Imported <span className="text-accent-green">{summary.ratingsImported}</span> rating
-            {summary.ratingsImported === 1 ? "" : "s"} and{" "}
+            Imported <span className="text-accent-green">{summary.diaryImported}</span> diary
+            {summary.diaryImported === 1 ? " entry" : " entries"},{" "}
+            <span className="text-accent-green">{summary.ratingsImported}</span> rating
+            {summary.ratingsImported === 1 ? "" : "s"}, and{" "}
             <span className="text-accent-green">{summary.watchlistImported}</span> watchlist item
             {summary.watchlistImported === 1 ? "" : "s"}.
           </p>

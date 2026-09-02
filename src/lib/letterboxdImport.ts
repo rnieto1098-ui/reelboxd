@@ -3,6 +3,10 @@ import Papa from "papaparse";
 import { prisma } from "@/lib/prisma";
 import { searchMovies } from "@/lib/tmdb";
 import { ensureMovieCached } from "@/lib/movies";
+import { createDiaryEntry } from "@/lib/diary";
+import { checkNewlyCompletedChallenges, type ChallengeCompletion } from "@/lib/challenges";
+import { checkGoalJustCompleted } from "@/lib/goals";
+import type { Movie } from "@prisma/client";
 
 type CsvRow = Record<string, string>;
 type FilmKey = string;
@@ -41,8 +45,32 @@ async function matchTmdbId(name: string, year: string): Promise<number | null> {
 export type ImportSummary = {
   ratingsImported: number;
   watchlistImported: number;
+  diaryImported: number;
   unmatched: { title: string; year: string }[];
+  completedChallenges: ChallengeCompletion[];
+  completedGoal: { year: number; target: number } | null;
 };
+
+type DiaryRow = { key: FilmKey; watchedDate: string; rewatch: boolean };
+
+// Letterboxd's diary.csv uses "Watched Date" for the actual date watched and
+// "Date" for the date the entry was logged — usually the same day, but not
+// always (logging a watch after the fact). Prefer "Watched Date"; "Date" is
+// only there for older exports that predate that column.
+function parseDiaryRows(rows: CsvRow[]): DiaryRow[] {
+  const parsed: DiaryRow[] = [];
+  for (const row of rows) {
+    const name = row["Name"];
+    const watchedDate = row["Watched Date"] || row["Date"];
+    if (!name || !watchedDate) continue;
+    parsed.push({
+      key: filmKey(name, row["Year"] ?? ""),
+      watchedDate,
+      rewatch: (row["Rewatch"] ?? "").trim().toLowerCase() === "yes",
+    });
+  }
+  return parsed;
+}
 
 export async function importLetterboxdZip(
   userId: string,
@@ -50,13 +78,13 @@ export async function importLetterboxdZip(
 ): Promise<ImportSummary> {
   const zip = await JSZip.loadAsync(fileBuffer);
 
-  const ratingsCsv =
-    (await readCsv(zip, "ratings.csv")) ?? (await readCsv(zip, "diary.csv")) ?? [];
+  const diaryCsv = (await readCsv(zip, "diary.csv")) ?? [];
+  const ratingsCsv = (await readCsv(zip, "ratings.csv")) ?? diaryCsv;
   const watchlistCsv = (await readCsv(zip, "watchlist.csv")) ?? [];
 
-  if (ratingsCsv.length === 0 && watchlistCsv.length === 0) {
+  if (ratingsCsv.length === 0 && watchlistCsv.length === 0 && diaryCsv.length === 0) {
     throw new Error(
-      "That file didn't contain any of the files we look for (ratings.csv, watchlist.csv). Make sure you uploaded the .zip Letterboxd gave you, unmodified."
+      "That file didn't contain any of the files we look for (ratings.csv, diary.csv, watchlist.csv). Make sure you uploaded the .zip Letterboxd gave you, unmodified."
     );
   }
 
@@ -71,6 +99,7 @@ export async function importLetterboxdZip(
   }
 
   const watchlistKeys = new Set<FilmKey>();
+  const diaryRows = parseDiaryRows(diaryCsv);
   const filmsToMatch = new Map<FilmKey, { name: string; year: string }>();
 
   for (const row of ratingsCsv) {
@@ -87,8 +116,16 @@ export async function importLetterboxdZip(
     watchlistKeys.add(k);
     filmsToMatch.set(k, { name: row["Name"], year: row["Year"] ?? "" });
   }
+  for (const row of diaryCsv) {
+    if (!row["Name"]) continue;
+    filmsToMatch.set(filmKey(row["Name"], row["Year"] ?? ""), {
+      name: row["Name"],
+      year: row["Year"] ?? "",
+    });
+  }
 
   const unmatched: { title: string; year: string }[] = [];
+  const movieByKey = new Map<FilmKey, Movie>();
   let ratingsImported = 0;
   let watchlistImported = 0;
 
@@ -105,6 +142,7 @@ export async function importLetterboxdZip(
         }
 
         const movie = await ensureMovieCached(tmdbId);
+        movieByKey.set(key, movie);
 
         const rating = ratingsByKey.get(key);
         if (rating != null) {
@@ -128,7 +166,55 @@ export async function importLetterboxdZip(
     );
   }
 
-  return { ratingsImported, watchlistImported, unmatched };
+  // Diary rows are processed separately (rather than folded into the
+  // per-film loop above) because rewatches mean the same film can appear
+  // many times with different watched dates — each one is its own log, not
+  // a dedup target like ratings/watchlist are.
+  let diaryImported = 0;
+  const completedChallenges: ChallengeCompletion[] = [];
+  const seenChallengeIds = new Set<string>();
+  let completedGoal: { year: number; target: number } | null = null;
+
+  for (let i = 0; i < diaryRows.length; i += MATCH_CONCURRENCY) {
+    const batch = diaryRows.slice(i, i + MATCH_CONCURRENCY);
+    for (const row of batch) {
+      const movie = movieByKey.get(row.key);
+      if (!movie) continue;
+
+      const watchedDate = new Date(`${row.watchedDate}T00:00:00.000Z`);
+      const dayStart = new Date(watchedDate);
+      const dayEnd = new Date(watchedDate.getTime() + 24 * 60 * 60 * 1000);
+
+      const existing = await prisma.diaryEntry.findFirst({
+        where: { userId, movieId: movie.id, watchedDate: { gte: dayStart, lt: dayEnd } },
+        select: { id: true },
+      });
+      if (existing) continue;
+
+      await createDiaryEntry({ userId, movieId: movie.id, watchedDate, rewatch: row.rewatch });
+      diaryImported++;
+
+      const [newlyCompleted, justCompletedGoal] = await Promise.all([
+        row.rewatch ? Promise.resolve([]) : checkNewlyCompletedChallenges(userId, movie, watchedDate),
+        checkGoalJustCompleted(userId, watchedDate),
+      ]);
+      for (const c of newlyCompleted) {
+        if (seenChallengeIds.has(c.id)) continue;
+        seenChallengeIds.add(c.id);
+        completedChallenges.push(c);
+      }
+      if (justCompletedGoal) completedGoal = justCompletedGoal;
+    }
+  }
+
+  return {
+    ratingsImported,
+    watchlistImported,
+    diaryImported,
+    unmatched,
+    completedChallenges,
+    completedGoal,
+  };
 }
 
 export type WatchlistImportSummary = {

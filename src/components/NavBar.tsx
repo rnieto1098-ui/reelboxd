@@ -36,34 +36,34 @@ export async function NavBar() {
         </div>
 
         <div className="flex items-center gap-6 sm:absolute sm:left-1/2 sm:-translate-x-1/2">
-          <nav className="hidden sm:flex items-center gap-6 text-sm text-muted">
-            <Link href="/" className="hover:text-foreground transition-colors">
+          <nav className="hidden sm:flex items-center gap-6 text-sm font-semibold text-foreground/90">
+            <Link href="/" className="hover:text-accent-green transition-colors">
               Home
             </Link>
             {session?.user && (
-              <Link href="/recommend" className="hover:text-foreground transition-colors">
+              <Link href="/recommend" className="hover:text-accent-green transition-colors">
                 Recommend Me
               </Link>
             )}
-            <Link href="/lists" className="hover:text-foreground transition-colors">
+            <Link href="/lists" className="hover:text-accent-green transition-colors">
               Lists
             </Link>
           </nav>
 
           <SearchBox />
 
-          <nav className="hidden sm:flex items-center gap-6 text-sm text-muted">
+          <nav className="hidden sm:flex items-center gap-6 text-sm font-semibold text-foreground/90">
             {session?.user && (
               <>
-                <Link href="/watchlist" className="hover:text-foreground transition-colors">
+                <Link href="/watchlist" className="hover:text-accent-green transition-colors">
                   Watchlist
                 </Link>
-                <Link href="/challenges" className="hover:text-foreground transition-colors">
+                <Link href="/challenges" className="hover:text-accent-green transition-colors">
                   Challenges
                 </Link>
               </>
             )}
-            <Link href="/crew" className="hover:text-foreground transition-colors">
+            <Link href="/crew" className="hover:text-accent-green transition-colors">
               Crew
             </Link>
           </nav>

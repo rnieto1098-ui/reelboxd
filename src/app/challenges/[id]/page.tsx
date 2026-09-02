@@ -1,12 +1,13 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getUserOwnedTmdbIds } from "@/lib/streaming";
 import { getUserWatchlistedTmdbIds } from "@/lib/movies";
-import { getCrewFilmography } from "@/lib/challenges";
+import { getChallengeSuggestions, getCrewFilmography } from "@/lib/challenges";
 import { CreditGrid, type CreditDisplay } from "@/components/CreditGrid";
 import { FadeWatchedControl } from "@/components/FadeWatchedControl";
+import { MovieRow } from "@/components/MovieRow";
 
 const TYPE_LABEL: Record<string, string> = {
   GENRE: "Genre challenge",
@@ -19,15 +20,25 @@ export default async function ChallengeDetailPage({
 }: PageProps<"/challenges/[id]">) {
   const { id } = await params;
   const session = await auth();
-  if (!session?.user?.id) redirect("/login");
-  const userId = session.user.id;
+  const viewerId = session?.user?.id;
 
-  const challenge = await prisma.challenge.findUnique({ where: { id } });
-  if (!challenge || challenge.userId !== userId) notFound();
+  // Public, like a profile page — anyone can look at a challenge, only the
+  // owner sees edit/delete controls (those live on the /challenges list
+  // page, not here). Progress is always computed against the challenge's
+  // owner; owned/watchlist highlighting and "what to watch next" reflect
+  // whoever is looking, same convention as the profile page.
+  const challenge = await prisma.challenge.findUnique({
+    where: { id },
+    include: { user: { select: { username: true } } },
+  });
+  if (!challenge) notFound();
+  const ownerId = challenge.userId;
+  const isOwner = viewerId === ownerId;
 
-  const [ownedIds, watchlistIds] = await Promise.all([
-    getUserOwnedTmdbIds(userId),
-    getUserWatchlistedTmdbIds(userId),
+  const [ownedIds, watchlistIds, suggestions] = await Promise.all([
+    getUserOwnedTmdbIds(viewerId),
+    getUserWatchlistedTmdbIds(viewerId),
+    viewerId ? getChallengeSuggestions(viewerId, challenge) : Promise.resolve([]),
   ]);
 
   let credits: CreditDisplay[];
@@ -39,7 +50,7 @@ export default async function ChallengeDetailPage({
     target = filmography.length;
 
     const logged = await prisma.diaryEntry.findMany({
-      where: { userId, movie: { tmdbId: { in: filmography.map((c) => c.id) } } },
+      where: { userId: ownerId, movie: { tmdbId: { in: filmography.map((c) => c.id) } } },
       select: { movie: { select: { tmdbId: true } } },
       distinct: ["movieId"],
     });
@@ -64,10 +75,10 @@ export default async function ChallengeDetailPage({
     const entries = await prisma.diaryEntry.findMany({
       where:
         challenge.type === "GENRE" && challenge.genreName
-          ? { userId, movie: { genres: { contains: challenge.genreName } } }
+          ? { userId: ownerId, movie: { genres: { contains: challenge.genreName } } }
           : challenge.type === "TIMEFRAME" && challenge.startDate && challenge.endDate
-            ? { userId, watchedDate: { gte: challenge.startDate, lte: challenge.endDate } }
-            : { userId, id: "never-matches" },
+            ? { userId: ownerId, watchedDate: { gte: challenge.startDate, lte: challenge.endDate } }
+            : { userId: ownerId, id: "never-matches" },
       include: { movie: true },
       orderBy: { watchedDate: "desc" },
       distinct: ["movieId"],
@@ -91,13 +102,14 @@ export default async function ChallengeDetailPage({
   return (
     <div>
       <Link
-        href="/challenges"
+        href={isOwner ? "/challenges" : `/profile/${challenge.user.username}`}
         className="text-sm text-muted hover:text-foreground hover:underline"
       >
-        ← Challenges
+        ← {isOwner ? "Challenges" : challenge.user.username}
       </Link>
       <p className="mt-1 text-xs uppercase tracking-wide text-muted">
         {TYPE_LABEL[challenge.type] ?? "Challenge"}
+        {!isOwner && ` · ${challenge.user.username}`}
       </p>
       <h1 className="text-2xl font-bold">{challenge.title}</h1>
       <p className="mb-8 mt-1 text-sm text-muted">{subtitle}</p>
@@ -114,6 +126,17 @@ export default async function ChallengeDetailPage({
         </FadeWatchedControl>
       ) : (
         <CreditGrid title="Movies" credits={credits} />
+      )}
+
+      {suggestions.length > 0 && (
+        <div className="mt-10">
+          <MovieRow
+            title="What to watch next"
+            movies={suggestions}
+            ownedIds={[...ownedIds]}
+            watchlistIds={[...watchlistIds]}
+          />
+        </div>
       )}
     </div>
   );

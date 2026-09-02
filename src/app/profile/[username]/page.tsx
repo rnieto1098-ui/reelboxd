@@ -7,9 +7,12 @@ import { prisma } from "@/lib/prisma";
 import { getCustomPosterMap } from "@/lib/customPosters";
 import { getUserWatchlistedTmdbIds } from "@/lib/movies";
 import { getUserOwnedTmdbIds } from "@/lib/streaming";
+import { getGoalProgress } from "@/lib/goals";
+import { getChallengesWithProgress, type ChallengeSummary } from "@/lib/challenges";
 import { MovieRow } from "@/components/MovieRow";
 import { RecentlyLoggedRow } from "@/components/RecentlyLoggedRow";
 import { SortChips } from "@/components/SortChips";
+import { WatchGoalWidget } from "@/components/WatchGoalWidget";
 import { compareNullableNumbers, type SortDir } from "@/lib/sortComparator";
 import type { TmdbMovieSummary } from "@/lib/tmdb";
 import type { Movie } from "@prisma/client";
@@ -41,6 +44,39 @@ function sortEntries(entries: RecentEntry[], sortKey: SortKey, dir: SortDir): Re
     return e.movie.popularity;
   };
   return [...entries].sort((a, b) => compareNullableNumbers(valueOf(a), valueOf(b), dir));
+}
+
+const CHALLENGE_TYPE_LABEL: Record<ChallengeSummary["type"], string> = {
+  GENRE: "Genre",
+  TIMEFRAME: "Time frame",
+  CREW: "Crew",
+};
+
+function ChallengeCard({ challenge }: { challenge: ChallengeSummary }) {
+  return (
+    <Link
+      href={`/challenges/${challenge.id}`}
+      className="block rounded-lg border border-border bg-surface p-4 hover:border-accent-green"
+    >
+      <span className="mb-1 inline-block rounded-full border border-border px-2 py-0.5 text-[11px] text-muted">
+        {CHALLENGE_TYPE_LABEL[challenge.type]}
+      </span>
+      <p className="text-sm font-semibold">{challenge.title}</p>
+      <div className="mt-2 h-3 overflow-hidden rounded-full bg-background">
+        <div
+          className="h-full rounded-full bg-accent-green transition-all"
+          style={{ width: `${challenge.percent ?? 0}%` }}
+        />
+      </div>
+      <p className="mt-1.5 text-xs text-muted">
+        {challenge.target != null
+          ? challenge.percent != null && challenge.percent >= 100
+            ? `Complete — ${challenge.count}/${challenge.target} films! 🎉`
+            : `${challenge.count} / ${challenge.target} films`
+          : `${challenge.count} films logged`}
+      </p>
+    </Link>
+  );
 }
 
 function buildHref(username: string, key: SortKey, dir: SortDir) {
@@ -144,13 +180,15 @@ export default async function ProfilePage({
   // poster is a personal preference that follows you wherever a film shows up.
   // Same reasoning for owned/watchlist highlighting below: it reflects
   // whoever is looking, not necessarily this profile's owner.
-  const [posterOverrides, viewerOwnedIds, viewerWatchlistIds] = await Promise.all([
+  const [posterOverrides, viewerOwnedIds, viewerWatchlistIds, goal, challenges] = await Promise.all([
     getCustomPosterMap(session?.user?.id, [
       ...recentEntries.map((e) => e.movie.tmdbId),
       ...user.owned.map((o) => o.movie.tmdbId),
     ]),
     getUserOwnedTmdbIds(session?.user?.id),
     getUserWatchlistedTmdbIds(session?.user?.id),
+    getGoalProgress(user.id, new Date().getFullYear()),
+    getChallengesWithProgress(user.id),
   ]);
 
   return (
@@ -198,6 +236,11 @@ export default async function ProfilePage({
             >
               Year in Review
             </Link>
+            {isOwnProfile && (
+              <Link href="/challenges" className="text-accent-green hover:underline">
+                Challenges
+              </Link>
+            )}
           </div>
         </div>
 
@@ -224,6 +267,28 @@ export default async function ProfilePage({
           </div>
         )}
       </div>
+
+      {(goal.target != null || challenges.length > 0) && (
+        <div className="mb-10 space-y-4">
+          {goal.target != null && (
+            <WatchGoalWidget
+              year={goal.year}
+              target={goal.target}
+              count={goal.count}
+              percent={goal.percent}
+              isOwner={isOwnProfile}
+              username={username}
+            />
+          )}
+          {challenges.length > 0 && (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {challenges.map((challenge) => (
+                <ChallengeCard key={challenge.id} challenge={challenge} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-lg font-semibold">Recently logged</h2>

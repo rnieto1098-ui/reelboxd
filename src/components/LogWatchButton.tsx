@@ -27,7 +27,15 @@ export function LogWatchButton({ tmdbId, signedIn }: { tmdbId: number; signedIn:
       showToast("Couldn't log that watch — try again.", "error");
       return;
     }
+
+    const body = await res.json().catch(() => null);
     showToast("Logged as watched today");
+    for (const challenge of body?.completedChallenges ?? []) {
+      showToast(`🎉 Challenge complete: ${challenge.title}`);
+    }
+    if (body?.completedGoal) {
+      showToast(`🎉 ${body.completedGoal.year} watch goal complete!`);
+    }
     router.refresh();
   }
 

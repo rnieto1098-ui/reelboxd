@@ -6,6 +6,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { posterUrl, type TmdbImage } from "@/lib/tmdb";
 import { BookmarkIcon, CalendarIcon, DiscIcon, ImageIcon } from "@/components/icons";
+import { useToast } from "@/components/Toast";
 
 type ActionState = "idle" | "saving" | "done";
 
@@ -37,6 +38,7 @@ export function PosterQuickActions({
   initialInWatchlist?: boolean;
 }) {
   const router = useRouter();
+  const showToast = useToast();
   const [diaryState, setDiaryState] = useState<ActionState>("idle");
   const [owned, setOwned] = useState(initialOwned);
   const [ownedSaving, setOwnedSaving] = useState(false);
@@ -64,29 +66,36 @@ export function PosterQuickActions({
     setInWatchlist(initialInWatchlist);
   }
 
-  async function runAction(
-    e: React.MouseEvent,
-    setState: (s: ActionState) => void,
-    url: string,
-    body?: unknown
-  ) {
+  // Log watch is its own function rather than a generic runAction helper —
+  // it's the only quick action that needs to read the response
+  // body, to surface a challenge/goal-completion toast when this log was
+  // the one that pushed it over. Every other quick action here stays silent
+  // on success (see StreamingServiceToggle for the "would spam" reasoning);
+  // this one only ever toasts on the rare completion, not on the routine log.
+  async function logDiaryWatch(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
-    setState("saving");
-    const res = await fetch(url, {
+    setDiaryState("saving");
+    const res = await fetch("/api/diary", {
       method: "POST",
-      ...(body !== undefined && {
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tmdbId }),
     });
     if (res.status === 401) {
       router.push("/login");
       return;
     }
-    setState("done");
+    setDiaryState("done");
     router.refresh();
-    setTimeout(() => setState("idle"), 1500);
+    setTimeout(() => setDiaryState("idle"), 1500);
+
+    const body = await res.json().catch(() => null);
+    for (const challenge of body?.completedChallenges ?? []) {
+      showToast(`🎉 Challenge complete: ${challenge.title}`);
+    }
+    if (body?.completedGoal) {
+      showToast(`🎉 ${body.completedGoal.year} watch goal complete!`);
+    }
   }
 
   // Owned/watchlist are real toggles (unlike Log watch, which just logs a
@@ -183,7 +192,7 @@ export function PosterQuickActions({
           title="Log watch"
           aria-label="Log watch"
           disabled={diaryState === "saving"}
-          onClick={(e) => runAction(e, setDiaryState, "/api/diary", { tmdbId })}
+          onClick={logDiaryWatch}
           className={actionButtonClass(false)}
         >
           {diaryState === "done" ? <CheckIcon /> : <CalendarIcon />}

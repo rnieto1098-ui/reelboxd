@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/Toast";
 
@@ -11,7 +11,7 @@ type PersonResult = {
   known_for_department: string | null;
 };
 
-type DepartmentOption = { department: string; count: number };
+type DepartmentOption = { department: string; count: number; watched: number };
 
 const CHALLENGE_TYPES = [
   { key: "GENRE", label: "Genre" },
@@ -30,10 +30,13 @@ export function NewChallengeForm({ genres }: { genres: string[] }) {
 
   const [genreName, setGenreName] = useState(genres[0] ?? "");
   const [genreTarget, setGenreTarget] = useState("10");
+  const [genreCounts, setGenreCounts] = useState<Record<string, number> | null>(null);
 
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [timeframeTarget, setTimeframeTarget] = useState("10");
+  const [timeframeCount, setTimeframeCount] = useState<number | null>(null);
+  const [loadingTimeframeCount, setLoadingTimeframeCount] = useState(false);
 
   const [personQuery, setPersonQuery] = useState("");
   const [personResults, setPersonResults] = useState<PersonResult[]>([]);
@@ -42,6 +45,42 @@ export function NewChallengeForm({ genres }: { genres: string[] }) {
   const [departments, setDepartments] = useState<DepartmentOption[] | null>(null);
   const [loadingDepartments, setLoadingDepartments] = useState(false);
   const [department, setDepartment] = useState<string | null>(null);
+
+  // Fetched once, up front, rather than per-keystroke — there are only a
+  // couple dozen genres, so one request covers every option in the select.
+  useEffect(() => {
+    if (!open || type !== "GENRE" || genreCounts) return;
+    fetch("/api/challenges/genre-counts")
+      .then((res) => res.json())
+      .then((body) => setGenreCounts(body.counts ?? {}))
+      .catch(() => setGenreCounts({}));
+  }, [open, type, genreCounts]);
+
+  // Timeframe count depends on both dates, so it's refetched whenever either
+  // changes rather than fetched once.
+  useEffect(() => {
+    // Stale timeframeCount from a previous pair of dates never renders once
+    // either date is cleared — the JSX below only shows it when both dates
+    // are set — so there's nothing to reset here, just nothing to fetch.
+    if (!open || type !== "TIMEFRAME" || !startDate || !endDate) return;
+    let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch trigger, not a derived-state effect
+    setLoadingTimeframeCount(true);
+    fetch(`/api/challenges/timeframe-preview?start=${startDate}&end=${endDate}`)
+      .then((res) => res.json())
+      .then((body) => {
+        if (!cancelled) setTimeframeCount(typeof body.count === "number" ? body.count : null);
+      })
+      .catch(() => {
+        if (!cancelled) setTimeframeCount(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingTimeframeCount(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, type, startDate, endDate]);
 
   async function searchPeople() {
     if (!personQuery.trim()) return;
@@ -154,54 +193,72 @@ export function NewChallengeForm({ genres }: { genres: string[] }) {
       </div>
 
       {type === "GENRE" && (
-        <div className="flex flex-wrap items-center gap-2 text-sm">
-          <span className="text-muted">Watch</span>
-          <input
-            type="number"
-            min={1}
-            value={genreTarget}
-            onChange={(e) => setGenreTarget(e.target.value)}
-            className="w-16 rounded-md border border-border bg-background px-2 py-1 text-center focus:outline-none focus:border-accent-green"
-          />
-          <select
-            value={genreName}
-            onChange={(e) => setGenreName(e.target.value)}
-            className="rounded-md border border-border bg-background px-2 py-1 focus:outline-none focus:border-accent-green"
-          >
-            {genres.map((g) => (
-              <option key={g} value={g}>
-                {g}
-              </option>
-            ))}
-          </select>
-          <span className="text-muted">movies</span>
+        <div className="space-y-1.5 text-sm">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-muted">Watch</span>
+            <input
+              type="number"
+              min={1}
+              value={genreTarget}
+              onChange={(e) => setGenreTarget(e.target.value)}
+              className="w-16 rounded-md border border-border bg-background px-2 py-1 text-center focus:outline-none focus:border-accent-green"
+            />
+            <select
+              value={genreName}
+              onChange={(e) => setGenreName(e.target.value)}
+              className="rounded-md border border-border bg-background px-2 py-1 focus:outline-none focus:border-accent-green"
+            >
+              {genres.map((g) => (
+                <option key={g} value={g}>
+                  {g}
+                </option>
+              ))}
+            </select>
+            <span className="text-muted">movies</span>
+          </div>
+          {genreCounts && (genreCounts[genreName] ?? 0) > 0 && (
+            <p className="text-xs text-muted">
+              You&apos;ve already logged {genreCounts[genreName]} {genreName} movie
+              {genreCounts[genreName] === 1 ? "" : "s"}.
+            </p>
+          )}
         </div>
       )}
 
       {type === "TIMEFRAME" && (
-        <div className="flex flex-wrap items-center gap-2 text-sm">
-          <span className="text-muted">Watch</span>
-          <input
-            type="number"
-            min={1}
-            value={timeframeTarget}
-            onChange={(e) => setTimeframeTarget(e.target.value)}
-            className="w-16 rounded-md border border-border bg-background px-2 py-1 text-center focus:outline-none focus:border-accent-green"
-          />
-          <span className="text-muted">movies between</span>
-          <input
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            className="rounded-md border border-border bg-background px-2 py-1 focus:outline-none focus:border-accent-green"
-          />
-          <span className="text-muted">and</span>
-          <input
-            type="date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            className="rounded-md border border-border bg-background px-2 py-1 focus:outline-none focus:border-accent-green"
-          />
+        <div className="space-y-1.5 text-sm">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-muted">Watch</span>
+            <input
+              type="number"
+              min={1}
+              value={timeframeTarget}
+              onChange={(e) => setTimeframeTarget(e.target.value)}
+              className="w-16 rounded-md border border-border bg-background px-2 py-1 text-center focus:outline-none focus:border-accent-green"
+            />
+            <span className="text-muted">movies between</span>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="rounded-md border border-border bg-background px-2 py-1 focus:outline-none focus:border-accent-green"
+            />
+            <span className="text-muted">and</span>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="rounded-md border border-border bg-background px-2 py-1 focus:outline-none focus:border-accent-green"
+            />
+          </div>
+          {startDate && endDate && (
+            <p className="text-xs text-muted">
+              {loadingTimeframeCount
+                ? "Checking your diary..."
+                : timeframeCount != null &&
+                  `You've already logged ${timeframeCount} movie${timeframeCount === 1 ? "" : "s"} in that range.`}
+            </p>
+          )}
         </div>
       )}
 
@@ -265,22 +322,33 @@ export function NewChallengeForm({ genres }: { genres: string[] }) {
               {loadingDepartments ? (
                 <p className="text-xs text-muted">Loading filmography...</p>
               ) : departments && departments.length > 0 ? (
-                <div className="flex flex-wrap gap-1">
-                  {departments.map((d) => (
-                    <button
-                      key={d.department}
-                      type="button"
-                      onClick={() => setDepartment(d.department)}
-                      className={`rounded-full px-2.5 py-1 text-xs transition-colors ${
-                        department === d.department
-                          ? "bg-accent-green text-black"
-                          : "border border-border text-muted hover:text-foreground"
-                      }`}
-                    >
-                      {d.department} ({d.count})
-                    </button>
-                  ))}
-                </div>
+                <>
+                  <div className="flex flex-wrap gap-1">
+                    {departments.map((d) => (
+                      <button
+                        key={d.department}
+                        type="button"
+                        onClick={() => setDepartment(d.department)}
+                        className={`rounded-full px-2.5 py-1 text-xs transition-colors ${
+                          department === d.department
+                            ? "bg-accent-green text-black"
+                            : "border border-border text-muted hover:text-foreground"
+                        }`}
+                      >
+                        {d.department} ({d.count})
+                      </button>
+                    ))}
+                  </div>
+                  {department &&
+                    (() => {
+                      const selected = departments.find((d) => d.department === department);
+                      return selected && selected.watched > 0 ? (
+                        <p className="text-xs text-muted">
+                          You&apos;ve already watched {selected.watched} of {selected.count}.
+                        </p>
+                      ) : null;
+                    })()}
+                </>
               ) : departments ? (
                 <p className="text-xs text-muted">No movie credits found for this person.</p>
               ) : null}

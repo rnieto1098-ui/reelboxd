@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
 import { getPersonMovieCredits } from "@/lib/tmdb";
 
 function dedupeById<T extends { id: number }>(items: T[]): T[] {
@@ -12,7 +13,9 @@ function dedupeById<T extends { id: number }>(items: T[]): T[] {
 
 // Lists the departments (plus "Acting") this person actually has movie
 // credits in, with counts — so the challenge form can offer only real
-// choices ("Directing (24)") instead of a generic fixed list.
+// choices ("Directing (24)") instead of a generic fixed list. Also reports
+// how many of each department's credits the signed-in user has already
+// logged, for the form's live "you've already watched N of these" preview.
 export async function GET(
   _request: Request,
   context: { params: Promise<{ personId: string }> }
@@ -30,23 +33,31 @@ export async function GET(
 
   const credits = await getPersonMovieCredits(personId).catch(() => ({ cast: [], crew: [] }));
 
-  const byDepartment = new Map<string, number>();
-  for (const credit of credits.crew) {
-    byDepartment.set(credit.department, (byDepartment.get(credit.department) ?? 0) + 1);
+  const byDepartment = new Map<string, { id: number }[]>();
+  for (const department of new Set(credits.crew.map((c) => c.department))) {
+    byDepartment.set(department, dedupeById(credits.crew.filter((c) => c.department === department)));
   }
-  // Re-count after dedupe so a person credited twice on one film (e.g.
-  // director + writer within the same department) isn't over-counted.
-  for (const [department] of byDepartment) {
-    const list = credits.crew.filter((c) => c.department === department);
-    byDepartment.set(department, dedupeById(list).length);
-  }
+  const actingCredits = dedupeById(credits.cast);
+  if (actingCredits.length > 0) byDepartment.set("Acting", actingCredits);
+
+  const allTmdbIds = [...new Set([...byDepartment.values()].flat().map((c) => c.id))];
+  const logged =
+    allTmdbIds.length > 0
+      ? await prisma.diaryEntry.findMany({
+          where: { userId: session.user.id, movie: { tmdbId: { in: allTmdbIds } } },
+          select: { movie: { select: { tmdbId: true } } },
+          distinct: ["movieId"],
+        })
+      : [];
+  const loggedTmdbIds = new Set(logged.map((l) => l.movie.tmdbId));
 
   const departments = [...byDepartment.entries()]
-    .map(([department, count]) => ({ department, count }))
+    .map(([department, list]) => ({
+      department,
+      count: list.length,
+      watched: list.filter((c) => loggedTmdbIds.has(c.id)).length,
+    }))
     .sort((a, b) => b.count - a.count);
-
-  const actingCount = dedupeById(credits.cast).length;
-  if (actingCount > 0) departments.push({ department: "Acting", count: actingCount });
 
   return NextResponse.json({ departments });
 }

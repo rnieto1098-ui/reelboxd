@@ -3,6 +3,8 @@ import { z } from "zod";
 import { auth } from "@/auth";
 import { ensureMovieCached } from "@/lib/movies";
 import { createDiaryEntry } from "@/lib/diary";
+import { checkNewlyCompletedChallenges } from "@/lib/challenges";
+import { checkGoalJustCompleted } from "@/lib/goals";
 
 const diarySchema = z.object({
   tmdbId: z.number().int().positive(),
@@ -26,13 +28,22 @@ export async function POST(request: Request) {
   }
 
   const movie = await ensureMovieCached(parsed.data.tmdbId);
+  const watchedDate = parsed.data.watchedDate ? new Date(parsed.data.watchedDate) : new Date();
 
   const entry = await createDiaryEntry({
     userId: session.user.id,
     movieId: movie.id,
-    watchedDate: parsed.data.watchedDate ? new Date(parsed.data.watchedDate) : undefined,
+    watchedDate,
     rewatch: parsed.data.rewatch,
   });
 
-  return NextResponse.json(entry, { status: 201 });
+  // A rewatch can't newly satisfy a challenge (those count distinct movies,
+  // already counted on the first watch) but can still push the yearly goal
+  // over (that counts every log, rewatches included).
+  const [completedChallenges, completedGoal] = await Promise.all([
+    entry.rewatch ? Promise.resolve([]) : checkNewlyCompletedChallenges(session.user.id, movie, watchedDate),
+    checkGoalJustCompleted(session.user.id, watchedDate),
+  ]);
+
+  return NextResponse.json({ ...entry, completedChallenges, completedGoal }, { status: 201 });
 }

@@ -21,7 +21,9 @@ import { FadeWatchedControl } from "@/components/FadeWatchedControl";
 import { ListCoverUpload } from "@/components/ListCoverUpload";
 import { AvailabilityFilterLinks } from "@/components/AvailabilityFilterLinks";
 import { SortChips } from "@/components/SortChips";
+import { ListTagsEditor } from "@/components/ListTagsEditor";
 import { getCachedList } from "@/lib/listCache";
+import { parseStoredTags } from "@/lib/listTags";
 
 const SORT_OPTIONS = {
   order: { label: "List Order" },
@@ -217,6 +219,13 @@ export default async function ListDetailPage({
             </p>
             {list.description && (
               <p className="mt-2 max-w-2xl text-sm text-muted">{list.description}</p>
+            )}
+            {!list.isSystem && (
+              <ListTagsEditor
+                listId={list.id}
+                initialTags={parseStoredTags(list.tags)}
+                isOwner={isOwner}
+              />
             )}
             {watchedPercent != null && (
               <div className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-2.5 py-1 text-xs text-muted">

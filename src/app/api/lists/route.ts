@@ -2,10 +2,12 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { parseTagsInput, tagsToStorageString } from "@/lib/listTags";
 
 const createListSchema = z.object({
   title: z.string().min(1, "Give your list a name").max(100),
   description: z.string().max(500).optional(),
+  tags: z.string().max(300).optional(),
 });
 
 export async function POST(request: Request) {
@@ -27,6 +29,7 @@ export async function POST(request: Request) {
     data: {
       title: parsed.data.title,
       description: parsed.data.description,
+      tags: parsed.data.tags ? tagsToStorageString(parseTagsInput(parsed.data.tags)) : null,
       ownerId: session.user.id,
     },
   });

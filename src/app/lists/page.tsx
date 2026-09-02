@@ -7,8 +7,12 @@ import { ensureSystemLists } from "@/lib/systemLists";
 import { getPersonalListCoverMap } from "@/lib/listCovers";
 import { CreateListForm } from "@/components/CreateListForm";
 import { ListRow } from "@/components/ListRow";
+import { parseStoredTags } from "@/lib/listTags";
 
-export default async function ListsPage() {
+export default async function ListsPage({ searchParams }: PageProps<"/lists">) {
+  const { tag } = await searchParams;
+  const activeTag = typeof tag === "string" ? tag : null;
+
   const session = await auth();
   await ensureSystemLists();
 
@@ -45,6 +49,21 @@ export default async function ListsPage() {
     itemCount: list._count.items,
   }));
 
+  const userListsWithTags = userLists.map((list) => ({ ...list, tagList: parseStoredTags(list.tags) }));
+  const tagsByKey = new Map<string, string>();
+  for (const list of userListsWithTags) {
+    for (const t of list.tagList) {
+      const key = t.toLowerCase();
+      if (!tagsByKey.has(key)) tagsByKey.set(key, t);
+    }
+  }
+  const allTags = [...tagsByKey.values()].sort((a, b) => a.localeCompare(b));
+  // Case-insensitive match — a tag's display casing (from whichever list
+  // set it first) doesn't have to match the casing in the URL.
+  const visibleLists = activeTag
+    ? userListsWithTags.filter((l) => l.tagList.some((t) => t.toLowerCase() === activeTag.toLowerCase()))
+    : userListsWithTags;
+
   return (
     <div>
       <h1 className="mb-2 text-2xl font-bold">Lists</h1>
@@ -62,10 +81,39 @@ export default async function ListsPage() {
             <h2 className="text-lg font-semibold">Your Lists</h2>
             <CreateListForm />
           </div>
+
+          {allTags.length > 0 && (
+            <div className="mb-4 flex flex-wrap items-center gap-1.5 text-xs">
+              <Link
+                href="/lists"
+                className={`rounded-full px-2.5 py-1 transition-colors ${
+                  !activeTag ? "bg-accent-green text-black" : "border border-border text-muted hover:text-foreground"
+                }`}
+              >
+                All
+              </Link>
+              {allTags.map((t) => (
+                <Link
+                  key={t}
+                  href={`/lists?tag=${encodeURIComponent(t)}`}
+                  className={`rounded-full px-2.5 py-1 transition-colors ${
+                    activeTag?.toLowerCase() === t.toLowerCase()
+                      ? "bg-accent-green text-black"
+                      : "border border-border text-muted hover:text-foreground"
+                  }`}
+                >
+                  {t}
+                </Link>
+              ))}
+            </div>
+          )}
+
           {userLists.length === 0 ? (
             <p className="text-sm text-muted">You haven&apos;t made any lists yet.</p>
+          ) : visibleLists.length === 0 ? (
+            <p className="text-sm text-muted">No lists tagged &ldquo;{activeTag}&rdquo;.</p>
           ) : (
-            <ListGrid lists={userLists} personalCovers={personalCovers} />
+            <ListGrid lists={visibleLists} personalCovers={personalCovers} />
           )}
         </section>
       )}
@@ -84,6 +132,7 @@ function ListGrid({
     coverImage: string | null;
     items: { posterPath: string | null }[];
     _count: { items: number };
+    tagList: string[];
   }[];
   personalCovers: Map<string, string>;
 }) {
@@ -117,6 +166,9 @@ function ListGrid({
             <p className="text-xs text-muted">
               {list._count.items} movie{list._count.items === 1 ? "" : "s"}
             </p>
+            {list.tagList.length > 0 && (
+              <p className="mt-0.5 truncate text-[11px] text-muted">{list.tagList.join(" · ")}</p>
+            )}
           </Link>
         );
       })}

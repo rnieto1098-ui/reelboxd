@@ -264,6 +264,11 @@ model List {
   // the first time can't both succeed and produce duplicates.
   key         String?  @unique
   coverImage  String?
+  // Comma-separated, owner-set tags for organizing/filtering the Lists page
+  // (e.g. "Horror, Rewatch pile") — plain string, matching this schema's
+  // existing convention for lightweight multi-value fields (see Movie.genres)
+  // rather than a normalized join table.
+  tags        String?
   createdAt   DateTime @default(now())
 
   ownerId String?

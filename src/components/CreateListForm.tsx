@@ -10,6 +10,7 @@ export function CreateListForm() {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [tags, setTags] = useState("");
   const [saving, setSaving] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -21,7 +22,11 @@ export function CreateListForm() {
     const res = await fetch("/api/lists", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, description: description || undefined }),
+      body: JSON.stringify({
+        title,
+        description: description || undefined,
+        tags: tags || undefined,
+      }),
     });
     const body = await res.json();
     setSaving(false);
@@ -64,6 +69,13 @@ export function CreateListForm() {
         onChange={(e) => setDescription(e.target.value)}
         placeholder="Description (optional)"
         rows={2}
+        className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm placeholder:text-muted focus:outline-none focus:border-accent-green"
+      />
+      <input
+        type="text"
+        value={tags}
+        onChange={(e) => setTags(e.target.value)}
+        placeholder="Tags, comma separated (optional)"
         className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm placeholder:text-muted focus:outline-none focus:border-accent-green"
       />
       <div className="flex gap-2">

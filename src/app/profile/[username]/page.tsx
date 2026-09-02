@@ -13,6 +13,7 @@ import { MovieRow } from "@/components/MovieRow";
 import { RecentlyLoggedRow } from "@/components/RecentlyLoggedRow";
 import { SortChips } from "@/components/SortChips";
 import { WatchGoalWidget } from "@/components/WatchGoalWidget";
+import { LetterboxdSyncCard } from "@/components/LetterboxdSyncCard";
 import { compareNullableNumbers, type SortDir } from "@/lib/sortComparator";
 import type { TmdbMovieSummary } from "@/lib/tmdb";
 import type { Movie } from "@prisma/client";
@@ -267,6 +268,15 @@ export default async function ProfilePage({
           </div>
         )}
       </div>
+
+      {isOwnProfile && (
+        <div className="mb-8 rounded-lg border border-border bg-surface p-4">
+          <LetterboxdSyncCard
+            initialUsername={user.letterboxdUsername}
+            initialSyncedAt={user.letterboxdSyncedAt?.toISOString() ?? null}
+          />
+        </div>
+      )}
 
       {(goal.target != null || challenges.length > 0) && (
         <div className="mb-10 space-y-4">

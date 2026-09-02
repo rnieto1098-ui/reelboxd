@@ -35,6 +35,29 @@ model User {
   lists             List[]
   watchGoals        WatchGoal[]
   challenges        Challenge[]
+
+  // One-way Letterboxd -> Flixtally diary sync (see lib/letterboxdSync.ts).
+  // Null username means sync isn't connected.
+  letterboxdUsername  String?
+  letterboxdSyncedAt  DateTime?
+  letterboxdSyncItems LetterboxdSyncItem[]
+}
+
+// Tracks which Letterboxd diary RSS entries have already been synced for a
+// user, keyed by Letterboxd's own guid for that log — the dedupe key that
+// keeps a re-sync (the feed always covers the same recent window) from
+// creating duplicate diary entries. Recorded only on a successful import, so
+// an entry that failed to resolve to a TMDB id gets retried next sync rather
+// than silently skipped forever.
+model LetterboxdSyncItem {
+  id        String   @id @default(cuid())
+  guid      String
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, guid])
 }
 
 model Account {

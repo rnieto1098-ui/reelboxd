@@ -17,13 +17,51 @@ function filmKey(name: string, year: string) {
   return `${name.trim().toLowerCase()}|${year.trim()}`;
 }
 
+// Excel and other spreadsheet tools commonly save CSVs with a leading UTF-8
+// BOM — left in place, it silently glues itself onto the first header cell
+// ("﻿Name"), so a plain `row["Name"]` lookup on that column never
+// matches and every row looks empty.
+function stripBom(text: string): string {
+  return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+}
+
+const TITLE_HEADER_CANDIDATES = ["name", "title", "movie", "film"];
+const YEAR_HEADER_CANDIDATES = ["year", "release year", "releaseyear"];
+
+function findHeaderKey(sampleRow: CsvRow, candidates: string[]): string | null {
+  const keys = Object.keys(sampleRow);
+  for (const candidate of candidates) {
+    const key = keys.find((k) => k.trim().toLowerCase() === candidate);
+    if (key) return key;
+  }
+  return null;
+}
+
+// Letterboxd's own exports always use exact "Name"/"Year" headers, but a
+// user's own spreadsheet (owned-movies import, a re-saved watchlist export,
+// ...) might use different casing or a synonym like "Title" — this re-keys
+// whatever the file actually used onto "Name"/"Year" so the rest of the
+// pipeline doesn't need to special-case it.
+function normalizeTitleYearRows(rows: CsvRow[]): CsvRow[] {
+  if (rows.length === 0) return rows;
+  const nameKey = findHeaderKey(rows[0], TITLE_HEADER_CANDIDATES);
+  const yearKey = findHeaderKey(rows[0], YEAR_HEADER_CANDIDATES);
+  if ((!nameKey || nameKey === "Name") && (!yearKey || yearKey === "Year")) return rows;
+
+  return rows.map((row) => ({
+    ...row,
+    ...(nameKey && !row["Name"] ? { Name: row[nameKey] } : {}),
+    ...(yearKey && !row["Year"] ? { Year: row[yearKey] } : {}),
+  }));
+}
+
 async function readCsv(zip: JSZip, filename: string): Promise<CsvRow[] | null> {
   const entry = Object.values(zip.files).find(
     (f) => !f.dir && f.name.toLowerCase().endsWith(filename)
   );
   if (!entry) return null;
 
-  const text = await entry.async("string");
+  const text = stripBom(await entry.async("string"));
   const { data } = Papa.parse<CsvRow>(text, { header: true, skipEmptyLines: true });
   return data;
 }
@@ -238,13 +276,13 @@ async function parseWatchlistRows(file: File): Promise<CsvRow[]> {
     if (!rows) {
       throw new Error("That .zip didn't contain a watchlist.csv.");
     }
-    return rows;
+    return normalizeTitleYearRows(rows);
   }
 
   if (name.endsWith(".csv")) {
-    const text = await file.text();
+    const text = stripBom(await file.text());
     const { data } = Papa.parse<CsvRow>(text, { header: true, skipEmptyLines: true });
-    return data;
+    return normalizeTitleYearRows(data);
   }
 
   throw new Error("Please upload a .csv or .zip file.");
@@ -261,7 +299,7 @@ export async function importWatchlistFile(
 
   if (films.length === 0) {
     throw new Error(
-      "No movies found in that file — make sure it has Name and Year columns."
+      "No movies found in that file — make sure it has a Name (or Title) column, ideally with Year too."
     );
   }
 
@@ -310,7 +348,7 @@ export async function importOwnedFile(userId: string, file: File): Promise<Owned
 
   if (films.length === 0) {
     throw new Error(
-      "No movies found in that file — make sure it has Name and Year columns."
+      "No movies found in that file — make sure it has a Name (or Title) column, ideally with Year too."
     );
   }
 

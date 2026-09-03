@@ -1,7 +1,6 @@
 "use client";
 
 import { MovieCard } from "@/components/MovieCard";
-import { ProviderLogos } from "@/components/ProviderLogos";
 import { ShuffleButton } from "@/components/ShuffleButton";
 import { useShuffle } from "@/lib/useShuffle";
 
@@ -29,7 +28,7 @@ export function WatchlistGrid({ entries }: { entries: WatchlistGridEntry[] }) {
         <ShuffleButton onClick={shuffle} disabled={entries.length < 2} />
       </div>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-        {order.map(({ item, providers, owned }) => (
+        {order.map(({ item, owned }) => (
           <div key={item.id}>
             <MovieCard
               tmdbId={item.movie.tmdbId}
@@ -39,12 +38,10 @@ export function WatchlistGrid({ entries }: { entries: WatchlistGridEntry[] }) {
               owned={owned}
               inWatchlist
             />
-            {owned ? (
+            {owned && (
               <span className="mt-1 inline-block rounded-full border border-accent-green px-2 py-0.5 text-xs text-accent-green">
                 Owned
               </span>
-            ) : (
-              <ProviderLogos providers={providers} />
             )}
           </div>
         ))}

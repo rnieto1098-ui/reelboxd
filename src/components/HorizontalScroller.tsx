@@ -21,7 +21,13 @@ export function HorizontalScroller({
     const el = scrollerRef.current;
     if (!el) return;
     const amount = el.clientWidth * 0.9;
-    el.scrollBy({ left: direction === "left" ? -amount : amount, behavior: "smooth" });
+    // `behavior: "smooth"` (plus the CSS scroll-smooth class this used to
+    // also carry) reliably stalled partway through its animation on a long
+    // row — new poster images loading in and reflowing the layout mid-
+    // scroll appears to interrupt the browser's native animation, leaving
+    // the arrow looking broken after one click. Instant scrolling has no
+    // animation to interrupt.
+    el.scrollBy({ left: direction === "left" ? -amount : amount, behavior: "auto" });
   }
 
   return (
@@ -47,7 +53,7 @@ export function HorizontalScroller({
 
           <div
             ref={scrollerRef}
-            className="no-scrollbar -mx-4 flex gap-3 overflow-x-auto scroll-smooth px-4 pb-2 sm:mx-0 sm:px-0"
+            className="no-scrollbar -mx-4 flex gap-3 overflow-x-auto px-4 pb-2 sm:mx-0 sm:px-0"
           >
             {children}
           </div>

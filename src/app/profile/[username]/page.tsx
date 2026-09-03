@@ -14,6 +14,7 @@ import { RecentlyLoggedRow } from "@/components/RecentlyLoggedRow";
 import { SortChips } from "@/components/SortChips";
 import { WatchGoalWidget } from "@/components/WatchGoalWidget";
 import { LetterboxdSyncCard } from "@/components/LetterboxdSyncCard";
+import { OwnedImportForm } from "@/components/OwnedImportForm";
 import { compareNullableNumbers, type SortDir } from "@/lib/sortComparator";
 import type { TmdbMovieSummary } from "@/lib/tmdb";
 import type { Movie } from "@prisma/client";
@@ -333,6 +334,7 @@ export default async function ProfilePage({
           emptyMessage="No owned movies marked yet."
           ownedIds={[...viewerOwnedIds]}
           watchlistIds={[...viewerWatchlistIds]}
+          headerExtra={isOwnProfile && <OwnedImportForm />}
           movies={user.owned.map(
             (o): TmdbMovieSummary => ({
               id: o.movie.tmdbId,

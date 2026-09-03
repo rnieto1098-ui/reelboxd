@@ -13,6 +13,7 @@ export function MovieRow({
   emptyMessage,
   ownedIds,
   watchlistIds,
+  headerExtra,
 }: {
   title: string;
   movies: TmdbMovieSummary[];
@@ -21,6 +22,9 @@ export function MovieRow({
   // Client Component boundary this component now sits behind.
   ownedIds?: number[];
   watchlistIds?: number[];
+  // Extra header content shown alongside the shuffle button (e.g. an
+  // import link) — most rows don't need this, so it's optional.
+  headerExtra?: ReactNode;
 }) {
   const { order, shuffle } = useShuffle(movies);
   const ownedSet = useMemo(() => new Set(ownedIds), [ownedIds]);
@@ -30,7 +34,12 @@ export function MovieRow({
     <HorizontalScroller
       title={title}
       headerAction={
-        movies.length > 1 && <ShuffleButton onClick={shuffle} />
+        (movies.length > 1 || headerExtra) && (
+          <div className="flex items-center gap-3">
+            {headerExtra}
+            {movies.length > 1 && <ShuffleButton onClick={shuffle} />}
+          </div>
+        )
       }
       isEmpty={movies.length === 0}
       emptyMessage={emptyMessage}

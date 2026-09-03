@@ -291,3 +291,52 @@ export async function importWatchlistFile(
 
   return { imported, unmatched };
 }
+
+export type OwnedImportSummary = {
+  imported: number;
+  unmatched: { title: string; year: string }[];
+};
+
+// Not a Letterboxd concept — "owned" is Flixtally-only — so this is for a
+// plain CSV with Name/Year columns (a DVD-shelf spreadsheet, this app's own
+// export, etc.), not a Letterboxd export. Shares parseWatchlistRows since
+// the accepted shapes (.csv, or a .zip containing a watchlist.csv-named
+// file) are otherwise identical.
+export async function importOwnedFile(userId: string, file: File): Promise<OwnedImportSummary> {
+  const rows = await parseWatchlistRows(file);
+  const films = rows
+    .filter((row) => row["Name"])
+    .map((row) => ({ title: row["Name"], year: row["Year"] ?? "" }));
+
+  if (films.length === 0) {
+    throw new Error(
+      "No movies found in that file — make sure it has Name and Year columns."
+    );
+  }
+
+  const unmatched: { title: string; year: string }[] = [];
+  let imported = 0;
+
+  for (let i = 0; i < films.length; i += MATCH_CONCURRENCY) {
+    const batch = films.slice(i, i + MATCH_CONCURRENCY);
+    await Promise.all(
+      batch.map(async (film) => {
+        const tmdbId = await matchTmdbId(film.title, film.year);
+        if (!tmdbId) {
+          unmatched.push(film);
+          return;
+        }
+
+        const movie = await ensureMovieCached(tmdbId);
+        await prisma.ownedItem.upsert({
+          where: { userId_movieId: { userId, movieId: movie.id } },
+          update: {},
+          create: { userId, movieId: movie.id },
+        });
+        imported++;
+      })
+    );
+  }
+
+  return { imported, unmatched };
+}

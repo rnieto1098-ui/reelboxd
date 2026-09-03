@@ -55,6 +55,34 @@ function normalizeTitleYearRows(rows: CsvRow[]): CsvRow[] {
   }));
 }
 
+// A hand-exported spreadsheet CSV (as opposed to a clean Letterboxd export)
+// commonly has junk above the real header — blank rows, a title row, a
+// leading blank column from row/column offset in the original sheet. Papa's
+// `header: true` always treats the literal first line as the header no
+// matter what skipEmptyLines is set to, so a file like this would silently
+// take that junk as the header and bury every real row as unreadable data.
+// This instead parses as plain arrays, scans down for the first row that
+// actually looks like a header (contains a Name/Title-like cell), and reads
+// Name/Year off that row's column positions — a blank leading column or two
+// just becomes an ignored index, not something that has to match exactly.
+function parseTitleYearCsv(text: string): CsvRow[] {
+  const { data: rows } = Papa.parse<string[]>(text, { skipEmptyLines: "greedy" });
+
+  const headerIndex = rows.findIndex((row) =>
+    row.some((cell) => TITLE_HEADER_CANDIDATES.includes(cell.trim().toLowerCase()))
+  );
+  if (headerIndex === -1) return [];
+
+  const header = rows[headerIndex];
+  const nameCol = header.findIndex((cell) => TITLE_HEADER_CANDIDATES.includes(cell.trim().toLowerCase()));
+  const yearCol = header.findIndex((cell) => YEAR_HEADER_CANDIDATES.includes(cell.trim().toLowerCase()));
+
+  return rows.slice(headerIndex + 1).map((row) => ({
+    Name: (row[nameCol] ?? "").trim(),
+    Year: yearCol >= 0 ? (row[yearCol] ?? "").trim() : "",
+  }));
+}
+
 async function readCsv(zip: JSZip, filename: string): Promise<CsvRow[] | null> {
   const entry = Object.values(zip.files).find(
     (f) => !f.dir && f.name.toLowerCase().endsWith(filename)
@@ -281,8 +309,7 @@ async function parseWatchlistRows(file: File): Promise<CsvRow[]> {
 
   if (name.endsWith(".csv")) {
     const text = stripBom(await file.text());
-    const { data } = Papa.parse<CsvRow>(text, { header: true, skipEmptyLines: true });
-    return normalizeTitleYearRows(data);
+    return parseTitleYearCsv(text);
   }
 
   throw new Error("Please upload a .csv or .zip file.");

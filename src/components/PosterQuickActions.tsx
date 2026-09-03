@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { posterUrl, type TmdbImage } from "@/lib/tmdb";
-import { BookmarkIcon, CalendarIcon, DiscIcon, ImageIcon } from "@/components/icons";
+import { BookmarkIcon, CalendarIcon, ImageIcon, ShoppingBagIcon } from "@/components/icons";
 import { useToast } from "@/components/Toast";
 
 type ActionState = "idle" | "saving" | "done";
@@ -186,7 +186,7 @@ export function PosterQuickActions({
           onClick={toggleOwned}
           className={actionButtonClass(owned)}
         >
-          <DiscIcon />
+          <ShoppingBagIcon />
         </button>
       </div>
 

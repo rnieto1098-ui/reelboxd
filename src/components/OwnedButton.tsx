@@ -1,7 +1,7 @@
 "use client";
 
 import { useToggleAction } from "@/lib/useToggleAction";
-import { DiscIcon } from "@/components/icons";
+import { ShoppingBagIcon } from "@/components/icons";
 
 export function OwnedButton({
   tmdbId,
@@ -29,7 +29,7 @@ export function OwnedButton({
           : "border-border text-muted hover:text-foreground"
       }`}
     >
-      <DiscIcon />
+      <ShoppingBagIcon />
       Owned
     </button>
   );

@@ -261,6 +261,15 @@ model OwnedItem {
 model DiaryEntry {
   id          String   @id @default(cuid())
   watchedDate DateTime
+  // Always watchedDate truncated to UTC midnight — a normalized copy that
+  // exists solely so the DB itself can enforce "one log per movie per day"
+  // via the unique constraint below. watchedDate can't be used directly for
+  // that: a same-day log created "now" carries a real time-of-day, not
+  // midnight, so two logs on the same day wouldn't naturally collide on it.
+  // Backs up createDiaryEntry's application-level check with a real
+  // constraint, closing the race where two near-simultaneous requests both
+  // pass the check before either write lands.
+  watchedDay  DateTime?
   rewatch     Boolean  @default(false)
   createdAt   DateTime @default(now())
 
@@ -269,6 +278,7 @@ model DiaryEntry {
   movieId String
   movie   Movie @relation(fields: [movieId], references: [id], onDelete: Cascade)
 
+  @@unique([userId, movieId, watchedDay])
   @@index([userId, watchedDate])
 }
 

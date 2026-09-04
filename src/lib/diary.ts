@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { DiaryEntry } from "@prisma/client";
 
@@ -56,17 +57,34 @@ export async function createDiaryEntry({
       select: { id: true },
     })) != null;
 
-  const [entry] = await Promise.all([
-    prisma.diaryEntry.create({
-      data: {
-        userId,
-        movieId,
-        watchedDate: effectiveDate,
-        rewatch: isRewatch,
-      },
-    }),
-    prisma.watchlistItem.deleteMany({ where: { userId, movieId } }),
-  ]);
+  // The findFirst check above is a fast path, not the real guarantee — two
+  // requests can both pass it before either write lands (double-click, or a
+  // manual log racing the sync cron). The @@unique([userId, movieId,
+  // watchedDay]) constraint is the actual source of truth: if this create
+  // loses that race, it throws P2002, and we treat it exactly like the fast
+  // path above — return the entry that won, created: false.
+  try {
+    const [entry] = await Promise.all([
+      prisma.diaryEntry.create({
+        data: {
+          userId,
+          movieId,
+          watchedDate: effectiveDate,
+          watchedDay: start,
+          rewatch: isRewatch,
+        },
+      }),
+      prisma.watchlistItem.deleteMany({ where: { userId, movieId } }),
+    ]);
 
-  return { entry, created: true };
+    return { entry, created: true };
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      const winner = await prisma.diaryEntry.findFirst({
+        where: { userId, movieId, watchedDay: start },
+      });
+      if (winner) return { entry: winner, created: false };
+    }
+    throw error;
+  }
 }

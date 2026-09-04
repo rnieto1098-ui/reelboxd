@@ -4900,6 +4900,10 @@ export type ListProgress = {
   percent: number;
 };
 
+function parseCuratedListOrder(raw: string | null | undefined): string[] {
+  return raw ? raw.split(",").filter(Boolean) : [];
+}
+
 // A rating anywhere in this app means "watched" — same convention as every
 // per-list watched-percent badge, just computed for every curated list at
 // once instead of one at a time.
@@ -4910,22 +4914,59 @@ export async function getCuratedListsProgress(
   if (!userId) return [];
   await ensureSystemLists();
 
-  const lists = await prisma.list.findMany({
-    where: { isSystem: true },
-    select: { id: true, title: true, items: { select: { tmdbId: true } } },
+  const [lists, user] = await Promise.all([
+    prisma.list.findMany({
+      where: { isSystem: true },
+      select: { id: true, title: true, items: { select: { tmdbId: true } } },
+    }),
+    prisma.user.findUnique({ where: { id: userId }, select: { curatedListOrder: true } }),
+  ]);
+
+  const progress = lists.map((list) => {
+    const itemCount = list.items.length;
+    const watchedCount = list.items.filter((item) => watchedTmdbIds.has(item.tmdbId)).length;
+    return {
+      id: list.id,
+      title: list.title,
+      itemCount,
+      watchedCount,
+      percent: itemCount > 0 ? Math.round((watchedCount / itemCount) * 100) : 0,
+    };
   });
 
-  return lists
-    .map((list) => {
-      const itemCount = list.items.length;
-      const watchedCount = list.items.filter((item) => watchedTmdbIds.has(item.tmdbId)).length;
-      return {
-        id: list.id,
-        title: list.title,
-        itemCount,
-        watchedCount,
-        percent: itemCount > 0 ? Math.round((watchedCount / itemCount) * 100) : 0,
-      };
-    })
+  const savedOrder = parseCuratedListOrder(user?.curatedListOrder);
+  if (savedOrder.length === 0) {
+    // No custom order saved yet — same default as before this feature
+    // existed, so a user who's never touched the reorder controls sees no
+    // change.
+    return progress.sort((a, b) => b.percent - a.percent);
+  }
+
+  // Anything the user has already placed keeps that order; a curated list
+  // added since they last reordered (something with no saved position)
+  // falls back to percent-desc and is appended after the ones they placed.
+  const positionById = new Map(savedOrder.map((id, i) => [id, i]));
+  const ordered = progress
+    .filter((p) => positionById.has(p.id))
+    .sort((a, b) => positionById.get(a.id)! - positionById.get(b.id)!);
+  const unordered = progress
+    .filter((p) => !positionById.has(p.id))
     .sort((a, b) => b.percent - a.percent);
+  return [...ordered, ...unordered];
+}
+
+// Persists the signed-in user's preferred display order for their "Your
+// List Progress" cards. Filtered against the real set of system list ids
+// so a stale or tampered id can't sneak an arbitrary string into the
+// column — anything not recognized is silently dropped rather than
+// rejecting the whole save.
+export async function setCuratedListOrder(userId: string, orderedIds: string[]): Promise<void> {
+  const validIds = new Set(
+    (await prisma.list.findMany({ where: { isSystem: true }, select: { id: true } })).map((l) => l.id)
+  );
+  const cleaned = orderedIds.filter((id) => validIds.has(id));
+  await prisma.user.update({
+    where: { id: userId },
+    data: { curatedListOrder: cleaned.join(",") },
+  });
 }

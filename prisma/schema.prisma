@@ -53,6 +53,14 @@ model User {
   // on every failed run, and cleared on the next successful run.
   letterboxdWatchlistSyncBroken Boolean @default(false)
   letterboxdWatchlistItems      LetterboxdWatchlistItem[]
+
+  // The user's preferred display order for the homepage's "Your List
+  // Progress" cards (system curated lists only) — a comma-separated list of
+  // List ids, most-preferred first. Null means no custom order has been set
+  // yet, so getCuratedListsProgress falls back to its default percent-desc
+  // sort. Any list id not present here (a newly added curated list the user
+  // hasn't touched yet) is appended after the ones that are.
+  curatedListOrder String?
 }
 
 // One row per Letterboxd watchlist film already pulled into this user's

@@ -311,7 +311,17 @@ export default async function ProfilePage({
       )}
 
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-lg font-semibold">Recently logged</h2>
+        <div className="flex items-baseline gap-3">
+          <h2 className="text-lg font-semibold">Recently logged</h2>
+          {recentEntries.length > 0 && (
+            <Link
+              href={`/profile/${username}/diary`}
+              className="text-xs text-muted hover:text-foreground hover:underline"
+            >
+              View all
+            </Link>
+          )}
+        </div>
         <SortChips
           options={(Object.keys(SORT_OPTIONS) as SortKey[]).map((key) => ({
             key,
@@ -343,7 +353,21 @@ export default async function ProfilePage({
           emptyMessage="No owned movies marked yet."
           ownedIds={[...viewerOwnedIds]}
           watchlistIds={[...viewerWatchlistIds]}
-          headerExtra={isOwnProfile && <OwnedImportForm />}
+          headerExtra={
+            (isOwnProfile || user.owned.length > 0) && (
+              <>
+                {isOwnProfile && <OwnedImportForm />}
+                {user.owned.length > 0 && (
+                  <Link
+                    href={`/profile/${username}/owned`}
+                    className="text-xs text-muted hover:text-foreground hover:underline"
+                  >
+                    View all
+                  </Link>
+                )}
+              </>
+            )
+          }
           movies={user.owned.map(
             (o): TmdbMovieSummary => ({
               id: o.movie.tmdbId,

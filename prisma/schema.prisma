@@ -41,6 +41,44 @@ model User {
   letterboxdUsername  String?
   letterboxdSyncedAt  DateTime?
   letterboxdSyncItems LetterboxdSyncItem[]
+
+  // Watchlist sync (see lib/letterboxdWatchlistSync.ts) — reuses
+  // letterboxdUsername above, add-only (never removes a Flixtally watchlist
+  // item just because it left Letterboxd — see that file for why).
+  letterboxdWatchlistSyncedAt  DateTime?
+  // Set when a sync run can't make sense of the watchlist page at all
+  // (Letterboxd changed their markup, got blocked, etc.) — distinct from
+  // "0 films found", which is a legitimately empty watchlist. Drives the
+  // "sync broke" email: sent once on the transition into this state, not
+  // on every failed run, and cleared on the next successful run.
+  letterboxdWatchlistSyncBroken Boolean @default(false)
+  letterboxdWatchlistItems      LetterboxdWatchlistItem[]
+}
+
+// One row per Letterboxd watchlist film already pulled into this user's
+// Flixtally watchlist, keyed by Letterboxd's own film slug — the dedupe key
+// for "already synced" and the basis for detecting *new* additions on each
+// run. Deliberately never deleted when a film drops off the Letterboxd
+// watchlist (see the add-only note above), so this only ever grows.
+model LetterboxdWatchlistItem {
+  id        String   @id @default(cuid())
+  filmSlug  String
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, filmSlug])
+}
+
+// Global (not per-user) cache of Letterboxd film slug -> TMDB id. The
+// watchlist page itself never exposes a TMDB id (unlike the diary RSS feed),
+// so resolving one means an extra fetch of the film's own page — this cache
+// means that only has to happen once per film, ever, across every user.
+model LetterboxdFilmMapping {
+  filmSlug  String   @id
+  tmdbId    Int
+  createdAt DateTime @default(now())
 }
 
 // Tracks which Letterboxd diary RSS entries have already been synced for a

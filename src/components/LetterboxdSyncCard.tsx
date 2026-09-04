@@ -16,13 +16,23 @@ type SyncSummary = {
   likesImported?: number;
   completedChallenges?: { id: string; title: string }[];
   completedGoal?: { year: number; target: number } | null;
+  watchlistAdded?: number;
+  watchlistError?: string | null;
 };
 
+function hasNewData(body: SyncSummary) {
+  return body.imported > 0 || (body.watchlistAdded ?? 0) > 0;
+}
+
 function summaryMessage(body: SyncSummary) {
-  if (body.imported === 0) return "Already up to date — nothing new on Letterboxd.";
-  const parts = [`${body.imported} diary ${body.imported === 1 ? "entry" : "entries"}`];
+  if (!hasNewData(body)) return "Already up to date — nothing new on Letterboxd.";
+  const parts = [];
+  if (body.imported > 0) parts.push(`${body.imported} diary ${body.imported === 1 ? "entry" : "entries"}`);
   if (body.ratingsImported) parts.push(`${body.ratingsImported} rating${body.ratingsImported === 1 ? "" : "s"}`);
   if (body.likesImported) parts.push(`${body.likesImported} like${body.likesImported === 1 ? "" : "s"}`);
+  if (body.watchlistAdded) {
+    parts.push(`${body.watchlistAdded} watchlist item${body.watchlistAdded === 1 ? "" : "s"}`);
+  }
   return `Synced ${parts.join(", ")} from Letterboxd`;
 }
 
@@ -46,6 +56,9 @@ export function LetterboxdSyncCard({
     if (body.completedGoal) {
       showToast(`🎉 ${body.completedGoal.year} watch goal complete!`);
     }
+    if (body.watchlistError) {
+      showToast(`Watchlist sync: ${body.watchlistError}`, "error");
+    }
   }
 
   useEffect(() => {
@@ -56,7 +69,7 @@ export function LetterboxdSyncCard({
     fetch("/api/account/letterboxd/sync", { method: "POST" })
       .then((res) => (res.ok ? res.json() : null))
       .then((body: SyncSummary | null) => {
-        if (!body || body.imported === 0) return;
+        if (!body || !hasNewData(body)) return;
         announce(body);
         router.refresh();
       })
@@ -113,7 +126,7 @@ export function LetterboxdSyncCard({
     return (
       <form onSubmit={connect} className="flex flex-wrap items-end gap-2">
         <div>
-          <label className="mb-1 block text-xs text-muted">Sync diary from Letterboxd</label>
+          <label className="mb-1 block text-xs text-muted">Sync diary &amp; watchlist from Letterboxd</label>
           <input
             type="text"
             value={username}

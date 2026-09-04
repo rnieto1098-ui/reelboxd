@@ -7,6 +7,10 @@
     {
       "path": "/api/cron/provider-snapshot",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/letterboxd-watchlist-sync",
+      "schedule": "0 10 * * *"
     }
   ]
 }

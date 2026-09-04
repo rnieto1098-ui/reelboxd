@@ -73,6 +73,7 @@ export function RecommendForm() {
   const [selectedGenres, setSelectedGenres] = useState<Set<string>>(new Set());
   const [selectedRuntimes, setSelectedRuntimes] = useState<Set<number>>(new Set());
   const [onlyWatchlist, setOnlyWatchlist] = useState(false);
+  const [excludeWatchlist, setExcludeWatchlist] = useState(false);
   const [onlyStreaming, setOnlyStreaming] = useState(false);
   // R-rated movies are allowed by default; checking this opts INTO the
   // stricter PG-13 cap instead.
@@ -92,6 +93,7 @@ export function RecommendForm() {
     selectedGenres.size > 0 ||
     selectedRuntimes.size > 0 ||
     onlyWatchlist ||
+    excludeWatchlist ||
     onlyStreaming ||
     restrictToPG13;
 
@@ -127,6 +129,7 @@ export function RecommendForm() {
       genres: [...selectedGenres],
       maxRuntimeMinutes,
       onlyWatchlist,
+      excludeWatchlist,
       onlyStreaming,
       allowR: !restrictToPG13,
     };
@@ -245,7 +248,24 @@ export function RecommendForm() {
             <Chip
               label="On watchlist"
               selected={onlyWatchlist}
-              onClick={() => setOnlyWatchlist((v) => !v)}
+              onClick={() =>
+                setOnlyWatchlist((v) => {
+                  // Mutually exclusive with "Not on watchlist" — turning
+                  // this on doesn't make sense at the same time as that one.
+                  if (!v) setExcludeWatchlist(false);
+                  return !v;
+                })
+              }
+            />
+            <Chip
+              label="Not on watchlist"
+              selected={excludeWatchlist}
+              onClick={() =>
+                setExcludeWatchlist((v) => {
+                  if (!v) setOnlyWatchlist(false);
+                  return !v;
+                })
+              }
             />
             <Chip
               label="On your services"
@@ -328,6 +348,7 @@ function PromptSummary({ data }: { data: ApiResponse }) {
   if (parsed.runtimeMinMinutes) bits.push(`over ${formatMinutes(parsed.runtimeMinMinutes)}`);
   if (parsed.minRating10) bits.push(`rated ${parsed.minRating10.toFixed(1)}+/10`);
   if (parsed.onlyWatchlist) bits.push("on your watchlist");
+  if (parsed.excludeWatchlist) bits.push("not on your watchlist");
   if (parsed.onlyStreaming) bits.push("on your streaming services");
 
   return (

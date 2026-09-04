@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { ensureMovieCached, parseGenres } from "@/lib/movies";
+import { ensureMovieCached, getUserWatchlistedTmdbIds, parseGenres } from "@/lib/movies";
 import { getWatchedTmdbIds } from "@/lib/recommendations";
 import { filterMoviesByStreaming, getUserOwnedTmdbIds, getUserProviderIds } from "@/lib/streaming";
 import {
@@ -65,6 +65,11 @@ export async function getPromptRecommendations(
   presets?: PromptPresets
 ): Promise<PromptRecommendation> {
   const onlyWatchlist = presets?.onlyWatchlist ?? false;
+  // Mutually exclusive with onlyWatchlist in the UI (can't ask for "only
+  // watchlist" and "never watchlist" at once) — not enforced here, since
+  // that's a UI-level chip concern, not something this function needs an
+  // opinion on.
+  const excludeWatchlist = presets?.excludeWatchlist ?? false;
   const onlyStreaming = presets?.onlyStreaming ?? false;
   const excludeIds = new Set(presets?.excludeIds ?? []);
   // A hard content-rating ceiling, same treatment as onlyWatchlist/
@@ -74,13 +79,14 @@ export async function getPromptRecommendations(
   // runtime/rating.
   const maxCertification = (presets?.allowR ?? true) ? "R" : "PG-13";
 
-  const [watchedIds, genreCatalog, watchlistCandidates, userProviderIds, ownedTmdbIds] =
+  const [watchedIds, genreCatalog, watchlistCandidates, userProviderIds, ownedTmdbIds, watchlistedTmdbIds] =
     await Promise.all([
       getWatchedTmdbIds(userId),
       getGenres(),
       onlyWatchlist ? getWatchlistCandidates(userId) : Promise.resolve<WatchlistCandidate[]>([]),
       onlyStreaming ? getUserProviderIds(userId) : Promise.resolve(new Set<number>()),
       onlyStreaming ? getUserOwnedTmdbIds(userId) : Promise.resolve(new Set<number>()),
+      excludeWatchlist ? getUserWatchlistedTmdbIds(userId) : Promise.resolve(new Set<number>()),
     ]);
 
   // Parsed once genres are in hand rather than fetching its own copy — the
@@ -221,6 +227,7 @@ export async function getPromptRecommendations(
     const sources = onlyWatchlist ? [pool] : [pool, similarPool];
     for (const movie of sources.flat()) {
       if (watchedIds.has(movie.id)) continue;
+      if (excludeWatchlist && watchlistedTmdbIds.has(movie.id)) continue;
       if (!skipExclude && excludeIds.has(movie.id)) continue;
       merged.set(movie.id, movie);
     }

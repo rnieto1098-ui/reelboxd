@@ -114,3 +114,8 @@ test("onlyWatchlist and onlyStreaming default to false and pass through presets"
   assert.equal(withPresets.onlyWatchlist, true);
   assert.equal(withPresets.onlyStreaming, true);
 });
+
+test("excludeWatchlist defaults to false and passes through presets", () => {
+  assert.equal(parsePrompt("", undefined, GENRES).excludeWatchlist, false);
+  assert.equal(parsePrompt("", { excludeWatchlist: true }, GENRES).excludeWatchlist, true);
+});

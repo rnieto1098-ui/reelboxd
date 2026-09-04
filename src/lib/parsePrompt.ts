@@ -32,6 +32,10 @@ export type ParsedPrompt = {
   minRating10: number | null;
   similarToQuery: string | null;
   onlyWatchlist: boolean;
+  // Mutually exclusive with onlyWatchlist in the UI (the two chips can't
+  // both be selected) — but each is read independently here since this
+  // parser has no opinion on that, it just reflects whatever presets said.
+  excludeWatchlist: boolean;
   onlyStreaming: boolean;
   // US MPAA cap: true = R or below (the default), false = PG-13 or below.
   allowR: boolean;
@@ -45,6 +49,7 @@ export type PromptPresets = {
   genreNames?: string[];
   maxRuntimeMinutes?: number | null;
   onlyWatchlist?: boolean;
+  excludeWatchlist?: boolean;
   onlyStreaming?: boolean;
   allowR?: boolean;
   // Movie ids to leave out of the results — sent when the user hits
@@ -131,6 +136,7 @@ export function parsePrompt(
     minRating10,
     similarToQuery,
     onlyWatchlist: presets?.onlyWatchlist ?? false,
+    excludeWatchlist: presets?.excludeWatchlist ?? false,
     onlyStreaming: presets?.onlyStreaming ?? false,
     // R is allowed by default — the UI's "PG-13 and below" toggle opts INTO
     // the stricter cap, rather than opting into R.

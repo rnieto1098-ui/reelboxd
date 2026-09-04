@@ -12,6 +12,7 @@ const promptSchema = z
     genres: z.array(z.string()).max(12).default([]),
     maxRuntimeMinutes: z.number().int().positive().max(600).nullable().optional(),
     onlyWatchlist: z.boolean().default(false),
+    excludeWatchlist: z.boolean().default(false),
     onlyStreaming: z.boolean().default(false),
     // R is allowed by default — the UI's "PG-13 and below" toggle sends
     // allowR: false to opt INTO the stricter cap.
@@ -24,6 +25,7 @@ const promptSchema = z
       data.genres.length > 0 ||
       data.maxRuntimeMinutes != null ||
       data.onlyWatchlist ||
+      data.excludeWatchlist ||
       data.onlyStreaming ||
       // allowR === true is the default (no filter picked) — only an
       // active restriction to PG-13 counts as a selection.
@@ -50,6 +52,7 @@ export async function POST(request: Request) {
     genreNames: parsed.data.genres,
     maxRuntimeMinutes: parsed.data.maxRuntimeMinutes ?? null,
     onlyWatchlist: parsed.data.onlyWatchlist,
+    excludeWatchlist: parsed.data.excludeWatchlist,
     onlyStreaming: parsed.data.onlyStreaming,
     allowR: parsed.data.allowR,
     excludeIds: parsed.data.excludeIds,

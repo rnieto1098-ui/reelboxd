@@ -28,6 +28,15 @@ const SORT_OPTIONS = {
 
 type SortKey = keyof typeof SORT_OPTIONS;
 
+// How many movies "Recently logged" and "Owned movies" show before the row
+// runs out of content to scroll through. 24 turned out too small in
+// practice — at typical screen widths each arrow click scrolls ~90% of the
+// visible row, so 24 items (roughly 2-2.5 screens wide) hit the end after
+// only two clicks, which reads as "scrolling is broken" rather than "you've
+// seen everything." Bumped well past that so scrolling has real room, while
+// staying bounded (these are activity previews, not the full archive).
+const ROW_PREVIEW_LIMIT = 60;
+
 // A movie can be rated, logged (diary), or both — this merges the two into
 // one row per movie so "Recently Logged" reflects everything you've watched,
 // not just what you got around to rating.
@@ -140,7 +149,7 @@ export default async function ProfilePage({
       owned: {
         include: { movie: true },
         orderBy: { addedAt: "desc" },
-        take: 24,
+        take: ROW_PREVIEW_LIMIT,
       },
       _count: {
         select: { ratings: true, watchlist: true, owned: true, diaryEntries: true },
@@ -176,7 +185,7 @@ export default async function ProfilePage({
       });
     }
   }
-  const recentEntries = sortEntries([...byMovie.values()], sortKey, sortDir).slice(0, 24);
+  const recentEntries = sortEntries([...byMovie.values()], sortKey, sortDir).slice(0, ROW_PREVIEW_LIMIT);
 
   // Use the viewer's own poster choices, not the profile owner's — a custom
   // poster is a personal preference that follows you wherever a film shows up.

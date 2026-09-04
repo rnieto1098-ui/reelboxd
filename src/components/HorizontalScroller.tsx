@@ -1,6 +1,14 @@
 "use client";
 
-import { useRef, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
+
+const SCROLL_DURATION_MS = 400;
+
+// Ease-out cubic: fast start, gentle settle — standard curve for a "jump
+// forward one screen" motion like this.
+function easeOutCubic(t: number): number {
+  return 1 - Math.pow(1 - t, 3);
+}
 
 export function HorizontalScroller({
   title,
@@ -16,18 +24,55 @@ export function HorizontalScroller({
   children: ReactNode;
 }) {
   const scrollerRef = useRef<HTMLDivElement>(null);
+  const animationFrameRef = useRef<number | null>(null);
+
+  // Cancel a still-running animation on unmount so it doesn't keep ticking
+  // (and touching a detached element) after the row is gone.
+  useEffect(() => {
+    return () => {
+      if (animationFrameRef.current != null) cancelAnimationFrame(animationFrameRef.current);
+    };
+  }, []);
 
   function scroll(direction: "left" | "right") {
     const el = scrollerRef.current;
     if (!el) return;
+
+    // A repeat click while the previous animation is still running (fast
+    // double-click, or spamming the arrow) cancels it outright and starts
+    // fresh from the row's current position, rather than letting the two
+    // fight over scrollLeft.
+    if (animationFrameRef.current != null) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+
     const amount = el.clientWidth * 0.9;
+    const startLeft = el.scrollLeft;
+    const maxScrollLeft = el.scrollWidth - el.clientWidth;
+    const target = Math.max(
+      0,
+      Math.min(maxScrollLeft, startLeft + (direction === "left" ? -amount : amount))
+    );
+    const distance = target - startLeft;
+    const startTime = performance.now();
+
+    // Driven by our own requestAnimationFrame loop — setting `scrollLeft`
+    // directly every frame — rather than the browser's native
     // `behavior: "smooth"` (plus the CSS scroll-smooth class this used to
-    // also carry) reliably stalled partway through its animation on a long
-    // row — new poster images loading in and reflowing the layout mid-
-    // scroll appears to interrupt the browser's native animation, leaving
-    // the arrow looking broken after one click. Instant scrolling has no
-    // animation to interrupt.
-    el.scrollBy({ left: direction === "left" ? -amount : amount, behavior: "auto" });
+    // also carry). That native version reliably stalled partway through on
+    // a long row: new poster images loading in and reflowing the layout
+    // mid-scroll appears to interrupt the browser's own scroll animation,
+    // leaving the arrow looking broken after one click. Driving scrollLeft
+    // ourselves isn't vulnerable to that — an unrelated reflow can't
+    // silently abandon an animation nothing but this loop is in charge of.
+    const step = (now: number) => {
+      const elapsed = now - startTime;
+      const t = Math.min(1, elapsed / SCROLL_DURATION_MS);
+      el.scrollLeft = startLeft + distance * easeOutCubic(t);
+      animationFrameRef.current = t < 1 ? requestAnimationFrame(step) : null;
+    };
+    animationFrameRef.current = requestAnimationFrame(step);
   }
 
   return (

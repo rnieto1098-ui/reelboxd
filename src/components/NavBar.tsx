@@ -22,7 +22,10 @@ export async function NavBar() {
     // search box — this is mobile's only other way back to your profile.
     ...(session?.user
       ? [{ href: `/profile/${session.user.name}`, label: `${session.user.name} (Profile)` }]
-      : []),
+      : [
+          { href: "/login", label: "Sign in" },
+          { href: "/signup", label: "Sign up" },
+        ]),
   ];
 
   return (
@@ -82,7 +85,11 @@ export async function NavBar() {
           {session?.user ? (
             <SignOutButton />
           ) : (
-            <>
+            // Hidden below sm — same links are in the mobile hamburger menu
+            // (mobileNavItems above) instead, since at narrow widths this
+            // pair used to sit alongside the search box with nowhere to
+            // shrink to and pushed the page wider than the screen.
+            <div className="hidden items-center gap-4 sm:flex">
               <Link
                 href="/login"
                 className="text-sm text-muted hover:text-foreground transition-colors"
@@ -95,7 +102,7 @@ export async function NavBar() {
               >
                 Sign up
               </Link>
-            </>
+            </div>
           )}
         </div>
       </div>

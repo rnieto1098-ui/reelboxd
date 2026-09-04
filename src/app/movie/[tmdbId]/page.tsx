@@ -14,6 +14,7 @@ import {
 } from "@/lib/tmdb";
 import { applyPosterOverrides, getCustomPosterMap } from "@/lib/customPosters";
 import { getUserProviderIds, getWatchAvailability } from "@/lib/streaming";
+import { excludeShortFilms } from "@/lib/runtimeFilter";
 import { formatRuntime } from "@/lib/format";
 import { StarRating } from "@/components/StarRating";
 import { WatchlistButton } from "@/components/WatchlistButton";
@@ -119,14 +120,18 @@ export default async function MovieDetailPage({
       }),
     ]);
 
+  // "More like this" is a recommendation like any other row — same
+  // app-wide minimum-runtime rule applies (see runtimeFilter.ts).
+  const similarFiltered = await excludeShortFilms(similar.results);
+
   // One combined lookup for both the primary movie's poster override and the
   // "More like this" row's, instead of two separate CustomPoster queries.
   const posterOverrides = await getCustomPosterMap(session?.user?.id, [
     tmdbId,
-    ...similar.results.map((m) => m.id),
+    ...similarFiltered.map((m) => m.id),
   ]);
   const customPosterPath = posterOverrides.get(tmdbId) ?? null;
-  const similarMovies = applyPosterOverrides(similar.results.slice(0, 12), posterOverrides);
+  const similarMovies = applyPosterOverrides(similarFiltered.slice(0, 12), posterOverrides);
 
   const myRating = localMovie?.ratings?.[0]?.score ?? null;
   const inWatchlist = (localMovie?.watchlist?.length ?? 0) > 0;

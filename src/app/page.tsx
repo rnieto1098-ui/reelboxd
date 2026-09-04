@@ -23,6 +23,7 @@ import {
 import { getHomepageListCards, getCuratedListsProgress } from "@/lib/systemLists";
 import { getGoalProgress } from "@/lib/goals";
 import { getRecentlyAddedForUser } from "@/lib/providerSnapshot";
+import { excludeShortFilms } from "@/lib/runtimeFilter";
 import { MovieRow } from "@/components/MovieRow";
 import { ListRow } from "@/components/ListRow";
 import { UpcomingReleasesRow } from "@/components/UpcomingReleasesRow";
@@ -215,8 +216,8 @@ async function HomeMovieRows({
   const recommendCount = canFilterByAvailability ? STREAMING_RECOMMEND_COUNT : BASE_RECOMMEND_COUNT;
 
   const [popularRaw, trendingRaw] = await Promise.all([
-    getPopularMoviesMultiPage(rowPages),
-    getTrendingMoviesMultiPage("week", rowPages),
+    getPopularMoviesMultiPage(rowPages).then(excludeShortFilms),
+    getTrendingMoviesMultiPage("week", rowPages).then(excludeShortFilms),
   ]);
 
   // Stubbed into TmdbMovieSummary shape from the local cache snapshot —
@@ -268,14 +269,14 @@ async function HomeMovieRows({
     discoverMoviesMultiPage(
       { sortBy: "vote_average.desc", minVoteCount: 10000, revalidateSeconds: SLOW_ROW_CACHE_SECONDS },
       rowPages
-    ),
+    ).then(excludeShortFilms),
     ...GENRE_ROWS.map((row) => {
       const genreId = genreIdByName.get(row.genreName);
       return genreId
         ? discoverMoviesMultiPage(
             { genreIds: [genreId], revalidateSeconds: SLOW_ROW_CACHE_SECONDS },
             rowPages
-          )
+          ).then(excludeShortFilms)
         : Promise.resolve([] as TmdbMovieSummary[]);
     }),
   ]);

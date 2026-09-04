@@ -10,6 +10,7 @@ import {
   type TmdbMovieSummary,
 } from "@/lib/tmdb";
 import { parsePrompt, type ParsedPrompt, type PromptPresets } from "@/lib/parsePrompt";
+import { MIN_RECOMMENDABLE_RUNTIME_MINUTES } from "@/lib/runtimeFilter";
 
 export { parsePrompt, type ParsedPrompt, type PromptPresets };
 
@@ -93,6 +94,11 @@ export async function getPromptRecommendations(
   // genre catalog is already being fetched above for the same request.
   const parsed = await parsePrompt(prompt, presets, genreCatalog.genres);
 
+  // The app-wide "nothing under 45 minutes" floor (see runtimeFilter.ts),
+  // combined with whatever longer minimum the user themselves asked for —
+  // this is never looser than the global floor, only ever stricter.
+  const effectiveMinRuntime = Math.max(MIN_RECOMMENDABLE_RUNTIME_MINUTES, parsed.runtimeMinMinutes ?? 0);
+
   const genreIdToName = new Map(genreCatalog.genres.map((g) => [g.id, g.name]));
 
   let similarToMovie: { id: number; title: string } | null = null;
@@ -136,7 +142,7 @@ export async function getPromptRecommendations(
         discoverMovies({
           genreIds: stage === "popularOnly" ? undefined : effectiveGenreIds,
           minVoteAverage: stage === "full" ? parsed.minRating10 ?? undefined : undefined,
-          minRuntime: parsed.runtimeMinMinutes ?? undefined,
+          minRuntime: effectiveMinRuntime,
           maxRuntime: parsed.runtimeMaxMinutes ?? undefined,
           certificationCountry: "US",
           maxCertification,
@@ -168,7 +174,9 @@ export async function getPromptRecommendations(
         if (parsed.runtimeMaxMinutes != null && (m.runtime == null || m.runtime > parsed.runtimeMaxMinutes)) {
           return false;
         }
-        if (parsed.runtimeMinMinutes != null && (m.runtime == null || m.runtime < parsed.runtimeMinMinutes)) {
+        // Always enforced, not just when the user asked for a minimum — see
+        // effectiveMinRuntime above.
+        if (m.runtime == null || m.runtime < effectiveMinRuntime) {
           return false;
         }
         if (stage === "full" && parsed.minRating10 != null) {
@@ -198,12 +206,13 @@ export async function getPromptRecommendations(
   // candidate's real runtime via ensureMovieCached (same helper used
   // whenever a movie is rated/watchlisted elsewhere in the app — this also
   // warms the local cache for next time). Unknown runtime (a lookup failure)
-  // excludes the movie rather than risk violating a cap the user asked for.
-  // Not needed for the watchlist pool — runWatchlistPool already checks
-  // real runtime from that same local cache directly.
+  // excludes the movie rather than risk violating the app-wide 45-minute
+  // floor or a cap the user asked for. Always runs now — even with no
+  // user-specified runtime filter at all, the 45-minute floor (see
+  // effectiveMinRuntime above) still has to be checked. Not needed for the
+  // watchlist pool — runWatchlistPool already checks real runtime from that
+  // same local cache directly.
   async function verifyRuntime(movies: TmdbMovieSummary[]): Promise<TmdbMovieSummary[]> {
-    if (parsed.runtimeMaxMinutes == null && parsed.runtimeMinMinutes == null) return movies;
-
     const kept: TmdbMovieSummary[] = [];
     for (let i = 0; i < movies.length; i += RUNTIME_CHECK_CONCURRENCY) {
       const batch = movies.slice(i, i + RUNTIME_CHECK_CONCURRENCY);
@@ -212,7 +221,7 @@ export async function getPromptRecommendations(
         const runtime = cached[idx]?.runtime;
         if (runtime == null) return;
         if (parsed.runtimeMaxMinutes != null && runtime > parsed.runtimeMaxMinutes) return;
-        if (parsed.runtimeMinMinutes != null && runtime < parsed.runtimeMinMinutes) return;
+        if (runtime < effectiveMinRuntime) return;
         kept.push(movie);
       });
     }

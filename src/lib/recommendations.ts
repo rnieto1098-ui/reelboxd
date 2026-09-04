@@ -6,6 +6,7 @@ import {
   type TmdbMovieSummary,
 } from "@/lib/tmdb";
 import { parseGenres } from "@/lib/movies";
+import { excludeShortFilms } from "@/lib/runtimeFilter";
 
 // A rating at or above this counts as the user "liking" the movie, and
 // contributes to which genres/directors/cast we chase recommendations in.
@@ -125,18 +126,18 @@ export async function getRecommendationsForUser(
   for (const directorId of topDirectorIds) {
     if (results.length >= peopleResultCap) break;
     const page = await discoverMovies({ crewId: directorId });
-    addFromPage(page.results, peopleResultCap);
+    addFromPage(await excludeShortFilms(page.results), peopleResultCap);
   }
   for (const castId of topCastIds) {
     if (results.length >= peopleResultCap) break;
     const page = await discoverMovies({ castId });
-    addFromPage(page.results, peopleResultCap);
+    addFromPage(await excludeShortFilms(page.results), peopleResultCap);
   }
 
   for (const genreId of genreIds) {
     if (results.length >= resultCount) break;
     const movies = await discoverMoviesMultiPage({ genreIds: [genreId] }, GENRE_PAGES_PER_QUERY);
-    addFromPage(movies, resultCount);
+    addFromPage(await excludeShortFilms(movies), resultCount);
   }
 
   return results;

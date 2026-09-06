@@ -79,8 +79,15 @@ export default async function MovieDetailPage({
 
   if (!details) notFound();
 
-  const [localMovie, watchAvailability, userProviderIds, similar, myLists, avgRating] =
-    await Promise.all([
+  const [
+    localMovie,
+    watchAvailability,
+    userProviderIds,
+    similar,
+    myLists,
+    listsContainingMovie,
+    avgRating,
+  ] = await Promise.all([
       prisma.movie.findUnique({
         where: { tmdbId },
         include: {
@@ -112,6 +119,17 @@ export default async function MovieDetailPage({
             include: { items: { where: { tmdbId }, select: { id: true } } },
           })
         : Promise.resolve([]),
+      // Every list this movie is actually on — Flixtally's curated system
+      // lists (Best Picture, Top 250, etc.) plus the viewer's own, so the
+      // "Lists" button under the poster isn't limited to lists they made.
+      prisma.list.findMany({
+        where: {
+          items: { some: { tmdbId } },
+          OR: [{ isSystem: true }, ...(session?.user?.id ? [{ ownerId: session.user.id }] : [])],
+        },
+        orderBy: [{ isSystem: "desc" }, { title: "asc" }],
+        select: { id: true, title: true, isSystem: true },
+      }),
       // Filtered by the relation rather than a local Movie id so this can run
       // alongside the query above instead of waiting on it to resolve first.
       prisma.rating.aggregate({
@@ -192,15 +210,15 @@ export default async function MovieDetailPage({
               cast={cast}
             />
           </div>
-          {session?.user && (
-            <div className="mt-2 flex justify-center md:justify-start">
-              <MovieListsButton
-                lists={myLists
-                  .filter((l) => l.items.length > 0)
-                  .map((l) => ({ id: l.id, title: l.title }))}
-              />
-            </div>
-          )}
+          <div className="mt-2 flex justify-center md:justify-start">
+            <MovieListsButton
+              lists={listsContainingMovie.map((l) => ({
+                id: l.id,
+                title: l.title,
+                isSystem: l.isSystem,
+              }))}
+            />
+          </div>
         </div>
 
         <div>

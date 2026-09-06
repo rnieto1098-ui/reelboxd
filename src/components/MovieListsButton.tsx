@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 
-type ListEntry = { id: string; title: string };
+type ListEntry = { id: string; title: string; isSystem: boolean };
 
 export function MovieListsButton({ lists }: { lists: ListEntry[] }) {
   const [open, setOpen] = useState(false);
@@ -21,9 +21,9 @@ export function MovieListsButton({ lists }: { lists: ListEntry[] }) {
       {open && <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />}
 
       {open && (
-        <div className="absolute left-0 top-full z-50 mt-2 w-56 rounded-lg border border-border bg-surface p-3 shadow-lg">
+        <div className="absolute left-0 top-full z-50 mt-2 w-64 rounded-lg border border-border bg-surface p-3 shadow-lg">
           {lists.length === 0 ? (
-            <p className="text-xs text-muted">Not on any of your lists yet.</p>
+            <p className="text-xs text-muted">Not on any lists yet.</p>
           ) : (
             <div className="max-h-48 space-y-1 overflow-y-auto">
               {lists.map((list) => (
@@ -31,9 +31,14 @@ export function MovieListsButton({ lists }: { lists: ListEntry[] }) {
                   key={list.id}
                   href={`/lists/${list.id}`}
                   onClick={() => setOpen(false)}
-                  className="block truncate rounded px-1 py-1 text-sm hover:bg-surface-hover hover:text-accent-green"
+                  className="flex items-center justify-between gap-2 rounded px-1 py-1 text-sm hover:bg-surface-hover hover:text-accent-green"
                 >
-                  {list.title}
+                  <span className="truncate">{list.title}</span>
+                  {list.isSystem && (
+                    <span className="shrink-0 rounded-full border border-border px-1.5 py-0.5 text-[10px] text-muted">
+                      Flixtally
+                    </span>
+                  )}
                 </Link>
               ))}
             </div>

@@ -47,6 +47,7 @@ async function getWatchlistCandidates(userId: string | undefined) {
           backdropPath: true,
           releaseDate: true,
           runtime: true,
+          certification: true,
           genres: true,
           voteAverage: true,
           popularity: true,
@@ -176,14 +177,11 @@ export async function getPromptRecommendations(
   // Mirrors runDiscover's stages, but filtered client-side against the
   // watchlist cache instead of queried from TMDB — "on watchlist" is a hard
   // constraint on the candidate pool itself, never relaxed away like genre/
-  // rating are, so even the loosest stage stays watchlist-only. Runtime is
-  // also a hard cap here (same reasoning as runDiscover above) and, unlike
-  // content rating, the cache does have it, so it applies at every stage.
-  // Note: the local Movie cache doesn't store a content rating (TMDB only
-  // exposes that via a separate per-movie release_dates call, not on the
-  // fields already cached for every movie), so maxCertification isn't
-  // applied here — a watchlisted movie is treated as already the user's
-  // own choice regardless of rating.
+  // rating are, so even the loosest stage stays watchlist-only. Runtime and
+  // certification are hard caps here too (same reasoning as runDiscover
+  // above), both checked against the local Movie cache directly (getWatchlistCandidates
+  // selects both fields) rather than needing a separate ensureMovieCached
+  // pass the way the non-watchlist pools do below.
   function runWatchlistPool(stage: Stage): TmdbMovieSummary[] {
     return watchlistCandidates
       .filter((m) => {
@@ -199,6 +197,7 @@ export async function getPromptRecommendations(
         if (m.runtime == null || m.runtime < effectiveMinRuntime) {
           return false;
         }
+        if (!passesCertificationCap(m.certification)) return false;
         if (stage === "full" && parsed.minRating10 != null) {
           if (m.voteAverage == null || m.voteAverage < parsed.minRating10) return false;
         }
@@ -256,9 +255,8 @@ export async function getPromptRecommendations(
   // floor or a cap the user asked for. Always runs now — even with no
   // user-specified runtime filter at all, the 45-minute floor (see
   // effectiveMinRuntime above) still has to be checked. Not needed for the
-  // watchlist pool — runWatchlistPool already checks real runtime from that
-  // same local cache directly (though not certification — see that
-  // function's own comment for why).
+  // watchlist pool — runWatchlistPool already checks both runtime and
+  // certification from that same local cache directly.
   async function verifyRuntime(movies: TmdbMovieSummary[]): Promise<TmdbMovieSummary[]> {
     const kept: TmdbMovieSummary[] = [];
     for (let i = 0; i < movies.length; i += RUNTIME_CHECK_CONCURRENCY) {

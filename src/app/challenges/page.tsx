@@ -9,6 +9,7 @@ import { WatchGoalWidget } from "@/components/WatchGoalWidget";
 import { NewChallengeForm } from "@/components/NewChallengeForm";
 import { RandomChallengeButton } from "@/components/RandomChallengeButton";
 import { DeleteChallengeButton } from "@/components/DeleteChallengeButton";
+import { EditableChallengeTitle } from "@/components/EditableChallengeTitle";
 
 const TYPE_LABEL: Record<ChallengeSummary["type"], string> = {
   GENRE: "Genre",
@@ -20,16 +21,15 @@ function ChallengeCard({ challenge }: { challenge: ChallengeSummary }) {
   return (
     <div className="rounded-lg border border-border bg-surface p-4">
       <div className="mb-2 flex items-start justify-between gap-3">
-        <div>
+        <div className="min-w-0">
           <span className="mb-1 inline-block rounded-full border border-border px-2 py-0.5 text-[11px] text-muted">
             {TYPE_LABEL[challenge.type]}
           </span>
-          <Link
+          <EditableChallengeTitle
+            challengeId={challenge.id}
+            title={challenge.title}
             href={`/challenges/${challenge.id}`}
-            className="block text-sm font-semibold hover:text-accent-green hover:underline"
-          >
-            {challenge.title}
-          </Link>
+          />
         </div>
         <DeleteChallengeButton challengeId={challenge.id} />
       </div>

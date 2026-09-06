@@ -3,23 +3,30 @@ import { z } from "zod";
 import { auth } from "@/auth";
 import { createChallenge } from "@/lib/challenges";
 
+// Trimmed and capped, but otherwise optional — an omitted or blank title
+// falls back to the auto-generated one in createChallenge.
+const titleField = z.string().trim().max(100).optional();
+
 const challengeSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("GENRE"),
     genreName: z.string().min(1).max(50),
     target: z.number().int().min(1).max(10000),
+    title: titleField,
   }),
   z.object({
     type: z.literal("TIMEFRAME"),
     startDate: z.string(),
     endDate: z.string(),
     target: z.number().int().min(1).max(10000),
+    title: titleField,
   }),
   z.object({
     type: z.literal("CREW"),
     personId: z.number().int().positive(),
     personName: z.string().min(1).max(200),
     department: z.string().min(1).max(50).nullable(),
+    title: titleField,
   }),
 ]);
 
@@ -54,6 +61,7 @@ export async function POST(request: Request) {
       startDate,
       endDate,
       target: data.target,
+      title: data.title,
     });
     return NextResponse.json(challenge, { status: 201 });
   }

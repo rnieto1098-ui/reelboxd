@@ -27,6 +27,7 @@ export function NewChallengeForm({ genres }: { genres: string[] }) {
   const [open, setOpen] = useState(false);
   const [type, setType] = useState<ChallengeTypeKey>("GENRE");
   const [saving, setSaving] = useState(false);
+  const [customTitle, setCustomTitle] = useState("");
 
   const [genreName, setGenreName] = useState(genres[0] ?? "");
   const [genreTarget, setGenreTarget] = useState("10");
@@ -140,6 +141,8 @@ export function NewChallengeForm({ genres }: { genres: string[] }) {
       };
     }
 
+    if (customTitle.trim()) payload.title = customTitle.trim();
+
     setSaving(true);
     const res = await fetch("/api/challenges", {
       method: "POST",
@@ -156,6 +159,7 @@ export function NewChallengeForm({ genres }: { genres: string[] }) {
 
     showToast("Challenge added");
     setOpen(false);
+    setCustomTitle("");
     resetCrewFields();
     router.refresh();
   }
@@ -177,6 +181,15 @@ export function NewChallengeForm({ genres }: { genres: string[] }) {
       onSubmit={handleSubmit}
       className="space-y-4 rounded-lg border border-border bg-surface p-4"
     >
+      <input
+        type="text"
+        value={customTitle}
+        onChange={(e) => setCustomTitle(e.target.value)}
+        placeholder="Custom title (optional)"
+        maxLength={100}
+        className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm placeholder:text-muted focus:outline-none focus:border-accent-green"
+      />
+
       <div className="flex w-fit gap-1 rounded-full border border-border p-1 text-xs">
         {CHALLENGE_TYPES.map((t) => (
           <button
@@ -369,6 +382,7 @@ export function NewChallengeForm({ genres }: { genres: string[] }) {
           type="button"
           onClick={() => {
             setOpen(false);
+            setCustomTitle("");
             resetCrewFields();
           }}
           className="text-sm text-muted hover:text-foreground"

@@ -206,16 +206,17 @@ export async function getChallengesWithProgress(userId: string): Promise<Challen
 export async function createChallenge(
   userId: string,
   input:
-    | { type: "GENRE"; genreName: string; target: number }
-    | { type: "TIMEFRAME"; startDate: Date; endDate: Date; target: number }
-    | { type: "CREW"; personId: number; personName: string; department: string | null }
+    | { type: "GENRE"; genreName: string; target: number; title?: string }
+    | { type: "TIMEFRAME"; startDate: Date; endDate: Date; target: number; title?: string }
+    | { type: "CREW"; personId: number; personName: string; department: string | null; title?: string }
 ) {
-  const title =
+  const defaultTitle =
     input.type === "GENRE"
       ? `Watch ${input.target} ${input.genreName} movies`
       : input.type === "TIMEFRAME"
         ? `Watch ${input.target} movies (${input.startDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })} – ${input.endDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })})`
         : `Watch all of ${input.personName}'s ${input.department ? input.department.toLowerCase() : "acting"} movies`;
+  const title = input.title?.trim() || defaultTitle;
 
   return prisma.challenge.create({
     data: {
@@ -235,6 +236,18 @@ export async function createChallenge(
 
 export async function deleteChallenge(userId: string, id: string) {
   await prisma.challenge.deleteMany({ where: { id, userId } });
+}
+
+// Returns true when a matching, owned challenge was actually found and
+// renamed — lets the route distinguish that from "not yours"/"doesn't
+// exist" without a separate lookup.
+export async function renameChallenge(
+  userId: string,
+  id: string,
+  title: string
+): Promise<boolean> {
+  const result = await prisma.challenge.updateMany({ where: { id, userId }, data: { title } });
+  return result.count > 0;
 }
 
 function pickWeighted<T>(candidates: { item: T; weight: number }[]): T | null {

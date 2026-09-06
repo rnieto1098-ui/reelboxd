@@ -22,6 +22,7 @@ import { ListCoverUpload } from "@/components/ListCoverUpload";
 import { AvailabilityFilterLinks } from "@/components/AvailabilityFilterLinks";
 import { SortChips } from "@/components/SortChips";
 import { ListTagsEditor } from "@/components/ListTagsEditor";
+import { EditableTitle } from "@/components/EditableTitle";
 import { getCachedList } from "@/lib/listCache";
 import { parseStoredTags } from "@/lib/listTags";
 
@@ -212,7 +213,12 @@ export default async function ListDetailPage({
             )}
           </div>
           <div>
-            <h1 className="text-2xl font-bold">{list.title}</h1>
+            <EditableTitle
+              endpoint={`/api/lists/${list.id}`}
+              title={list.title}
+              canEdit={isOwner && !list.isSystem}
+              className="text-2xl font-bold"
+            />
             <p className="text-sm text-muted">
               {list.isSystem ? "Curated by Flixtally" : `By ${list.owner?.username}`} ·{" "}
               {list.items.length} movie{list.items.length === 1 ? "" : "s"}

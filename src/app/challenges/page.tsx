@@ -9,7 +9,7 @@ import { WatchGoalWidget } from "@/components/WatchGoalWidget";
 import { NewChallengeForm } from "@/components/NewChallengeForm";
 import { RandomChallengeButton } from "@/components/RandomChallengeButton";
 import { DeleteChallengeButton } from "@/components/DeleteChallengeButton";
-import { EditableChallengeTitle } from "@/components/EditableChallengeTitle";
+import { EditableTitle } from "@/components/EditableTitle";
 
 const TYPE_LABEL: Record<ChallengeSummary["type"], string> = {
   GENRE: "Genre",
@@ -25,10 +25,11 @@ function ChallengeCard({ challenge }: { challenge: ChallengeSummary }) {
           <span className="mb-1 inline-block rounded-full border border-border px-2 py-0.5 text-[11px] text-muted">
             {TYPE_LABEL[challenge.type]}
           </span>
-          <EditableChallengeTitle
-            challengeId={challenge.id}
+          <EditableTitle
+            endpoint={`/api/challenges/${challenge.id}`}
             title={challenge.title}
             href={`/challenges/${challenge.id}`}
+            canEdit
           />
         </div>
         <DeleteChallengeButton challengeId={challenge.id} />

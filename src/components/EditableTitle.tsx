@@ -5,20 +5,37 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/Toast";
 
-export function EditableChallengeTitle({
-  challengeId,
+// Rename-in-place for anything the owner titled themselves. Shared by
+// challenge cards and list pages rather than written twice, since the only
+// things that actually differ are the endpoint it PATCHes, whether the
+// title doubles as a link, and how big the text is.
+export function EditableTitle({
+  endpoint,
   title,
   href,
+  canEdit,
+  className = "text-sm font-semibold",
 }: {
-  challengeId: string;
+  /** PATCH target; receives `{ title }`. */
+  endpoint: string;
   title: string;
-  href: string;
+  href?: string;
+  canEdit: boolean;
+  className?: string;
 }) {
   const router = useRouter();
   const showToast = useToast();
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(title);
   const [saving, setSaving] = useState(false);
+
+  // The title can change under us after a router.refresh() — adjust during
+  // render, the same way PosterQuickActions handles its own props.
+  const [prevTitle, setPrevTitle] = useState(title);
+  if (title !== prevTitle) {
+    setPrevTitle(title);
+    setValue(title);
+  }
 
   function cancel() {
     setEditing(false);
@@ -33,7 +50,7 @@ export function EditableChallengeTitle({
     }
 
     setSaving(true);
-    const res = await fetch(`/api/challenges/${challengeId}`, {
+    const res = await fetch(endpoint, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title: trimmed }),
@@ -41,13 +58,23 @@ export function EditableChallengeTitle({
     setSaving(false);
 
     if (!res.ok) {
-      showToast("Couldn't rename that challenge — try again.", "error");
+      showToast("Couldn't rename that — try again.", "error");
       return;
     }
 
     setEditing(false);
     router.refresh();
   }
+
+  const text = href ? (
+    <Link href={href} className={`block truncate hover:text-accent-green hover:underline ${className}`}>
+      {title}
+    </Link>
+  ) : (
+    <span className={`block truncate ${className}`}>{title}</span>
+  );
+
+  if (!canEdit) return text;
 
   if (editing) {
     return (
@@ -67,7 +94,7 @@ export function EditableChallengeTitle({
           }}
           maxLength={100}
           disabled={saving}
-          className="min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-1 text-sm focus:outline-none focus:border-accent-green disabled:opacity-50"
+          className={`min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-1 focus:border-accent-green focus:outline-none disabled:opacity-50 ${className}`}
         />
         <button
           type="button"
@@ -91,12 +118,7 @@ export function EditableChallengeTitle({
 
   return (
     <div className="flex items-center gap-1.5">
-      <Link
-        href={href}
-        className="block truncate text-sm font-semibold hover:text-accent-green hover:underline"
-      >
-        {title}
-      </Link>
+      {text}
       <button
         type="button"
         onClick={() => setEditing(true)}

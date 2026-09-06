@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getClientIp, isRateLimited, recordHit } from "@/lib/rateLimit";
+import { normalizeEmail } from "@/lib/normalizeEmail";
 
 const SIGNUP_LIMIT = 5;
 const SIGNUP_WINDOW_MS = 60 * 60 * 1000; // 1 hour
@@ -38,7 +39,8 @@ export async function POST(request: Request) {
     );
   }
 
-  const { username, email, password } = parsed.data;
+  const { username, password } = parsed.data;
+  const email = normalizeEmail(parsed.data.email);
 
   const existing = await prisma.user.findFirst({
     where: { OR: [{ email }, { username }] },

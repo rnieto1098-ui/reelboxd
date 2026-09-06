@@ -4,6 +4,7 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { isRateLimited, recordHit } from "@/lib/rateLimit";
+import { normalizeEmail } from "@/lib/normalizeEmail";
 
 const LOGIN_FAIL_LIMIT = 10;
 const LOGIN_FAIL_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
@@ -20,11 +21,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        const email = credentials?.email;
+        const rawEmail = credentials?.email;
         const password = credentials?.password;
-        if (typeof email !== "string" || typeof password !== "string") {
+        if (typeof rawEmail !== "string" || typeof password !== "string") {
           return null;
         }
+        const email = normalizeEmail(rawEmail);
 
         // Keyed by email, not IP — the goal is stopping credential
         // stuffing against one account regardless of which IP it comes
@@ -32,7 +34,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // anyway). Only failed attempts count below, so a user who just
         // fumble-typed their own password a few times in a row is never
         // the one who gets locked out.
-        const rateLimitKey = `login:${email.toLowerCase()}`;
+        const rateLimitKey = `login:${email}`;
         if (await isRateLimited(rateLimitKey, LOGIN_FAIL_LIMIT, LOGIN_FAIL_WINDOW_MS)) {
           // Returning null (not throwing) keeps this indistinguishable
           // from "wrong password" to the client — no signal to a would-be

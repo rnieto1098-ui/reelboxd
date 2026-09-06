@@ -4,6 +4,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getClientIp, isRateLimited, recordHit } from "@/lib/rateLimit";
 import { sendPasswordResetEmail } from "@/lib/email";
+import { normalizeEmail } from "@/lib/normalizeEmail";
 import { SITE_URL } from "@/lib/siteUrl";
 
 const schema = z.object({ email: z.string().email() });
@@ -24,7 +25,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Enter a valid email" }, { status: 400 });
   }
 
-  const email = parsed.data.email.toLowerCase();
+  const email = normalizeEmail(parsed.data.email);
   const ip = getClientIp(request);
   // Keyed by IP and email together — either alone is gameable (one IP
   // cycling through many target emails, or one email requested via many

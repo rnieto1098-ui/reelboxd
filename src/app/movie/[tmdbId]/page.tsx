@@ -25,6 +25,7 @@ import { CastList } from "@/components/CastList";
 import { PosterPicker } from "@/components/PosterPicker";
 import { AboutMovieModal } from "@/components/AboutMovieModal";
 import { AddToListButton } from "@/components/AddToListButton";
+import { MovieListsButton } from "@/components/MovieListsButton";
 import { ContentAdvisoryModal } from "@/components/ContentAdvisoryModal";
 import { MovieRow } from "@/components/MovieRow";
 
@@ -191,6 +192,15 @@ export default async function MovieDetailPage({
               cast={cast}
             />
           </div>
+          {session?.user && (
+            <div className="mt-2 flex justify-center md:justify-start">
+              <MovieListsButton
+                lists={myLists
+                  .filter((l) => l.items.length > 0)
+                  .map((l) => ({ id: l.id, title: l.title }))}
+              />
+            </div>
+          )}
         </div>
 
         <div>

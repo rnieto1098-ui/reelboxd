@@ -11,6 +11,7 @@ import {
 } from "@/lib/tmdb";
 import { parsePrompt, type ParsedPrompt, type PromptPresets } from "@/lib/parsePrompt";
 import { MIN_RECOMMENDABLE_RUNTIME_MINUTES } from "@/lib/runtimeFilter";
+import { fisherYatesShuffle } from "@/lib/shuffle";
 
 export { parsePrompt, type ParsedPrompt, type PromptPresets };
 
@@ -122,9 +123,27 @@ export async function getPromptRecommendations(
     effectiveGenreIds.map((id) => genreIdToName.get(id)).filter((n): n is string => !!n)
   );
 
+  // How many of TMDB's own (popularity/rating-sorted) discover pages count
+  // as "the pool" to draw from — deep enough to stay well within genuinely
+  // relevant matches, shallow enough that everything in it is still a
+  // reasonable recommendation.
+  const DISCOVER_POOL_DEPTH_PAGES = 5;
+
+  // A fixed page (or fixed pair of pages) for a given set of filters is
+  // exactly why the same handful of movies kept coming back in the same
+  // order for the same criteria, forever — even in a brand new session,
+  // since nothing about which page got fetched ever varied. Picking a
+  // random sample of pages out of the pool depth means two calls with
+  // identical filters draw from genuinely different candidates, not just a
+  // reshuffled copy of the same fixed set.
+  function randomPageSample(count: number): number[] {
+    const available = Array.from({ length: DISCOVER_POOL_DEPTH_PAGES }, (_, i) => i + 1);
+    return fisherYatesShuffle(available).slice(0, count);
+  }
+
   // A repeat click (same criteria, excludeIds set) needs a real shot at
-  // fresh candidates beyond whatever page 1 already showed — pull a second
-  // page too in that case rather than just hoping page 1 had overflow.
+  // fresh candidates beyond whatever page(s) already showed — sample one
+  // extra page in that case rather than just hoping there was overflow.
   //
   // "popularOnly" used to fall back to the plain /movie/popular endpoint,
   // but that has no certification filter — switched to the same discover
@@ -136,7 +155,7 @@ export async function getPromptRecommendations(
   // means under 2h, not "under 2h unless that leaves too few results." It's
   // passed at every stage below, never dropped the way genre/rating are.
   async function runDiscover(stage: Stage): Promise<TmdbMovieSummary[]> {
-    const pages = excludeIds.size > 0 ? [1, 2] : [1];
+    const pages = randomPageSample(excludeIds.size > 0 ? 3 : 2);
     const results = await Promise.all(
       pages.map((page) =>
         discoverMovies({
@@ -240,12 +259,23 @@ export async function getPromptRecommendations(
       if (!skipExclude && excludeIds.has(movie.id)) continue;
       merged.set(movie.id, movie);
     }
-    let sorted = [...merged.values()].sort((a, b) => (b.popularity ?? 0) - (a.popularity ?? 0));
-    if (!onlyWatchlist) sorted = await verifyRuntime(sorted);
+    let candidates = [...merged.values()];
+    if (!onlyWatchlist) candidates = await verifyRuntime(candidates);
     // Same reasoning as "on watchlist" above: an explicit "on your services"
     // filter is a hard constraint, applied after every stage and never
     // relaxed away, whatever the candidate pool's source.
-    return onlyStreaming ? filterMoviesByStreaming(sorted, userProviderIds, ownedTmdbIds) : sorted;
+    const filtered = onlyStreaming
+      ? await filterMoviesByStreaming(candidates, userProviderIds, ownedTmdbIds)
+      : candidates;
+    // Shuffled rather than sorted by popularity. Every movie left in the
+    // pool already passed every relevance filter (genre/rating/runtime/
+    // certification/availability) — there's no "best match" left to rank,
+    // so sorting by popularity just meant the same handful of most-popular
+    // titles came back in the same order for the same filters, forever,
+    // even in a brand new session. Shuffling (and then slicing to
+    // RESULT_LIMIT afterward) means both the order AND which subset of the
+    // pool gets shown varies from click to click.
+    return fisherYatesShuffle(filtered);
   }
 
   async function runStage(stage: Stage, skipExclude: boolean) {

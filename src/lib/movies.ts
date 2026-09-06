@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { getMovieDetails } from "@/lib/tmdb";
+import { getMovieDetails, getUsCertification } from "@/lib/tmdb";
 
 // Every movie card's hover overlay needs to know, for the signed-in viewer,
 // which posters are already owned/watchlisted so it can render those icons
@@ -41,6 +41,7 @@ export async function ensureMovieCached(tmdbId: number) {
       backdropPath: details.backdrop_path,
       releaseDate: details.release_date,
       runtime: details.runtime,
+      certification: getUsCertification(details),
       genres: details.genres.map((g) => g.name).join(", "),
       voteAverage: details.vote_average,
       popularity: details.popularity ?? null,

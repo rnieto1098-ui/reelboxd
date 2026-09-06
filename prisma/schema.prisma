@@ -154,6 +154,7 @@ model Movie {
   backdropPath String?
   releaseDate String?
   runtime     Int?
+  certification String? // US MPA rating (e.g. "PG-13", "R"), from TMDB release_dates
   genres      String? // comma-separated TMDB genre names
   voteAverage Float?
   popularity  Float?

@@ -79,7 +79,8 @@ export async function getPromptRecommendations(
   // fallback stages, since it's a content-appropriateness choice rather
   // than a "loosen this if results are scarce" preference like genre/
   // runtime/rating.
-  const maxCertification = (presets?.allowR ?? true) ? "R" : "PG-13";
+  const allowR = presets?.allowR ?? true;
+  const maxCertification = allowR ? "R" : "PG-13";
 
   const [watchedIds, genreCatalog, watchlistCandidates, userProviderIds, ownedTmdbIds, watchlistedTmdbIds] =
     await Promise.all([
@@ -217,6 +218,32 @@ export async function getPromptRecommendations(
 
   const RUNTIME_CHECK_CONCURRENCY = 8;
 
+  const CERTIFICATION_ORDER = ["G", "PG", "PG-13", "R", "NC-17"];
+  const maxCertificationRank = CERTIFICATION_ORDER.indexOf(maxCertification);
+
+  // Only the discover-sourced pool ever gets a certification check from
+  // TMDB itself (runDiscover passes certification_country/certification.lte
+  // — verified reliable there, unlike its runtime filter). The "similar to
+  // X" pool comes from /movie/{id}/recommendations, which has no
+  // certification param at all, so without this it bypassed the cap
+  // entirely — an R-rated "similar to John Wick" result could (and did)
+  // slip through even with "PG-13 and below" checked. Checking it here
+  // instead, against everything merged into buildFinal, closes that gap and
+  // doesn't cost anything extra: every candidate already goes through
+  // ensureMovieCached for the runtime check below.
+  //
+  // Unknown certification (TMDB has no US release_dates entry for it) is
+  // let through when R-and-below is the active cap — that's the default,
+  // loose state, and TMDB's own discover results already treat unknown the
+  // same way — but excluded outright once the user has actively restricted
+  // to PG-13-and-below, same reasoning as an unknown runtime: never risk
+  // violating a cap the user explicitly turned on.
+  function passesCertificationCap(certification: string | null): boolean {
+    if (certification == null) return allowR;
+    const rank = CERTIFICATION_ORDER.indexOf(certification);
+    return rank === -1 || rank <= maxCertificationRank;
+  }
+
   // TMDB's own with_runtime.gte/lte filter on /discover is unreliable — it
   // lets movies outside the requested range through even with the param set
   // correctly (confirmed directly against the API: a 90-minute cap still
@@ -230,7 +257,8 @@ export async function getPromptRecommendations(
   // user-specified runtime filter at all, the 45-minute floor (see
   // effectiveMinRuntime above) still has to be checked. Not needed for the
   // watchlist pool — runWatchlistPool already checks real runtime from that
-  // same local cache directly.
+  // same local cache directly (though not certification — see that
+  // function's own comment for why).
   async function verifyRuntime(movies: TmdbMovieSummary[]): Promise<TmdbMovieSummary[]> {
     const kept: TmdbMovieSummary[] = [];
     for (let i = 0; i < movies.length; i += RUNTIME_CHECK_CONCURRENCY) {
@@ -241,6 +269,7 @@ export async function getPromptRecommendations(
         if (runtime == null) return;
         if (parsed.runtimeMaxMinutes != null && runtime > parsed.runtimeMaxMinutes) return;
         if (runtime < effectiveMinRuntime) return;
+        if (!passesCertificationCap(cached[idx]?.certification ?? null)) return;
         kept.push(movie);
       });
     }

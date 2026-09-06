@@ -17,17 +17,27 @@ export function CuratedListsProgress({ lists }: { lists: ListProgress[] }) {
     const target = index + direction;
     if (target < 0 || target >= order.length) return;
 
+    const previous = order;
     const next = [...order];
     [next[index], next[target]] = [next[target], next[index]];
     setOrder(next);
 
+    // Checking res.ok matters as much as the catch: fetch only rejects on a
+    // network failure, so a 401/500 used to resolve normally and this
+    // reported success it hadn't had. On either kind of failure the local
+    // order is put back, so what's on screen still matches what's saved.
     fetch("/api/account/curated-list-order", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ order: next.map((l) => l.id) }),
-    }).catch(() => {
-      showToast("Couldn't save the new order — try again", "error");
-    });
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("save failed");
+      })
+      .catch(() => {
+        setOrder(previous);
+        showToast("Couldn't save the new order — try again", "error");
+      });
   }
 
   return (

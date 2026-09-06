@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useToast } from "@/components/Toast";
 
 export function WatchGoalWidget({
   year,
@@ -20,7 +21,9 @@ export function WatchGoalWidget({
   username: string;
 }) {
   const router = useRouter();
+  const showToast = useToast();
   const [editing, setEditing] = useState(false);
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
   const [value, setValue] = useState(target ? String(target) : "50");
   const [saving, setSaving] = useState(false);
 
@@ -28,20 +31,34 @@ export function WatchGoalWidget({
     const n = Number(value);
     if (!Number.isFinite(n) || n < 1) return;
     setSaving(true);
-    await fetch("/api/goals", {
+    const res = await fetch("/api/goals", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ year, target: Math.round(n) }),
     });
     setSaving(false);
+
+    if (!res.ok) {
+      showToast("Couldn't save that goal — try again.", "error");
+      return;
+    }
+
     setEditing(false);
     router.refresh();
   }
 
   async function remove() {
     setSaving(true);
-    await fetch(`/api/goals?year=${year}`, { method: "DELETE" });
+    const res = await fetch(`/api/goals?year=${year}`, { method: "DELETE" });
     setSaving(false);
+
+    if (!res.ok) {
+      showToast("Couldn't remove that goal — try again.", "error");
+      return;
+    }
+
+    setConfirmingRemove(false);
+    showToast("Goal removed");
     router.refresh();
   }
 
@@ -122,21 +139,45 @@ export function WatchGoalWidget({
             </div>
           ) : (
             <div className="flex items-center gap-3 text-xs">
-              <button
-                type="button"
-                onClick={() => setEditing(true)}
-                className="text-muted hover:text-foreground"
-              >
-                Edit
-              </button>
-              <button
-                type="button"
-                onClick={remove}
-                disabled={saving}
-                className="text-muted hover:text-red-400 disabled:opacity-50"
-              >
-                Remove
-              </button>
+              {/* Two-step, like DeleteChallengeButton right below it on this
+                  same page — deleting a year's goal used to be one misclick
+                  with nothing to undo it. */}
+              {confirmingRemove ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={remove}
+                    disabled={saving}
+                    className="text-red-400 hover:underline disabled:opacity-50"
+                  >
+                    {saving ? "Removing..." : "Confirm"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmingRemove(false)}
+                    className="text-muted hover:text-foreground"
+                  >
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setEditing(true)}
+                    className="text-muted hover:text-foreground"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmingRemove(true)}
+                    className="text-muted hover:text-red-400"
+                  >
+                    Remove
+                  </button>
+                </>
+              )}
             </div>
           ))}
       </div>

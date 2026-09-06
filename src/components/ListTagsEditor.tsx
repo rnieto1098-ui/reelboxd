@@ -55,7 +55,7 @@ export function ListTagsEditor({
         <button
           type="submit"
           disabled={saving}
-          className="rounded-full bg-accent-green px-2.5 py-1 text-xs font-medium text-black hover:opacity-90 disabled:opacity-50"
+          className="rounded-md bg-accent-green px-2.5 py-1 text-xs font-medium text-black hover:opacity-90 disabled:opacity-50"
         >
           {saving ? "Saving..." : "Save"}
         </button>

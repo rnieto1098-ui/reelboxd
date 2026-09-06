@@ -234,8 +234,11 @@ export async function createChallenge(
   });
 }
 
-export async function deleteChallenge(userId: string, id: string) {
-  await prisma.challenge.deleteMany({ where: { id, userId } });
+// Returns true when a matching, owned challenge was actually found and
+// deleted, so the route can 404 the same way renameChallenge's caller does.
+export async function deleteChallenge(userId: string, id: string): Promise<boolean> {
+  const result = await prisma.challenge.deleteMany({ where: { id, userId } });
+  return result.count > 0;
 }
 
 // Returns true when a matching, owned challenge was actually found and

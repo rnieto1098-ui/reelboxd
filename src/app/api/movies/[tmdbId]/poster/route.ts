@@ -21,7 +21,10 @@ export async function POST(
   const body = await request.json();
   const parsed = posterSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid poster" }, { status: 400 });
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message ?? "Invalid poster" },
+      { status: 400 }
+    );
   }
 
   const movie = await ensureMovieCached(Number(tmdbId));

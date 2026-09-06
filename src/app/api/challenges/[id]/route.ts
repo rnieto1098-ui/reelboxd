@@ -15,7 +15,10 @@ export async function DELETE(
   }
 
   const { id } = await context.params;
-  await deleteChallenge(session.user.id, id);
+  const deleted = await deleteChallenge(session.user.id, id);
+  if (!deleted) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
   return NextResponse.json({ ok: true });
 }
 

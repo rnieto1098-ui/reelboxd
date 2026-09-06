@@ -40,15 +40,21 @@ export default async function SearchPage({
         {query ? `Results for "${query}"` : "Search"}
       </h1>
 
-      {results && results.results.length === 0 && (
+      {/* The no-query case needs its own branch: landing on /search with
+          nothing typed left `results` null, which skipped the "No movies
+          found" line and rendered an empty grid — a blank page under the
+          heading with no explanation. */}
+      {!query ? (
+        <p className="text-muted">Search for a movie by title to get started.</p>
+      ) : results && results.results.length === 0 ? (
         <p className="text-muted">No movies found.</p>
+      ) : (
+        <SearchResultsGrid
+          movies={movies}
+          ownedIds={[...ownedIds]}
+          watchlistIds={[...watchlistIds]}
+        />
       )}
-
-      <SearchResultsGrid
-        movies={movies}
-        ownedIds={[...ownedIds]}
-        watchlistIds={[...watchlistIds]}
-      />
 
       {results && totalPages > 1 && (
         <div className="mt-8 flex items-center justify-center gap-4 text-sm">

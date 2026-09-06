@@ -26,7 +26,7 @@ export async function POST(request: Request, context: { params: Promise<{ listId
 
   const { listId } = await context.params;
   if (!(await assertOwnedList(listId, session.user.id))) {
-    return NextResponse.json({ error: "Not your list" }, { status: 403 });
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
   const formData = await request.formData();
@@ -74,7 +74,7 @@ export async function DELETE(_request: Request, context: { params: Promise<{ lis
 
   const { listId } = await context.params;
   if (!(await assertOwnedList(listId, session.user.id))) {
-    return NextResponse.json({ error: "Not your list" }, { status: 403 });
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
   const existing = await prisma.list.findUnique({ where: { id: listId }, select: { coverImage: true } });

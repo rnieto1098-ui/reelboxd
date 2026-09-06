@@ -4,7 +4,7 @@ import { auth } from "@/auth";
 import { getGoalProgress } from "@/lib/goals";
 import { getChallengesWithProgress, type ChallengeSummary } from "@/lib/challenges";
 import { getGenres } from "@/lib/tmdb";
-import { formatTimeLeft } from "@/lib/dates";
+import { formatTimeLeft, currentYearUTC } from "@/lib/dates";
 import { WatchGoalWidget } from "@/components/WatchGoalWidget";
 import { NewChallengeForm } from "@/components/NewChallengeForm";
 import { RandomChallengeButton } from "@/components/RandomChallengeButton";
@@ -19,7 +19,7 @@ const TYPE_LABEL: Record<ChallengeSummary["type"], string> = {
 
 function ChallengeCard({ challenge }: { challenge: ChallengeSummary }) {
   return (
-    <div className="rounded-lg border border-border bg-surface p-4">
+    <div className="rounded-lg border border-border bg-surface p-4 transition-colors hover:border-accent-green">
       <div className="mb-2 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <span className="mb-1 inline-block rounded-full border border-border px-2 py-0.5 text-[11px] text-muted">
@@ -59,7 +59,7 @@ export default async function ChallengesPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
-  const currentYear = new Date().getFullYear();
+  const currentYear = currentYearUTC();
   const [goal, challenges, genresData] = await Promise.all([
     getGoalProgress(session.user.id, currentYear),
     getChallengesWithProgress(session.user.id),

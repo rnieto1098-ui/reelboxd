@@ -25,7 +25,7 @@ export async function POST(request: Request, context: { params: Promise<{ listId
   const { listId } = await context.params;
   const list = await prisma.list.findUnique({ where: { id: listId }, select: { id: true } });
   if (!list) {
-    return NextResponse.json({ error: "List not found" }, { status: 404 });
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
   const formData = await request.formData();

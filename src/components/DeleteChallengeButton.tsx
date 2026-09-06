@@ -15,7 +15,10 @@ export function DeleteChallengeButton({ challengeId }: { challengeId: string }) 
     const res = await fetch(`/api/challenges/${challengeId}`, { method: "DELETE" });
     setDeleting(false);
 
-    if (!res.ok) {
+    // 404 means it's already gone (double-click, or removed in another tab),
+    // which is the outcome the user wanted — same handling as the diary
+    // entry delete button.
+    if (!res.ok && res.status !== 404) {
       showToast("Couldn't remove that challenge — try again.", "error");
       return;
     }

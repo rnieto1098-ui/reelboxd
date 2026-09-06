@@ -3,8 +3,10 @@ import { z } from "zod";
 import { auth } from "@/auth";
 import { setGoal, clearGoal } from "@/lib/goals";
 
+const yearSchema = z.number().int().min(2000).max(2100);
+
 const goalSchema = z.object({
-  year: z.number().int().min(2000).max(2100),
+  year: yearSchema,
   target: z.number().int().min(1).max(10000),
 });
 
@@ -33,10 +35,15 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
 
-  const year = Number(new URL(request.url).searchParams.get("year"));
-  if (!Number.isFinite(year)) {
+  // Parsed through the same schema the POST uses, rather than a bare
+  // Number.isFinite check — a missing ?year= reads as null, and Number(null)
+  // is a perfectly finite 0, which slipped through and cleared "year 0".
+  const raw = new URL(request.url).searchParams.get("year");
+  const parsed = yearSchema.safeParse(raw === null ? null : Number(raw));
+  if (!parsed.success) {
     return NextResponse.json({ error: "Invalid year" }, { status: 400 });
   }
+  const year = parsed.data;
 
   await clearGoal(session.user.id, year);
   return NextResponse.json({ ok: true });

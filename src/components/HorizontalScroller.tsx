@@ -14,7 +14,12 @@ export function HorizontalScroller({
   title,
   headerAction,
   isEmpty,
-  emptyMessage,
+  // Defaulted rather than optional-at-the-render-site: this used to only
+  // show a message when a caller passed one, so the rows that didn't
+  // (ListRow, PersonRow, StudioRow, UpcomingReleasesRow) rendered a heading
+  // over an empty scroller — complete with hover arrows scrolling nothing —
+  // whenever a TMDB call came back empty or the account was new.
+  emptyMessage = "Nothing here yet.",
   children,
 }: {
   title?: string;
@@ -83,7 +88,7 @@ export function HorizontalScroller({
           {headerAction}
         </div>
       )}
-      {isEmpty && emptyMessage ? (
+      {isEmpty ? (
         <p className="text-sm text-muted">{emptyMessage}</p>
       ) : (
         <div className="group/row relative">

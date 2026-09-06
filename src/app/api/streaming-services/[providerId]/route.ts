@@ -21,7 +21,10 @@ export async function POST(
   const body = await request.json();
   const parsed = bodySchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid provider" }, { status: 400 });
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message ?? "Invalid provider" },
+      { status: 400 }
+    );
   }
 
   const service = await prisma.streamingService.upsert({

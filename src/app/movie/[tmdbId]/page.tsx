@@ -281,6 +281,7 @@ export default async function MovieDetailPage({
                 month: "short",
                 day: "numeric",
                 year: "numeric",
+                timeZone: "UTC",
               })}
             </p>
           )}

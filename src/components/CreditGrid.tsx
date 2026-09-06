@@ -25,7 +25,7 @@ export type CreditDisplay = {
 // as MovieCard/MovieRow elsewhere in this app.
 export function CreditGrid({ title, credits }: { title: string; credits: CreditDisplay[] }) {
   const [expanded, setExpanded] = useState(false);
-  const { order, shuffle } = useShuffle(credits);
+  const { order, shuffle } = useShuffle(credits, (c) => c.id);
 
   if (credits.length === 0) return null;
 

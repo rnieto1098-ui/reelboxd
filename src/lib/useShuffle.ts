@@ -7,19 +7,37 @@ import { fisherYatesShuffle } from "@/lib/shuffle";
 // crew credits, homepage rows, ...) so the "reorder in place, reset when the
 // underlying data actually changes" behavior — and the shuffle algorithm
 // itself — can't drift between them.
-export function useShuffle<T>(items: T[]) {
-  const [order, setOrder] = useState(items);
-  // items is a new array reference whenever the underlying data actually
-  // changes (a different sort/filter/page) — reset to it instead of
-  // carrying a stale shuffle across that change.
-  const [prevItems, setPrevItems] = useState(items);
-  if (items !== prevItems) {
-    setPrevItems(items);
-    setOrder(items);
+//
+// getKey has to identify an item across renders. Comparing array identity
+// instead looks equivalent but isn't: a server component builds a brand-new
+// array every time it renders, so *any* router.refresh() counted as "the
+// data changed" and threw the shuffle away — including the refresh
+// PosterQuickActions fires after every owned/watchlist/log click, which made
+// a shuffled row snap back to server order on the next poster click.
+export function useShuffle<T>(items: T[], getKey: (item: T) => string | number) {
+  // The shuffle is stored as keys rather than the items themselves so the
+  // rendered objects are always the ones the server just sent. Holding the
+  // items would pin whatever was on screen when the shuffle happened and
+  // show stale data after a refresh.
+  const [shuffledKeys, setShuffledKeys] = useState<(string | number)[] | null>(null);
+
+  const signature = items.map(getKey).join(",");
+  const [prevSignature, setPrevSignature] = useState(signature);
+  if (signature !== prevSignature) {
+    setPrevSignature(signature);
+    setShuffledKeys(null);
+  }
+
+  let order = items;
+  if (shuffledKeys) {
+    const byKey = new Map(items.map((item) => [getKey(item), item]));
+    order = shuffledKeys
+      .map((key) => byKey.get(key))
+      .filter((item): item is T => item !== undefined);
   }
 
   return {
     order,
-    shuffle: () => setOrder(fisherYatesShuffle(items)),
+    shuffle: () => setShuffledKeys(fisherYatesShuffle(items).map(getKey)),
   };
 }

@@ -18,6 +18,7 @@ import { OwnedImportForm } from "@/components/OwnedImportForm";
 import { compareNullableNumbers, type SortDir } from "@/lib/sortComparator";
 import type { TmdbMovieSummary } from "@/lib/tmdb";
 import type { Movie } from "@prisma/client";
+import { currentYearUTC } from "@/lib/dates";
 
 const SORT_OPTIONS = {
   recent: { label: "Recently Logged" },
@@ -198,7 +199,7 @@ export default async function ProfilePage({
     ]),
     getUserOwnedTmdbIds(session?.user?.id),
     getUserWatchlistedTmdbIds(session?.user?.id),
-    getGoalProgress(user.id, new Date().getFullYear()),
+    getGoalProgress(user.id, currentYearUTC()),
     getChallengesWithProgress(user.id),
   ]);
 

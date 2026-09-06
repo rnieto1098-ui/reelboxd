@@ -20,14 +20,14 @@ export type WatchlistGridEntry = {
 };
 
 export function WatchlistGrid({ entries }: { entries: WatchlistGridEntry[] }) {
-  const { order, shuffle } = useShuffle(entries);
+  const { order, shuffle } = useShuffle(entries, (e) => e.item.id);
 
   return (
     <div>
       <div className="mb-3 flex justify-end">
         <ShuffleButton onClick={shuffle} disabled={entries.length < 2} />
       </div>
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-6">
         {order.map(({ item, owned }) => (
           <div key={item.id}>
             <MovieCard

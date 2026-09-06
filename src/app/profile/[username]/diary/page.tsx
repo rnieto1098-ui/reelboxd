@@ -53,10 +53,18 @@ export default async function DiaryPage({
   );
 
   // Group consecutive entries by "Month Year" — the list is already sorted
-  // newest-first, so this is a single pass, not a sort-by-key.
+  // newest-first, so this is a single pass, not a sort-by-key. Formatted in
+  // UTC because watchedDate is stored as a UTC midnight: on a server behind
+  // UTC, local formatting renders every entry a day early, which drags the
+  // 1st of a month into the previous month's section and can even emit the
+  // same month header twice.
   const groups: { label: string; entries: typeof entries }[] = [];
   for (const entry of entries) {
-    const label = entry.watchedDate.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+    const label = entry.watchedDate.toLocaleDateString("en-US", {
+      month: "long",
+      year: "numeric",
+      timeZone: "UTC",
+    });
     const last = groups[groups.length - 1];
     if (last && last.label === label) last.entries.push(entry);
     else groups.push({ label, entries: [entry] });
@@ -110,7 +118,10 @@ export default async function DiaryPage({
                       className="flex items-center gap-3 rounded-lg border border-border bg-surface p-2"
                     >
                       <div className="w-8 shrink-0 text-center text-xs text-muted">
-                        {entry.watchedDate.toLocaleDateString("en-US", { day: "numeric" })}
+                        {entry.watchedDate.toLocaleDateString("en-US", {
+                          day: "numeric",
+                          timeZone: "UTC",
+                        })}
                       </div>
                       <Link
                         href={`/movie/${entry.movie.tmdbId}`}

@@ -32,6 +32,7 @@ import { AvailabilityFilterLinks } from "@/components/AvailabilityFilterLinks";
 import { OnboardingChecklist, type ChecklistItem } from "@/components/OnboardingChecklist";
 import { WatchGoalWidget } from "@/components/WatchGoalWidget";
 import { HomeRowsSkeleton } from "@/components/HomeRowsSkeleton";
+import { currentYearUTC } from "@/lib/dates";
 
 const WELCOME_PHRASES = [
   "Here's what we think you'll love next.",
@@ -75,7 +76,7 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
   // eslint-disable-next-line react-hooks/purity -- intentional per-request randomness in a Server Component
   const welcomePhrase = WELCOME_PHRASES[Math.floor(Math.random() * WELCOME_PHRASES.length)];
 
-  const currentYear = new Date().getFullYear();
+  const currentYear = currentYearUTC();
 
   // Everything the page shell (header, goal widget, availability toggle,
   // onboarding checklist) needs is a cheap DB-only lookup — fetched here,

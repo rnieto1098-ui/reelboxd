@@ -8,6 +8,7 @@ import { getCustomPosterMap } from "@/lib/customPosters";
 import { getYearInReview } from "@/lib/yearInReview";
 import { getGoalProgress } from "@/lib/goals";
 import { formatWatchTime } from "@/lib/stats";
+import { currentYearUTC } from "@/lib/dates";
 
 function HighlightTile({ label, value }: { label: string; value: string | number }) {
   return (
@@ -70,7 +71,7 @@ export default async function YearInReviewPage({
   });
   if (!user) notFound();
 
-  const currentYear = new Date().getFullYear();
+  const currentYear = currentYearUTC();
   const year =
     typeof yearParam === "string" && Number.isFinite(Number(yearParam))
       ? Number(yearParam)
@@ -162,6 +163,7 @@ export default async function YearInReviewPage({
                 caption={review.firstWatch.watchedDate.toLocaleDateString("en-US", {
                   month: "short",
                   day: "numeric",
+                  timeZone: "UTC",
                 })}
               />
             )}
@@ -177,6 +179,7 @@ export default async function YearInReviewPage({
                 caption={review.mostRecentWatch.watchedDate.toLocaleDateString("en-US", {
                   month: "short",
                   day: "numeric",
+                  timeZone: "UTC",
                 })}
               />
             )}

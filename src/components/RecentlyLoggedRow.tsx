@@ -18,7 +18,7 @@ export type RecentlyLoggedEntry = {
 };
 
 export function RecentlyLoggedRow({ entries }: { entries: RecentlyLoggedEntry[] }) {
-  const { order, shuffle } = useShuffle(entries);
+  const { order, shuffle } = useShuffle(entries, (e) => e.id);
 
   return (
     <HorizontalScroller

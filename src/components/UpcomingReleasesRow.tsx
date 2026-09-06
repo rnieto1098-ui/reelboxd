@@ -19,10 +19,14 @@ export function UpcomingReleasesRow({
             tmdbId={movie.id}
             title={movie.title}
             posterPath={movie.poster_path}
+            // release_date is TMDB's "YYYY-MM-DD", which Date parses as UTC
+            // midnight — formatted in the server's local zone instead, every
+            // release renders a day early anywhere behind UTC.
             year={new Date(movie.release_date).toLocaleDateString("en-US", {
               month: "short",
               day: "numeric",
               year: "numeric",
+              timeZone: "UTC",
             })}
             owned={ownedIds?.has(movie.id)}
             inWatchlist

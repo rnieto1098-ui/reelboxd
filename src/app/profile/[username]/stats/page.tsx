@@ -11,6 +11,7 @@ import { getTopPeopleStats } from "@/lib/peopleStats";
 import { ReleaseYearChart } from "@/components/ReleaseYearChart";
 import { PersonRankList } from "@/components/PersonRankList";
 import { YearMovieList } from "@/components/YearMovieList";
+import { currentYearUTC } from "@/lib/dates";
 
 function StatTile({ label, value }: { label: string; value: string | number }) {
   return (
@@ -30,7 +31,7 @@ export default async function StatsPage({ params }: PageProps<"/profile/[usernam
   });
   if (!user) notFound();
 
-  const currentYear = new Date().getFullYear();
+  const currentYear = currentYearUTC();
 
   const [stats, topPeople, releaseYears, yearMovies] = await Promise.all([
     getUserStats(user.id),

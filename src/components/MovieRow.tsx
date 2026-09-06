@@ -26,7 +26,7 @@ export function MovieRow({
   // import link) — most rows don't need this, so it's optional.
   headerExtra?: ReactNode;
 }) {
-  const { order, shuffle } = useShuffle(movies);
+  const { order, shuffle } = useShuffle(movies, (m) => m.id);
   const ownedSet = useMemo(() => new Set(ownedIds), [ownedIds]);
   const watchlistSet = useMemo(() => new Set(watchlistIds), [watchlistIds]);
 

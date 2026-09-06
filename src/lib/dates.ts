@@ -5,6 +5,16 @@ export function yearBounds(year: number) {
   };
 }
 
+// The "current year" every year-scoped feature has to agree on. Plain
+// getFullYear() reads the server's local year, which disagrees with
+// yearBounds() and checkGoalJustCompleted() (both UTC) for a few hours
+// around New Year on any server behind UTC — long enough to show last
+// year's goal widget while new watches are already counting toward the
+// next year's goal.
+export function currentYearUTC(): number {
+  return new Date().getUTCFullYear();
+}
+
 // Human-readable countdown for a TIMEFRAME challenge's deadline. `now`
 // defaults to the real current time but is a parameter so callers (and
 // tests) can pin it.

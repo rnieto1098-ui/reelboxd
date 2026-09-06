@@ -25,7 +25,7 @@ export function ListMovieGrid({
   entries: ListGridEntry[];
   isOwner: boolean;
 }) {
-  const { order, shuffle } = useShuffle(entries);
+  const { order, shuffle } = useShuffle(entries, (e) => e.id);
 
   return (
     <div>

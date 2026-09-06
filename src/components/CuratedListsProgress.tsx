@@ -33,7 +33,7 @@ export function CuratedListsProgress({ lists }: { lists: ListProgress[] }) {
   return (
     <section>
       <h2 className="mb-3 text-lg font-semibold">Your List Progress</h2>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
         {order.map((list, i) => (
           <div
             key={list.id}

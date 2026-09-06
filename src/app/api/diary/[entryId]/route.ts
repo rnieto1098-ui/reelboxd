@@ -78,8 +78,11 @@ export async function DELETE(
 
   const { entryId } = await context.params;
   const entry = await prisma.diaryEntry.findUnique({ where: { id: entryId } });
+  // Same generic 404 the PATCH handler above uses for this identical check
+  // — both "never existed" and "belongs to someone else" get the same
+  // response so neither leaks which one it was.
   if (!entry || entry.userId !== session.user.id) {
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
   await prisma.diaryEntry.delete({ where: { id: entryId } });

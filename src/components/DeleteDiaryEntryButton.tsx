@@ -14,7 +14,12 @@ export function DeleteDiaryEntryButton({ entryId }: { entryId: string }) {
     const res = await fetch(`/api/diary/${entryId}`, { method: "DELETE" });
     setRemoving(false);
 
-    if (!res.ok) {
+    // A 404 here almost always means a double-click already removed it a
+    // moment ago (the API returns the same 404 for "gone" and "not yours,"
+    // but this button only ever renders for entries the viewer owns) — from
+    // the user's point of view that's still a successful removal, not an
+    // error.
+    if (!res.ok && res.status !== 404) {
       showToast("Couldn't remove that entry — try again.", "error");
       return;
     }

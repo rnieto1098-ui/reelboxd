@@ -46,7 +46,12 @@ export async function checkGoalJustCompleted(
   userId: string,
   watchedDate: Date
 ): Promise<{ year: number; target: number } | null> {
-  const year = watchedDate.getFullYear();
+  // UTC, not local time — same convention as every other date bucketing in
+  // this app (dayRangeUTC in diary.ts, yearBounds in dates.ts). A "log now"
+  // entry is a raw `new Date()`, so a server running outside UTC could
+  // otherwise credit a watch logged near a year boundary to the wrong
+  // year's goal.
+  const year = watchedDate.getUTCFullYear();
   const progress = await getGoalProgress(userId, year);
   if (progress.target != null && progress.count === progress.target) {
     return { year, target: progress.target };

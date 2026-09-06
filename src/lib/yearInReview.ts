@@ -75,7 +75,11 @@ export async function getYearInReview(userId: string, year: number): Promise<Yea
   const topGenres = topGenreCounts(entries);
 
   const monthCounts = new Array(12).fill(0);
-  for (const entry of entries) monthCounts[entry.watchedDate.getMonth()]++;
+  // UTC, not local time — same convention as every other date bucketing in
+  // this app (dayRangeUTC in diary.ts, yearBounds in dates.ts), so a watch
+  // logged near a month boundary doesn't land in the wrong month depending
+  // on the server's timezone.
+  for (const entry of entries) monthCounts[entry.watchedDate.getUTCMonth()]++;
   const maxMonthCount = Math.max(0, ...monthCounts);
   const busiestMonth = maxMonthCount > 0 ? MONTH_NAMES[monthCounts.indexOf(maxMonthCount)] : null;
 

@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { getFlatrateProviders } from "@/lib/streaming";
+import { getFlatrateProviders, parseProviderIds } from "@/lib/streaming";
 
 const SNAPSHOT_CONCURRENCY = 6;
 
@@ -7,15 +7,6 @@ const SNAPSHOT_CONCURRENCY = 6;
 // permanently showing a movie that was added once, months ago, and never
 // revisited.
 export const RECENTLY_ADDED_WINDOW_DAYS = 21;
-
-function parseProviderIds(stored: string): Set<number> {
-  return new Set(
-    stored
-      .split(",")
-      .map((s) => Number(s.trim()))
-      .filter((n) => Number.isFinite(n))
-  );
-}
 
 /**
  * For every movie that's ever landed on someone's watchlist or owned list,

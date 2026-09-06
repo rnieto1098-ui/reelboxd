@@ -8,13 +8,18 @@ import { getCustomPosterMap } from "@/lib/customPosters";
 import { getGoalProgress } from "@/lib/goals";
 import { yearBounds } from "@/lib/dates";
 import { DeleteDiaryEntryButton } from "@/components/DeleteDiaryEntryButton";
+import { Pagination } from "@/components/Pagination";
+
+// A diary only ever grows, and this page used to load every entry — with its
+// full Movie join — into a single response and a single DOM.
+const PAGE_SIZE = 100;
 
 export default async function DiaryPage({
   params,
   searchParams,
 }: PageProps<"/profile/[username]/diary">) {
   const { username } = await params;
-  const { year: yearParam } = await searchParams;
+  const { year: yearParam, page: pageParam } = await searchParams;
   const session = await auth();
 
   const user = await prisma.user.findUnique({
@@ -32,20 +37,30 @@ export default async function DiaryPage({
   const goal = year != null ? await getGoalProgress(user.id, year) : null;
   const bounds = year != null ? yearBounds(year) : null;
 
-  const [entries, ratings] = await Promise.all([
+  const requestedPage = Number(pageParam);
+  const page = Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+  const where = bounds
+    ? { userId: user.id, watchedDate: { gte: bounds.start, lt: bounds.end } }
+    : { userId: user.id };
+
+  const [entries, totalCount] = await Promise.all([
     prisma.diaryEntry.findMany({
-      where: bounds
-        ? { userId: user.id, watchedDate: { gte: bounds.start, lt: bounds.end } }
-        : { userId: user.id },
+      where,
       include: { movie: true },
       orderBy: { watchedDate: "desc" },
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
     }),
-    prisma.rating.findMany({
-      where: { userId: user.id },
-      select: { score: true, movieId: true },
-    }),
+    prisma.diaryEntry.count({ where }),
   ]);
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
+  // Scoped to the movies actually on this page rather than every rating the
+  // user has ever left, now that the page is bounded.
+  const ratings = await prisma.rating.findMany({
+    where: { userId: user.id, movieId: { in: entries.map((e) => e.movieId) } },
+    select: { score: true, movieId: true },
+  });
   const ratingByMovieId = new Map(ratings.map((r) => [r.movieId, r.score]));
   const posterOverrides = await getCustomPosterMap(
     session?.user?.id,
@@ -83,7 +98,7 @@ export default async function DiaryPage({
       </h1>
       <div className="mb-8">
         <p className="text-sm text-muted">
-          {entries.length} logged watch{entries.length === 1 ? "" : "es"}
+          {totalCount} logged watch{totalCount === 1 ? "" : "es"}
           {goal?.target != null && ` toward the ${year} goal of ${goal.target}`}
         </p>
         {year != null && (
@@ -96,10 +111,12 @@ export default async function DiaryPage({
         )}
       </div>
 
-      {entries.length === 0 ? (
+      {totalCount === 0 ? (
         <p className="text-muted">
           {year != null ? `No entries logged in ${year} yet.` : "No diary entries yet."}
         </p>
+      ) : entries.length === 0 ? (
+        <p className="text-muted">Nothing on this page — try going back.</p>
       ) : (
         <div className="space-y-8">
           {groups.map((group) => (
@@ -159,6 +176,18 @@ export default async function DiaryPage({
           ))}
         </div>
       )}
+
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        hrefFor={(target) => {
+          const query = new URLSearchParams();
+          if (year != null) query.set("year", String(year));
+          if (target > 1) query.set("page", String(target));
+          const qs = query.toString();
+          return `/profile/${username}/diary${qs ? `?${qs}` : ""}`;
+        }}
+      />
     </div>
   );
 }

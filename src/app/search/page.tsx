@@ -1,10 +1,10 @@
-import Link from "next/link";
 import { auth } from "@/auth";
 import { searchMovies } from "@/lib/tmdb";
 import { applyPosterOverrides, getCustomPosterMap } from "@/lib/customPosters";
 import { getUserWatchlistedTmdbIds } from "@/lib/movies";
 import { getUserOwnedTmdbIds } from "@/lib/streaming";
 import { SearchResultsGrid } from "@/components/SearchResultsGrid";
+import { Pagination } from "@/components/Pagination";
 
 // TMDB never returns more than 500 pages for any query, regardless of total_results.
 const MAX_PAGE = 500;
@@ -56,33 +56,7 @@ export default async function SearchPage({
         />
       )}
 
-      {results && totalPages > 1 && (
-        <div className="mt-8 flex items-center justify-center gap-4 text-sm">
-          {page > 1 ? (
-            <Link
-              href={pageHref(page - 1)}
-              className="rounded-full px-3 py-1 text-muted hover:text-foreground transition-colors"
-            >
-              ← Prev
-            </Link>
-          ) : (
-            <span className="rounded-full px-3 py-1 text-muted/40">← Prev</span>
-          )}
-          <span className="text-muted">
-            Page {page} of {totalPages}
-          </span>
-          {page < totalPages ? (
-            <Link
-              href={pageHref(page + 1)}
-              className="rounded-full px-3 py-1 text-muted hover:text-foreground transition-colors"
-            >
-              Next →
-            </Link>
-          ) : (
-            <span className="rounded-full px-3 py-1 text-muted/40">Next →</span>
-          )}
-        </div>
-      )}
+      {results && <Pagination page={page} totalPages={totalPages} hrefFor={pageHref} />}
     </div>
   );
 }

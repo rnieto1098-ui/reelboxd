@@ -1,6 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { hasStreamingAvailability, isAvailableOnServices } from "./streamingAvailability.ts";
+import {
+  hasStreamingAvailability,
+  isAvailableOnServices,
+  isAvailableOnServiceIds,
+} from "./streamingAvailability.ts";
 
 test("hasStreamingAvailability is false with no services and nothing owned", () => {
   assert.equal(hasStreamingAvailability(new Set(), new Set()), false);
@@ -26,4 +30,22 @@ test("isAvailableOnServices is false when no provider overlaps", () => {
 
 test("isAvailableOnServices is false for an empty provider list", () => {
   assert.equal(isAvailableOnServices([], new Set([8])), false);
+});
+
+// The id-only variant backs the watchlist page, which reads provider ids
+// from the snapshot table rather than full provider objects — it has to
+// agree with isAvailableOnServices exactly.
+test("isAvailableOnServiceIds matches the object-based check", () => {
+  const user = new Set([8, 337]);
+  assert.equal(isAvailableOnServiceIds(new Set([337, 15]), user), true);
+  assert.equal(isAvailableOnServiceIds(new Set([15, 384]), user), false);
+  assert.equal(isAvailableOnServiceIds(new Set(), user), false);
+  assert.equal(isAvailableOnServiceIds(new Set([8]), new Set()), false);
+
+  for (const ids of [[337, 15], [15, 384], []]) {
+    assert.equal(
+      isAvailableOnServiceIds(new Set(ids), user),
+      isAvailableOnServices(ids.map((id) => ({ provider_id: id })), user)
+    );
+  }
 });

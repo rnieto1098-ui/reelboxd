@@ -8,7 +8,11 @@ import {
 
 import { isAvailableOnServices } from "@/lib/streamingAvailability";
 
-export { hasStreamingAvailability, isAvailableOnServices } from "@/lib/streamingAvailability";
+export {
+  hasStreamingAvailability,
+  isAvailableOnServices,
+  isAvailableOnServiceIds,
+} from "@/lib/streamingAvailability";
 
 // TMDB's watch-provider data (sourced from JustWatch) is region-specific.
 // Hardcoding US for now — see project notes for how to add a region picker.
@@ -75,6 +79,75 @@ export async function getFlatrateProviders(tmdbId: number): Promise<TmdbWatchPro
   } catch {
     return [];
   }
+}
+
+export function parseProviderIds(stored: string): Set<number> {
+  return new Set(
+    stored
+      .split(",")
+      .map((s) => Number(s.trim()))
+      .filter((n) => Number.isFinite(n))
+  );
+}
+
+const SNAPSHOT_SEED_CONCURRENCY = 6;
+
+/**
+ * Flatrate provider ids for a batch of movies, keyed by tmdbId.
+ *
+ * The watchlist page needs this for every item at once, and used to get it
+ * with one TMDB request per movie — a few hundred watchlisted films meant
+ * dozens of sequential round trips on every single page load. The daily
+ * cron already records exactly this data in MovieProviderSnapshot, so read
+ * from there instead: one query for the whole page.
+ *
+ * Anything with no snapshot yet is fetched live and then written back, so
+ * this seeds itself on first use rather than depending on the cron having
+ * run — a watchlist stays slow only until its first load. The trade is that
+ * availability can be up to a day stale, which is the same freshness the
+ * "Recently added to your services" row already runs on; provider deals do
+ * not change by the hour.
+ */
+export async function getFlatrateProviderIdsByTmdbId(
+  movies: { id: string; tmdbId: number }[]
+): Promise<Map<number, Set<number>>> {
+  const byTmdbId = new Map<number, Set<number>>();
+  if (movies.length === 0) return byTmdbId;
+
+  const snapshots = await prisma.movieProviderSnapshot.findMany({
+    where: { movieId: { in: movies.map((m) => m.id) } },
+    select: { movieId: true, providerIds: true },
+  });
+  const storedByMovieId = new Map(snapshots.map((s) => [s.movieId, s.providerIds]));
+
+  const unseeded: { id: string; tmdbId: number }[] = [];
+  for (const movie of movies) {
+    const stored = storedByMovieId.get(movie.id);
+    if (stored == null) unseeded.push(movie);
+    else byTmdbId.set(movie.tmdbId, parseProviderIds(stored));
+  }
+
+  for (let i = 0; i < unseeded.length; i += SNAPSHOT_SEED_CONCURRENCY) {
+    const batch = unseeded.slice(i, i + SNAPSHOT_SEED_CONCURRENCY);
+    await Promise.all(
+      batch.map(async (movie) => {
+        const providers = await getFlatrateProviders(movie.tmdbId);
+        const ids = providers.map((p) => p.provider_id);
+        byTmdbId.set(movie.tmdbId, new Set(ids));
+        // Best-effort: a failed seed just means the next load fetches live
+        // again, so it must never take the page down with it.
+        await prisma.movieProviderSnapshot
+          .upsert({
+            where: { movieId: movie.id },
+            update: { providerIds: ids.join(",") },
+            create: { movieId: movie.id, providerIds: ids.join(",") },
+          })
+          .catch(() => null);
+      })
+    );
+  }
+
+  return byTmdbId;
 }
 
 export async function getWatchAvailability(tmdbId: number): Promise<TmdbWatchProviderResults> {

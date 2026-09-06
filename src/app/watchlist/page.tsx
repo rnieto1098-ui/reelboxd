@@ -3,13 +3,12 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import {
-  getFlatrateProviders,
+  getFlatrateProviderIdsByTmdbId,
   getUserOwnedTmdbIds,
   getUserProviderIds,
   hasStreamingAvailability,
-  isAvailableOnServices,
+  isAvailableOnServiceIds,
 } from "@/lib/streaming";
-import type { TmdbWatchProvider } from "@/lib/tmdb";
 import { WatchlistGrid } from "@/components/WatchlistGrid";
 import { WatchlistImportForm } from "@/components/WatchlistImportForm";
 import { AvailabilityFilterLinks } from "@/components/AvailabilityFilterLinks";
@@ -38,13 +37,6 @@ const SORT_OPTIONS = {
 >;
 
 type SortKey = keyof typeof SORT_OPTIONS;
-
-// TMDB has no batch watch-providers endpoint, so this is one request per
-// non-owned item — chunked (rather than one giant Promise.all) so a large
-// watchlist doesn't create hundreds of pending promises at once. The actual
-// network throttling happens one level down, in tmdbFetch's own concurrency
-// queue; this just keeps this page's own fan-out sane on top of that.
-const PROVIDER_LOOKUP_CONCURRENCY = 6;
 
 type AvailabilityMode = "all" | "on" | "off";
 
@@ -81,31 +73,23 @@ export default async function WatchlistPage({ searchParams }: PageProps<"/watchl
     getUserOwnedTmdbIds(session.user.id),
   ]);
 
-  const withAvailability: {
-    item: (typeof items)[number];
-    providers: TmdbWatchProvider[];
-    owned: boolean;
-  }[] = [];
-  for (let i = 0; i < items.length; i += PROVIDER_LOOKUP_CONCURRENCY) {
-    const batch = items.slice(i, i + PROVIDER_LOOKUP_CONCURRENCY);
-    const providerLists = await Promise.all(
-      batch.map((item) =>
-        ownedTmdbIds.has(item.movie.tmdbId) ? Promise.resolve([]) : getFlatrateProviders(item.movie.tmdbId)
-      )
-    );
-    batch.forEach((item, idx) => {
-      withAvailability.push({
-        item,
-        providers: providerLists[idx],
-        owned: ownedTmdbIds.has(item.movie.tmdbId),
-      });
-    });
-  }
+  // One snapshot query for the whole list instead of a TMDB request per
+  // item — see getFlatrateProviderIdsByTmdbId. Owned films skip the lookup
+  // entirely, since owning one already makes it available regardless.
+  const providerIdsByTmdbId = await getFlatrateProviderIdsByTmdbId(
+    items.filter((i) => !ownedTmdbIds.has(i.movie.tmdbId)).map((i) => i.movie)
+  );
+
+  const withAvailability = items.map((item) => ({
+    item,
+    providerIds: providerIdsByTmdbId.get(item.movie.tmdbId) ?? new Set<number>(),
+    owned: ownedTmdbIds.has(item.movie.tmdbId),
+  }));
 
   const hasServicesConfigured = userProviderIds.size > 0;
   const canFilterByAvailability = hasStreamingAvailability(userProviderIds, ownedTmdbIds);
-  const isAvailable = ({ providers, owned }: { providers: TmdbWatchProvider[]; owned: boolean }) =>
-    owned || isAvailableOnServices(providers, userProviderIds);
+  const isAvailable = ({ providerIds, owned }: { providerIds: Set<number>; owned: boolean }) =>
+    owned || isAvailableOnServiceIds(providerIds, userProviderIds);
   const visibleEntries = !canFilterByAvailability
     ? withAvailability
     : streamingOnly

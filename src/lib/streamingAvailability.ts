@@ -18,3 +18,16 @@ export function isAvailableOnServices(
 ): boolean {
   return providers.some((p) => userProviderIds.has(p.provider_id));
 }
+
+// Same check for callers that only have provider ids — the watchlist page
+// reads them from the snapshot table, which stores ids alone rather than
+// full provider objects.
+export function isAvailableOnServiceIds(
+  providerIds: Set<number>,
+  userProviderIds: Set<number>
+): boolean {
+  for (const id of providerIds) {
+    if (userProviderIds.has(id)) return true;
+  }
+  return false;
+}

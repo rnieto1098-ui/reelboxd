@@ -15,7 +15,6 @@ export type WatchlistGridEntry = {
       customPosters: { posterPath: string }[];
     };
   };
-  providers: { provider_id: number; provider_name: string; logo_path: string }[];
   owned?: boolean;
 };
 

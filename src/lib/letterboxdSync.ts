@@ -1,8 +1,12 @@
 import { prisma } from "@/lib/prisma";
 import { ensureMovieCached } from "@/lib/movies";
 import { createDiaryEntry } from "@/lib/diary";
-import { checkNewlyCompletedChallenges, type ChallengeCompletion } from "@/lib/challenges";
-import { checkGoalJustCompleted } from "@/lib/goals";
+import {
+  diffNewlyCompletedChallenges,
+  getCompletedChallengeIds,
+  type ChallengeCompletion,
+} from "@/lib/challenges";
+import { diffNewlyCompletedGoals, getCompletedGoals } from "@/lib/goals";
 
 // Letterboxd blocks requests without a browser-like User-Agent (a bare
 // Node fetch gets a 403), so this has to look like an actual browser.
@@ -126,7 +130,13 @@ export async function syncLetterboxdDiary(
     completedChallenges: [],
     completedGoal: null,
   };
-  const seenChallengeIds = new Set<string>();
+  // Snapshotted once up front, diffed once at the end — the per-entry check
+  // this replaced re-counted every challenge (and refetched whole
+  // filmographies from TMDB for CREW ones) for every synced row.
+  const [challengesCompletedBefore, goalsCompletedBefore] = await Promise.all([
+    getCompletedChallengeIds(userId),
+    getCompletedGoals(userId),
+  ]);
 
   for (const entry of entries) {
     if (seenGuids.has(entry.guid)) continue;
@@ -175,20 +185,13 @@ export async function syncLetterboxdDiary(
     }
 
     await prisma.letterboxdSyncItem.create({ data: { userId, guid: entry.guid } });
-
-    if (created) {
-      const [newlyCompleted, justCompletedGoal] = await Promise.all([
-        entry.rewatch ? Promise.resolve([]) : checkNewlyCompletedChallenges(userId, movie, watchedDate),
-        checkGoalJustCompleted(userId, watchedDate),
-      ]);
-      for (const c of newlyCompleted) {
-        if (seenChallengeIds.has(c.id)) continue;
-        seenChallengeIds.add(c.id);
-        summary.completedChallenges.push(c);
-      }
-      if (justCompletedGoal) summary.completedGoal = justCompletedGoal;
-    }
   }
+
+  summary.completedChallenges = await diffNewlyCompletedChallenges(
+    userId,
+    challengesCompletedBefore
+  );
+  summary.completedGoal = await diffNewlyCompletedGoals(userId, goalsCompletedBefore);
 
   await prisma.user.update({ where: { id: userId }, data: { letterboxdSyncedAt: new Date() } });
 

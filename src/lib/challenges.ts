@@ -164,6 +164,32 @@ export async function checkNewlyCompletedChallenges(
   return completions;
 }
 
+// Bulk equivalent of checkNewlyCompletedChallenges, for the Letterboxd
+// import and sync. Those used to call the per-entry version once per row,
+// which re-counted every challenge for every film — and for a CREW
+// challenge also refetched that person's whole filmography from TMDB each
+// time. A 500-film import against 5 challenges meant thousands of
+// sequential queries and hundreds of TMDB round trips. Taking one snapshot
+// before the import and one after makes it two passes regardless of size,
+// and also fixes the same "landed exactly on the target" assumption the
+// per-entry version relies on, which a bulk write can jump straight over.
+export async function getCompletedChallengeIds(userId: string): Promise<Set<string>> {
+  const progress = await getChallengesWithProgress(userId);
+  return new Set(
+    progress.filter((c) => c.percent != null && c.percent >= 100).map((c) => c.id)
+  );
+}
+
+export async function diffNewlyCompletedChallenges(
+  userId: string,
+  completedBefore: Set<string>
+): Promise<ChallengeCompletion[]> {
+  const progress = await getChallengesWithProgress(userId);
+  return progress
+    .filter((c) => c.percent != null && c.percent >= 100 && !completedBefore.has(c.id))
+    .map((c) => ({ id: c.id, title: c.title }));
+}
+
 export async function getChallengesWithProgress(userId: string): Promise<ChallengeSummary[]> {
   const challenges = await prisma.challenge.findMany({
     where: { userId },

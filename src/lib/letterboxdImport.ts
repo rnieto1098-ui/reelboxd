@@ -4,8 +4,12 @@ import { prisma } from "@/lib/prisma";
 import { searchMovies } from "@/lib/tmdb";
 import { ensureMovieCached } from "@/lib/movies";
 import { createDiaryEntry } from "@/lib/diary";
-import { checkNewlyCompletedChallenges, type ChallengeCompletion } from "@/lib/challenges";
-import { checkGoalJustCompleted } from "@/lib/goals";
+import {
+  diffNewlyCompletedChallenges,
+  getCompletedChallengeIds,
+  type ChallengeCompletion,
+} from "@/lib/challenges";
+import { diffNewlyCompletedGoals, getCompletedGoals } from "@/lib/goals";
 import type { Movie } from "@prisma/client";
 
 type CsvRow = Record<string, string>;
@@ -237,9 +241,15 @@ export async function importLetterboxdZip(
   // many times with different watched dates — each one is its own log, not
   // a dedup target like ratings/watchlist are.
   let diaryImported = 0;
-  const completedChallenges: ChallengeCompletion[] = [];
-  const seenChallengeIds = new Set<string>();
-  let completedGoal: { year: number; target: number } | null = null;
+
+  // Snapshot what was already finished before writing anything, so the
+  // whole import costs one pass here and one after the loop instead of a
+  // full re-count per row. See getCompletedChallengeIds for why the
+  // per-entry check isn't just slow but wrong for a bulk write.
+  const [challengesCompletedBefore, goalsCompletedBefore] = await Promise.all([
+    getCompletedChallengeIds(userId),
+    getCompletedGoals(userId),
+  ]);
 
   for (let i = 0; i < diaryRows.length; i += MATCH_CONCURRENCY) {
     const batch = diaryRows.slice(i, i + MATCH_CONCURRENCY);
@@ -251,8 +261,7 @@ export async function importLetterboxdZip(
 
       // createDiaryEntry itself enforces one log per movie per day — a
       // duplicate CSV row (or a re-import of the same file) is a no-op,
-      // which also means it doesn't get counted as imported or re-checked
-      // against challenges/goals.
+      // which also means it doesn't get counted as imported.
       const { created } = await createDiaryEntry({
         userId,
         movieId: movie.id,
@@ -261,19 +270,13 @@ export async function importLetterboxdZip(
       });
       if (!created) continue;
       diaryImported++;
-
-      const [newlyCompleted, justCompletedGoal] = await Promise.all([
-        row.rewatch ? Promise.resolve([]) : checkNewlyCompletedChallenges(userId, movie, watchedDate),
-        checkGoalJustCompleted(userId, watchedDate),
-      ]);
-      for (const c of newlyCompleted) {
-        if (seenChallengeIds.has(c.id)) continue;
-        seenChallengeIds.add(c.id);
-        completedChallenges.push(c);
-      }
-      if (justCompletedGoal) completedGoal = justCompletedGoal;
     }
   }
+
+  const [completedChallenges, completedGoal] = await Promise.all([
+    diffNewlyCompletedChallenges(userId, challengesCompletedBefore),
+    diffNewlyCompletedGoals(userId, goalsCompletedBefore),
+  ]);
 
   return {
     ratingsImported,

@@ -58,3 +58,33 @@ export async function checkGoalJustCompleted(
   }
   return null;
 }
+
+export type CompletedGoal = { year: number; target: number };
+
+// Bulk equivalent of checkGoalJustCompleted, for the Letterboxd import and
+// sync — they used to call that once per imported row, which is both a
+// query per row and wrong for a bulk write: the single-entry version keys
+// off `count === target`, since one log moves the count by exactly one, but
+// an import can jump straight past the target and never land on it. These
+// two compare a before/after snapshot of every year the user has a goal
+// for instead, so the whole import costs two passes rather than N.
+export async function getCompletedGoals(userId: string): Promise<CompletedGoal[]> {
+  const goals = await prisma.watchGoal.findMany({ where: { userId } });
+  const progress = await Promise.all(
+    goals.map(async (goal) => ({ goal, ...(await getGoalProgress(userId, goal.year)) }))
+  );
+  return progress
+    .filter((p) => p.target != null && p.count >= p.target)
+    .map((p) => ({ year: p.year, target: p.goal.target }));
+}
+
+export async function diffNewlyCompletedGoals(
+  userId: string,
+  completedBefore: CompletedGoal[]
+): Promise<CompletedGoal | null> {
+  const before = new Set(completedBefore.map((g) => g.year));
+  const after = await getCompletedGoals(userId);
+  // Only one gets surfaced, matching what the import already reported —
+  // the most recent year is the one the user is most likely to care about.
+  return after.filter((g) => !before.has(g.year)).sort((a, b) => b.year - a.year)[0] ?? null;
+}

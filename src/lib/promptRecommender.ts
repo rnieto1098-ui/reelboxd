@@ -1,5 +1,11 @@
 import { prisma } from "@/lib/prisma";
-import { ensureMovieCached, getUserWatchlistedTmdbIds, parseGenres } from "@/lib/movies";
+import {
+  ensureMovieCached,
+  getUserWatchlistedTmdbIds,
+  isMovieCacheStale,
+  parseGenres,
+  refreshStaleMovieCache,
+} from "@/lib/movies";
 import { getWatchedTmdbIds } from "@/lib/recommendations";
 import { filterMoviesByStreaming, getUserOwnedTmdbIds, getUserProviderIds } from "@/lib/streaming";
 import {
@@ -33,29 +39,45 @@ type Stage = "full" | "genreOnly" | "popularOnly";
 // The user's watchlist, in the fields the local Movie cache actually has —
 // used as the candidate pool instead of TMDB discover when "on watchlist" is
 // checked. Empty (no query at all) when the filter isn't in use.
+const WATCHLIST_CANDIDATE_SELECT = {
+  tmdbId: true,
+  title: true,
+  overview: true,
+  posterPath: true,
+  backdropPath: true,
+  releaseDate: true,
+  runtime: true,
+  certification: true,
+  genres: true,
+  voteAverage: true,
+  popularity: true,
+  cachedAt: true,
+} as const;
+
 async function getWatchlistCandidates(userId: string | undefined) {
   if (!userId) return [];
-  const items = await prisma.watchlistItem.findMany({
-    where: { userId },
-    select: {
-      movie: {
-        select: {
-          tmdbId: true,
-          title: true,
-          overview: true,
-          posterPath: true,
-          backdropPath: true,
-          releaseDate: true,
-          runtime: true,
-          certification: true,
-          genres: true,
-          voteAverage: true,
-          popularity: true,
-        },
-      },
-    },
-  });
-  return items.map((i) => i.movie);
+  const read = async () =>
+    (
+      await prisma.watchlistItem.findMany({
+        where: { userId },
+        select: { movie: { select: WATCHLIST_CANDIDATE_SELECT } },
+      })
+    ).map((i) => i.movie);
+
+  const candidates = await read();
+
+  // This pool reads certification out of the local cache directly, so unlike
+  // the discover/similar pools (which go through ensureMovieCached in
+  // verifyRuntime and heal as a side effect) it has to refresh stale rows
+  // itself. Without this, a movie cached before the certification column
+  // existed reads as unrated and gets dropped by the PG-13 cap forever.
+  // Bounded by one user's watchlist, and only re-reads when something was
+  // actually stale.
+  const stale = candidates.filter((m) => isMovieCacheStale(m.cachedAt));
+  if (stale.length === 0) return candidates;
+
+  await refreshStaleMovieCache(stale.map((m) => m.tmdbId));
+  return read();
 }
 
 type WatchlistCandidate = Awaited<ReturnType<typeof getWatchlistCandidates>>[number];
@@ -179,9 +201,10 @@ export async function getPromptRecommendations(
   // constraint on the candidate pool itself, never relaxed away like genre/
   // rating are, so even the loosest stage stays watchlist-only. Runtime and
   // certification are hard caps here too (same reasoning as runDiscover
-  // above), both checked against the local Movie cache directly (getWatchlistCandidates
-  // selects both fields) rather than needing a separate ensureMovieCached
-  // pass the way the non-watchlist pools do below.
+  // above), both checked against the local Movie cache directly —
+  // getWatchlistCandidates selects both fields and has already refreshed any
+  // row too old to have them — rather than needing a separate
+  // ensureMovieCached pass the way the non-watchlist pools do below.
   function runWatchlistPool(stage: Stage): TmdbMovieSummary[] {
     return watchlistCandidates
       .filter((m) => {

@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { getGoalProgress } from "@/lib/goals";
 import { getChallengesWithProgress, type ChallengeSummary } from "@/lib/challenges";
 import { getGenres } from "@/lib/tmdb";
+import { formatTimeLeft } from "@/lib/dates";
 import { WatchGoalWidget } from "@/components/WatchGoalWidget";
 import { NewChallengeForm } from "@/components/NewChallengeForm";
 import { RandomChallengeButton } from "@/components/RandomChallengeButton";
@@ -46,6 +47,9 @@ function ChallengeCard({ challenge }: { challenge: ChallengeSummary }) {
               : `${challenge.count} / ${challenge.target} films`
             : `${challenge.count} films logged`}
         </p>
+        {challenge.type === "TIMEFRAME" && challenge.endDate && (
+          <p className="mt-0.5 text-xs text-muted">{formatTimeLeft(challenge.endDate)}</p>
+        )}
       </Link>
     </div>
   );

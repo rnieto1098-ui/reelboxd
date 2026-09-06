@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getUserOwnedTmdbIds } from "@/lib/streaming";
 import { getUserWatchlistedTmdbIds } from "@/lib/movies";
+import { formatTimeLeft } from "@/lib/dates";
 import { getChallengeSuggestions, getCrewFilmography } from "@/lib/challenges";
 import { CreditGrid, type CreditDisplay } from "@/components/CreditGrid";
 import { FadeWatchedControl } from "@/components/FadeWatchedControl";
@@ -97,6 +98,9 @@ export default async function ChallengeDetailPage({
       target != null
         ? `${entries.length} / ${target} films logged`
         : `${entries.length} films logged`;
+    if (challenge.type === "TIMEFRAME" && challenge.endDate) {
+      subtitle += ` · ${formatTimeLeft(challenge.endDate)}`;
+    }
   }
 
   return (

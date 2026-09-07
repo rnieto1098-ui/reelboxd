@@ -17,6 +17,7 @@ import { compareNullableNumbers, type SortDir } from "@/lib/sortComparator";
 import { ListMovieGrid } from "@/components/ListMovieGrid";
 import { DeleteListButton } from "@/components/DeleteListButton";
 import { AddListToWatchlistButton } from "@/components/AddListToWatchlistButton";
+import { MakeListChallengeButton } from "@/components/MakeListChallengeButton";
 import { FadeWatchedControl } from "@/components/FadeWatchedControl";
 import { ListCoverUpload } from "@/components/ListCoverUpload";
 import { AvailabilityFilterLinks } from "@/components/AvailabilityFilterLinks";
@@ -274,6 +275,7 @@ export default async function ListDetailPage({
         </div>
         <div className="flex shrink-0 flex-col items-end gap-2">
           {userId && list.items.length > 0 && <AddListToWatchlistButton listId={list.id} />}
+          {userId && list.items.length > 0 && <MakeListChallengeButton listId={list.id} />}
           {isOwner && <DeleteListButton listId={list.id} />}
         </div>
       </div>

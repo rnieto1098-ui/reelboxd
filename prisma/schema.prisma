@@ -366,6 +366,7 @@ model List {
   owner   User?      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   items   ListItem[]
   customCovers CustomListCover[]
+  challenges   Challenge[]
 }
 
 // A viewer's personal cover image for a list they don't own — most useful
@@ -403,10 +404,11 @@ model RateLimitHit {
 // yearly challenge (homepage widget) stays on WatchGoal — this model is only
 // for the custom ones a user builds for themselves: a genre quota, a quota
 // within an arbitrary date range, or a "watch this person's whole
-// filmography" completionist goal. type is one of "GENRE" | "TIMEFRAME" |
-// "CREW" — plain String rather than a Prisma enum since the sqlite/libsql
-// connector doesn't support native enums. Only the fields relevant to the
-// challenge's type are populated; the rest stay null.
+// filmography" completionist goal, or working through a saved list. type is
+// one of "GENRE" | "TIMEFRAME" | "CREW" | "LIST" — plain String rather than
+// a Prisma enum since the sqlite/libsql connector doesn't support native
+// enums. Only the fields relevant to the challenge's type are populated;
+// the rest stay null.
 model Challenge {
   id        String   @id @default(cuid())
   type      String
@@ -429,10 +431,18 @@ model Challenge {
   personName String?
   department String?
 
+  // LIST — a saved list to work through. A live reference, not a snapshot of
+  // its movies, so a curated list that picks up a film raises this
+  // challenge's target too; cascading means a deleted list takes its
+  // challenges with it rather than leaving ones that can never be finished.
+  listId String?
+  list   List?   @relation(fields: [listId], references: [id], onDelete: Cascade)
+
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([listId])
 }
 
 model ListItem {

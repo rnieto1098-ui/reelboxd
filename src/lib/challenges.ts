@@ -13,7 +13,7 @@ import {
 // this person's whole filmography" completionist goal). The built-in yearly
 // challenge is a separate model (WatchGoal, see lib/goals.ts) since it's the
 // one shown on the homepage — these are Challenges-tab-only.
-export type ChallengeType = "GENRE" | "TIMEFRAME" | "CREW";
+export type ChallengeType = "GENRE" | "TIMEFRAME" | "CREW" | "LIST";
 
 export type ChallengeSummary = {
   id: string;
@@ -28,6 +28,7 @@ export type ChallengeSummary = {
   personId: number | null;
   personName: string | null;
   department: string | null;
+  listId: string | null;
 };
 
 function percentOf(count: number, target: number | null): number | null {
@@ -103,6 +104,38 @@ export async function getTimeframePreviewCount(
   return timeframeCount(userId, startDate, endDate);
 }
 
+// The tmdbIds a LIST challenge is measured against — read live rather than
+// snapshotted at creation, so a curated list that gains a film raises the
+// target instead of silently leaving the challenge finishable early.
+export async function getListChallengeTmdbIds(listId: string): Promise<number[]> {
+  const items = await prisma.listItem.findMany({
+    where: { listId },
+    select: { tmdbId: true },
+    orderBy: { position: "asc" },
+  });
+  return items.map((i) => i.tmdbId);
+}
+
+// How many distinct films from a set the user has logged. Shared by the LIST
+// and CREW paths, which ask the same question of different sets.
+async function watchedCountAmong(userId: string, tmdbIds: number[]): Promise<number> {
+  if (tmdbIds.length === 0) return 0;
+  const logged = await prisma.diaryEntry.findMany({
+    where: { userId, movie: { tmdbId: { in: tmdbIds } } },
+    select: { movie: { select: { tmdbId: true } } },
+    distinct: ["movieId"],
+  });
+  return new Set(logged.map((l) => l.movie.tmdbId)).size;
+}
+
+async function listProgress(
+  userId: string,
+  listId: string
+): Promise<{ count: number; target: number }> {
+  const tmdbIds = await getListChallengeTmdbIds(listId);
+  return { count: await watchedCountAmong(userId, tmdbIds), target: tmdbIds.length };
+}
+
 async function crewProgress(
   userId: string,
   personId: number,
@@ -151,13 +184,16 @@ export async function checkNewlyCompletedChallenges(
     } else if (c.type === "CREW" && c.personId != null) {
       const filmography = await getCrewFilmography(c.personId, c.department);
       if (filmography.length === 0 || !filmography.some((f) => f.id === movie.tmdbId)) continue;
-      const logged = await prisma.diaryEntry.findMany({
-        where: { userId, movie: { tmdbId: { in: filmography.map((f) => f.id) } } },
-        select: { movie: { select: { tmdbId: true } } },
-        distinct: ["movieId"],
-      });
-      const count = new Set(logged.map((l) => l.movie.tmdbId)).size;
+      const count = await watchedCountAmong(
+        userId,
+        filmography.map((f) => f.id)
+      );
       if (count === filmography.length) completions.push({ id: c.id, title: c.title });
+    } else if (c.type === "LIST" && c.listId) {
+      const tmdbIds = await getListChallengeTmdbIds(c.listId);
+      if (tmdbIds.length === 0 || !tmdbIds.includes(movie.tmdbId)) continue;
+      const count = await watchedCountAmong(userId, tmdbIds);
+      if (count === tmdbIds.length) completions.push({ id: c.id, title: c.title });
     }
   }
 
@@ -209,6 +245,10 @@ export async function getChallengesWithProgress(userId: string): Promise<Challen
         const progress = await crewProgress(userId, c.personId, c.department);
         count = progress.count;
         target = progress.target;
+      } else if (c.type === "LIST" && c.listId) {
+        const progress = await listProgress(userId, c.listId);
+        count = progress.count;
+        target = progress.target;
       }
 
       return {
@@ -224,6 +264,7 @@ export async function getChallengesWithProgress(userId: string): Promise<Challen
         personId: c.personId,
         personName: c.personName,
         department: c.department,
+        listId: c.listId,
       };
     })
   );
@@ -235,13 +276,16 @@ export async function createChallenge(
     | { type: "GENRE"; genreName: string; target: number; title?: string }
     | { type: "TIMEFRAME"; startDate: Date; endDate: Date; target: number; title?: string }
     | { type: "CREW"; personId: number; personName: string; department: string | null; title?: string }
+    | { type: "LIST"; listId: string; listTitle: string; title?: string }
 ) {
   const defaultTitle =
     input.type === "GENRE"
       ? `Watch ${input.target} ${input.genreName} movies`
       : input.type === "TIMEFRAME"
         ? `Watch ${input.target} movies (${input.startDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })} – ${input.endDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })})`
-        : `Watch all of ${input.personName}'s ${input.department ? input.department.toLowerCase() : "acting"} movies`;
+        : input.type === "CREW"
+          ? `Watch all of ${input.personName}'s ${input.department ? input.department.toLowerCase() : "acting"} movies`
+          : `Watch all of ${input.listTitle}`;
   const title = input.title?.trim() || defaultTitle;
 
   return prisma.challenge.create({
@@ -249,13 +293,16 @@ export async function createChallenge(
       userId,
       title,
       type: input.type,
-      target: input.type === "CREW" ? null : input.target,
+      // CREW and LIST both size themselves from the set they track, so
+      // there's no fixed number to store.
+      target: input.type === "CREW" || input.type === "LIST" ? null : input.target,
       genreName: input.type === "GENRE" ? input.genreName : null,
       startDate: input.type === "TIMEFRAME" ? input.startDate : null,
       endDate: input.type === "TIMEFRAME" ? input.endDate : null,
       personId: input.type === "CREW" ? input.personId : null,
       personName: input.type === "CREW" ? input.personName : null,
       department: input.type === "CREW" ? input.department : null,
+      listId: input.type === "LIST" ? input.listId : null,
     },
   });
 }
@@ -389,13 +436,13 @@ const SUGGESTION_COUNT = 12;
 // Popular movies that would actually count toward a GENRE or TIMEFRAME
 // challenge, filtered down to ones the user hasn't already logged — the
 // contributing-movies grid only shows what's already watched, this is what
-// to watch next. Not offered for CREW challenges since the filmography grid
-// (watched + unwatched) already serves that purpose.
+// to watch next. Not offered for CREW or LIST challenges, whose own grids
+// already show the full set (watched and unwatched) to pick from.
 export async function getChallengeSuggestions(
   userId: string,
   challenge: { type: string; genreName: string | null }
 ): Promise<TmdbMovieSummary[]> {
-  if (challenge.type === "CREW") return [];
+  if (challenge.type === "CREW" || challenge.type === "LIST") return [];
 
   const [genresData, logged] = await Promise.all([
     challenge.type === "GENRE" ? getGenres().catch(() => ({ genres: [] })) : null,

@@ -15,6 +15,7 @@ const TYPE_LABEL: Record<ChallengeSummary["type"], string> = {
   GENRE: "Genre",
   TIMEFRAME: "Time frame",
   CREW: "Crew",
+  LIST: "List",
 };
 
 function ChallengeCard({ challenge }: { challenge: ChallengeSummary }) {
@@ -96,8 +97,8 @@ export default async function ChallengesPage() {
 
         {challenges.length === 0 ? (
           <p className="text-sm text-muted">
-            No custom challenges yet — try a genre quota, a date-range quota, or watching a
-            director&apos;s whole filmography.
+            No custom challenges yet — try a genre quota, a date-range quota, watching a
+            director&apos;s whole filmography, or working through one of your lists.
           </p>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">

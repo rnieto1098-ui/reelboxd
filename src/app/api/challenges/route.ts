@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
 import { createChallenge } from "@/lib/challenges";
 
 // Trimmed and capped, but otherwise optional — an omitted or blank title
@@ -26,6 +27,11 @@ const challengeSchema = z.discriminatedUnion("type", [
     personId: z.number().int().positive(),
     personName: z.string().min(1).max(200),
     department: z.string().min(1).max(50).nullable(),
+    title: titleField,
+  }),
+  z.object({
+    type: z.literal("LIST"),
+    listId: z.string().min(1),
     title: titleField,
   }),
 ]);
@@ -61,6 +67,38 @@ export async function POST(request: Request) {
       startDate,
       endDate,
       target: data.target,
+      title: data.title,
+    });
+    return NextResponse.json(challenge, { status: 201 });
+  }
+
+  if (data.type === "LIST") {
+    // Any list you can open is fair game — system lists have no owner and
+    // another user's list is already publicly viewable — so this only has to
+    // confirm it exists, and reads the title here rather than trusting a
+    // client-supplied one.
+    const list = await prisma.list.findUnique({
+      where: { id: data.listId },
+      select: { id: true, title: true },
+    });
+    if (!list) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
+    // One-click creation makes a double-click easy, and two identical
+    // challenges for the same list would be pure noise — hand back the one
+    // that already exists instead.
+    const existing = await prisma.challenge.findFirst({
+      where: { userId: session.user.id, type: "LIST", listId: list.id },
+    });
+    if (existing) {
+      return NextResponse.json({ ...existing, alreadyExisted: true });
+    }
+
+    const challenge = await createChallenge(session.user.id, {
+      type: "LIST",
+      listId: list.id,
+      listTitle: list.title,
       title: data.title,
     });
     return NextResponse.json(challenge, { status: 201 });

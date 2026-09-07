@@ -62,6 +62,7 @@ const CHALLENGE_TYPE_LABEL: Record<ChallengeSummary["type"], string> = {
   GENRE: "Genre",
   TIMEFRAME: "Time frame",
   CREW: "Crew",
+  LIST: "List",
 };
 
 function ChallengeCard({ challenge }: { challenge: ChallengeSummary }) {

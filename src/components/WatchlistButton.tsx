@@ -16,7 +16,17 @@ export function WatchlistButton({
     initialInWatchlist,
     `/api/movies/${tmdbId}/watchlist`,
     signedIn,
-    ["Added to watchlist", "Removed from watchlist"]
+    ["Added to watchlist", "Removed from watchlist"],
+    // A film you've already seen doesn't go on a list of films to see, so
+    // the route declines to add it — say so rather than leaving the button
+    // lit for something that isn't there.
+    (body, attempted) =>
+      (body as { blockedByWatched?: boolean })?.blockedByWatched
+        ? {
+            active: false,
+            message: "You've already watched this — it's not going on your watchlist.",
+          }
+        : { active: attempted }
   );
 
   return (

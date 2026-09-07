@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { ensureMovieCached } from "@/lib/movies";
+import { addToWatchlist } from "@/lib/watchlist";
 
 // Same UA trick the diary RSS sync needs — Letterboxd blocks non-browser
 // requests outright.
@@ -120,6 +121,9 @@ async function resolveTmdbId(slug: string): Promise<number | null> {
 
 export type LetterboxdWatchlistSyncSummary = {
   added: number;
+  // Films on the Letterboxd watchlist the user has already seen here —
+  // recorded as synced but deliberately not added. See addToWatchlist.
+  skippedWatched: number;
   unmatched: string[];
   // True when there were more new films than MAX_NEW_FILMS_PER_RUN could
   // resolve this run — they'll pick up on the next sync instead of all at
@@ -154,6 +158,7 @@ export async function syncLetterboxdWatchlist(
 
   const unmatched: string[] = [];
   let added = 0;
+  let skippedWatched = 0;
 
   for (let i = 0; i < toProcess.length; i += RESOLVE_CONCURRENCY) {
     const batch = toProcess.slice(i, i + RESOLVE_CONCURRENCY);
@@ -166,15 +171,15 @@ export async function syncLetterboxdWatchlist(
         }
 
         const movie = await ensureMovieCached(tmdbId);
-        await Promise.all([
-          prisma.watchlistItem.upsert({
-            where: { userId_movieId: { userId, movieId: movie.id } },
-            update: {},
-            create: { userId, movieId: movie.id },
-          }),
+        // A film already watched here is skipped, not added (see
+        // addToWatchlist) — but it's still recorded as synced, or every run
+        // from now on would re-resolve the same slug and re-skip it forever.
+        const [{ added: addedNow }] = await Promise.all([
+          addToWatchlist(userId, [movie.id]),
           prisma.letterboxdWatchlistItem.create({ data: { userId, filmSlug: entry.slug } }),
         ]);
-        added++;
+        if (addedNow > 0) added++;
+        else skippedWatched++;
       })
     );
   }
@@ -184,5 +189,5 @@ export async function syncLetterboxdWatchlist(
     data: { letterboxdWatchlistSyncedAt: new Date(), letterboxdWatchlistSyncBroken: false },
   });
 
-  return { added, unmatched, remaining: newEntries.length - toProcess.length };
+  return { added, skippedWatched, unmatched, remaining: newEntries.length - toProcess.length };
 }

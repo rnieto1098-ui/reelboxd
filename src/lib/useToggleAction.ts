@@ -33,11 +33,23 @@ import { useCoalescedRefresh } from "@/lib/useCoalescedRefresh";
  * `toastLabels`, if given, is [message when turning on, message when
  * turning off] — shown via the shared toast system on a successful toggle.
  */
+/**
+ * Lets a route override the assumed flip. Returning a different `active`
+ * means the server didn't do what the click asked for — the watchlist
+ * refuses films you've already watched — and `message`, if given, replaces
+ * the usual success toast with an explanation.
+ */
+export type ToggleReconcile = (
+  body: unknown,
+  attemptedActive: boolean
+) => { active: boolean; message?: string };
+
 export function useToggleAction(
   initialActive: boolean,
   url: string,
   signedIn: boolean,
-  toastLabels?: [onLabel: string, offLabel: string]
+  toastLabels?: [onLabel: string, offLabel: string],
+  reconcile?: ToggleReconcile
 ) {
   const router = useRouter();
   const refresh = useCoalescedRefresh();
@@ -82,6 +94,19 @@ export function useToggleAction(
       setActive(previousActive);
       showToast("Something went wrong — try again.", "error");
       return;
+    }
+
+    if (reconcile) {
+      const body = await res.json().catch(() => null);
+      const resolved = reconcile(body, nextActive);
+      // The optimistic flip was a guess at what the server would do; this is
+      // what it actually did.
+      if (resolved.active !== nextActive) setActive(resolved.active);
+      if (resolved.message) {
+        showToast(resolved.message);
+        refresh();
+        return;
+      }
     }
 
     if (toastLabels) showToast(nextActive ? toastLabels[0] : toastLabels[1]);

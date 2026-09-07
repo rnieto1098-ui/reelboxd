@@ -20,13 +20,23 @@ export function AddListToWatchlistButton({ listId }: { listId: string }) {
       return;
     }
 
+    // Films already watched are deliberately left off (see addToWatchlist),
+    // so they get named here — otherwise adding a 250-film list and getting
+    // 180 looks like something silently failed.
+    const skipped = body.skippedWatched ?? 0;
+    const skippedNote = skipped > 0 ? ` (skipped ${skipped} you've already watched)` : "";
+
     if (body.added === 0) {
       showToast(
-        body.total === 0 ? "This list is empty." : "Every movie here is already on your watchlist."
+        body.total === 0
+          ? "This list is empty."
+          : skipped > 0
+            ? "Everything here is either already on your watchlist or already watched."
+            : "Every movie here is already on your watchlist."
       );
     } else {
       showToast(
-        `Added ${body.added} movie${body.added === 1 ? "" : "s"} to your watchlist`
+        `Added ${body.added} movie${body.added === 1 ? "" : "s"} to your watchlist${skippedNote}`
       );
     }
     router.refresh();

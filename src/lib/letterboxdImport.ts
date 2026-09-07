@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { searchMovies } from "@/lib/tmdb";
 import { ensureMovieCached } from "@/lib/movies";
 import { createDiaryEntry } from "@/lib/diary";
+import { addToWatchlist } from "@/lib/watchlist";
 import {
   diffNewlyCompletedChallenges,
   getCompletedChallengeIds,
@@ -115,6 +116,9 @@ async function matchTmdbId(name: string, year: string): Promise<number | null> {
 export type ImportSummary = {
   ratingsImported: number;
   watchlistImported: number;
+  // On the Letterboxd watchlist but already watched here, so deliberately
+  // not added — see addToWatchlist.
+  watchlistSkippedWatched: number;
   diaryImported: number;
   unmatched: { title: string; year: string }[];
   completedChallenges: ChallengeCompletion[];
@@ -198,6 +202,7 @@ export async function importLetterboxdZip(
   const movieByKey = new Map<FilmKey, Movie>();
   let ratingsImported = 0;
   let watchlistImported = 0;
+  let watchlistSkippedWatched = 0;
 
   const entries = [...filmsToMatch.entries()];
 
@@ -225,12 +230,12 @@ export async function importLetterboxdZip(
         }
 
         if (watchlistKeys.has(key)) {
-          await prisma.watchlistItem.upsert({
-            where: { userId_movieId: { userId, movieId: movie.id } },
-            update: {},
-            create: { userId, movieId: movie.id },
-          });
-          watchlistImported++;
+          // Films already watched here are left off — see addToWatchlist.
+          // Counted separately so the summary doesn't claim to have imported
+          // a film it deliberately skipped.
+          const { added } = await addToWatchlist(userId, [movie.id]);
+          if (added > 0) watchlistImported++;
+          else watchlistSkippedWatched++;
         }
       })
     );
@@ -281,6 +286,7 @@ export async function importLetterboxdZip(
   return {
     ratingsImported,
     watchlistImported,
+    watchlistSkippedWatched,
     diaryImported,
     unmatched,
     completedChallenges,
@@ -290,6 +296,9 @@ export async function importLetterboxdZip(
 
 export type WatchlistImportSummary = {
   imported: number;
+  // In the file but already watched here, so deliberately not added —
+  // see addToWatchlist.
+  skippedWatched: number;
   unmatched: { title: string; year: string }[];
 };
 
@@ -335,6 +344,7 @@ export async function importWatchlistFile(
 
   const unmatched: { title: string; year: string }[] = [];
   let imported = 0;
+  let skippedWatched = 0;
 
   for (let i = 0; i < films.length; i += MATCH_CONCURRENCY) {
     const batch = films.slice(i, i + MATCH_CONCURRENCY);
@@ -347,17 +357,14 @@ export async function importWatchlistFile(
         }
 
         const movie = await ensureMovieCached(tmdbId);
-        await prisma.watchlistItem.upsert({
-          where: { userId_movieId: { userId, movieId: movie.id } },
-          update: {},
-          create: { userId, movieId: movie.id },
-        });
-        imported++;
+        const { added } = await addToWatchlist(userId, [movie.id]);
+        if (added > 0) imported++;
+        else skippedWatched++;
       })
     );
   }
 
-  return { imported, unmatched };
+  return { imported, skippedWatched, unmatched };
 }
 
 export type OwnedImportSummary = {

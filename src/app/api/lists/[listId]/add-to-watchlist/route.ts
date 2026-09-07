@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { ensureMovieCached } from "@/lib/movies";
+import { addToWatchlist } from "@/lib/watchlist";
 
 // Cache-first (ensureMovieCached hits the local DB before ever touching
 // TMDB), so this can run at higher concurrency than a per-item TMDB call
@@ -47,16 +48,13 @@ export async function POST(
     ensureMovieCached(item.tmdbId).catch(() => null)
   );
 
-  await mapInChunks(
-    movies.filter((m) => m != null),
-    CONCURRENCY,
-    (movie) =>
-      prisma.watchlistItem.upsert({
-        where: { userId_movieId: { userId, movieId: movie.id } },
-        update: {},
-        create: { userId, movieId: movie.id },
-      })
+  // Films from the list the user has already seen are left off — see
+  // addToWatchlist. Reported back so the button can tell the user why a
+  // 250-film list only added 180, rather than looking like it half-failed.
+  const { added, skippedWatched } = await addToWatchlist(
+    userId,
+    movies.filter((m) => m != null).map((m) => m.id)
   );
 
-  return NextResponse.json({ added: movies.filter((m) => m != null).length, total: list.items.length });
+  return NextResponse.json({ added, skippedWatched, total: list.items.length });
 }

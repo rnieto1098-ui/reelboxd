@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { ensureMovieCached } from "@/lib/movies";
+import { addToWatchlist } from "@/lib/watchlist";
 
 export async function POST(
   _request: Request,
@@ -15,13 +16,17 @@ export async function POST(
   const { tmdbId } = await context.params;
   const movie = await ensureMovieCached(Number(tmdbId));
 
-  await prisma.watchlistItem.upsert({
-    where: { userId_movieId: { userId: session.user.id, movieId: movie.id } },
-    update: {},
-    create: { userId: session.user.id, movieId: movie.id },
-  });
+  const { added } = await addToWatchlist(session.user.id, [movie.id]);
 
-  return NextResponse.json({ ok: true, inWatchlist: true });
+  // Not an error — asking to watchlist something you've already seen is a
+  // reasonable thing to click, it just doesn't do anything. Reported rather
+  // than swallowed so the button can revert its optimistic flip and say why
+  // instead of claiming the film is on a list it isn't on.
+  return NextResponse.json({
+    ok: true,
+    inWatchlist: added > 0,
+    blockedByWatched: added === 0,
+  });
 }
 
 export async function DELETE(

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 type WatchlistImportSummary = {
   imported: number;
+  skippedWatched: number;
   unmatched: { title: string; year: string }[];
 };
 
@@ -105,6 +106,12 @@ export function WatchlistImportForm() {
                 Added <span className="text-accent-green">{summary.imported}</span> movie
                 {summary.imported === 1 ? "" : "s"} to your watchlist.
               </p>
+              {summary.skippedWatched > 0 && (
+                <p className="text-sm text-muted">
+                  Skipped {summary.skippedWatched} you&apos;ve already watched — a watched movie
+                  doesn&apos;t go back on your watchlist.
+                </p>
+              )}
               {summary.unmatched.length > 0 && (
                 <div>
                   <p className="text-sm text-muted">

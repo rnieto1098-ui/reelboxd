@@ -7,6 +7,7 @@ import { useToast } from "@/components/Toast";
 type ImportSummary = {
   ratingsImported: number;
   watchlistImported: number;
+  watchlistSkippedWatched: number;
   diaryImported: number;
   unmatched: { title: string; year: string }[];
   completedChallenges: { id: string; title: string }[];
@@ -81,6 +82,14 @@ export function ImportForm() {
             <span className="text-accent-green">{summary.watchlistImported}</span> watchlist item
             {summary.watchlistImported === 1 ? "" : "s"}.
           </p>
+
+          {summary.watchlistSkippedWatched > 0 && (
+            <p className="text-sm text-muted">
+              Left {summary.watchlistSkippedWatched} watchlist item
+              {summary.watchlistSkippedWatched === 1 ? "" : "s"} off — you&apos;ve already watched
+              {summary.watchlistSkippedWatched === 1 ? " it" : " them"}.
+            </p>
+          )}
 
           {summary.unmatched.length > 0 && (
             <div>

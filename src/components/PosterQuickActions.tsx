@@ -132,6 +132,16 @@ export function PosterQuickActions({
       showToast("Something went wrong — try again.", "error");
       return;
     }
+
+    // The route declines to watchlist a film you've already seen, so the
+    // optimistic flip has to be taken back and explained — otherwise the
+    // bookmark sits lit for something that was never added.
+    const body = await res.json().catch(() => null);
+    if (body?.blockedByWatched) {
+      setInWatchlist(false);
+      showToast("You've already watched this — it's not going on your watchlist.");
+      return;
+    }
     refresh();
   }
 

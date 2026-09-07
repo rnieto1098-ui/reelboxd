@@ -25,7 +25,7 @@ const MAX_BROWSABLE_PROVIDERS = 40;
 // e.g. standalone Starz and HBO Max both rank well past 100th. Pin them so
 // they show up regardless of where TMDB's own ordering would otherwise put
 // them.
-const FEATURED_PROVIDER_IDS = [1899, 43]; // HBO Max, Starz
+const FEATURED_PROVIDER_IDS = [1899, 43, 2754]; // HBO Max, Starz, Howdy
 
 /** The catalog of services shown on /streaming for the user to pick their own. */
 export async function getBrowsableProviders(): Promise<TmdbWatchProvider[]> {

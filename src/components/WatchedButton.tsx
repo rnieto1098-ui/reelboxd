@@ -69,20 +69,24 @@ export function WatchedButton({
       showToast("Something went wrong — try again.", "error");
       return;
     }
-    setSaving(false);
-
     if (res.status === 401) {
+      setSaving(false);
       setWatched(previousWatched);
       router.push("/login");
       return;
     }
     if (!res.ok) {
+      setSaving(false);
       setWatched(previousWatched);
       showToast("Something went wrong — try again.", "error");
       return;
     }
 
+    // Parsed before clearing `saving` — the response is what decides the
+    // final state, so re-enabling the button first would expose an
+    // unreconciled value to a second click.
     const body = await res.json().catch(() => null);
+    setSaving(false);
     // Reconciled against the server's answer, not assumed from the optimistic
     // flip — see the component doc comment for why a DELETE can still land
     // back on `true`.

@@ -33,6 +33,7 @@ export async function POST() {
   const watchlist = await syncLetterboxdWatchlist(session.user.id, user.letterboxdUsername).catch(
     (error) => ({
       added: 0,
+      skippedWatched: 0,
       unmatched: [] as string[],
       remaining: 0,
       error: error instanceof Error ? error.message : "Watchlist sync failed",
@@ -42,6 +43,10 @@ export async function POST() {
   return NextResponse.json({
     ...summary,
     watchlistAdded: watchlist.added,
+    // Films on the Letterboxd watchlist already watched here, deliberately
+    // left off (see addToWatchlist). Surfaced so a sync that adds nothing
+    // because everything was already seen doesn't read as "nothing new."
+    watchlistSkippedWatched: watchlist.skippedWatched,
     watchlistError: "error" in watchlist ? watchlist.error : null,
   });
 }

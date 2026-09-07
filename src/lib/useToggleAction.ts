@@ -6,6 +6,17 @@ import { useToast } from "@/components/Toast";
 import { useCoalescedRefresh } from "@/lib/useCoalescedRefresh";
 
 /**
+ * Lets a route override the assumed flip. Returning a different `active`
+ * means the server didn't do what the click asked for — the watchlist
+ * refuses films you've already watched — and `message`, if given, replaces
+ * the usual success toast with an explanation.
+ */
+export type ToggleReconcile = (
+  body: unknown,
+  attemptedActive: boolean
+) => { active: boolean; message?: string };
+
+/**
  * Shared logic behind every per-user-per-movie toggle button (watchlist,
  * like, owned): optimistic local state, a signed-out redirect, and a
  * POST/DELETE against `url` depending on the current state.
@@ -33,17 +44,6 @@ import { useCoalescedRefresh } from "@/lib/useCoalescedRefresh";
  * `toastLabels`, if given, is [message when turning on, message when
  * turning off] — shown via the shared toast system on a successful toggle.
  */
-/**
- * Lets a route override the assumed flip. Returning a different `active`
- * means the server didn't do what the click asked for — the watchlist
- * refuses films you've already watched — and `message`, if given, replaces
- * the usual success toast with an explanation.
- */
-export type ToggleReconcile = (
-  body: unknown,
-  attemptedActive: boolean
-) => { active: boolean; message?: string };
-
 export function useToggleAction(
   initialActive: boolean,
   url: string,
@@ -83,21 +83,25 @@ export function useToggleAction(
       showToast("Something went wrong — try again.", "error");
       return;
     }
-    setSaving(false);
-
     if (res.status === 401) {
+      setSaving(false);
       setActive(previousActive);
       router.push("/login");
       return;
     }
     if (!res.ok) {
+      setSaving(false);
       setActive(previousActive);
       showToast("Something went wrong — try again.", "error");
       return;
     }
 
     if (reconcile) {
+      // Parsed before clearing `saving`: re-enabling the button first left a
+      // window where it was clickable while still showing the optimistic
+      // value the server may be about to reject.
       const body = await res.json().catch(() => null);
+      setSaving(false);
       const resolved = reconcile(body, nextActive);
       // The optimistic flip was a guess at what the server would do; this is
       // what it actually did.
@@ -107,6 +111,8 @@ export function useToggleAction(
         refresh();
         return;
       }
+    } else {
+      setSaving(false);
     }
 
     if (toastLabels) showToast(nextActive ? toastLabels[0] : toastLabels[1]);

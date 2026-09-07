@@ -15,18 +15,16 @@ const COOLDOWN_MS = 1000;
 let lastRefreshAt = 0;
 let trailingTimer: ReturnType<typeof setTimeout> | null = null;
 let pendingRouter: { refresh: () => void } | null = null;
-let pendingLocation: string | null = null;
-
-function currentLocation(): string {
-  return window.location.pathname + window.location.search;
-}
 
 function runTrailing() {
   trailingTimer = null;
   lastRefreshAt = Date.now();
-  // Navigating away already fetched the new route's server components, so a
-  // refresh scheduled against the old one is pure waste at best.
-  if (currentLocation() !== pendingLocation) return;
+  // Runs even if the user has navigated since. It's tempting to skip it as
+  // wasted work on a page the write didn't touch, but router.refresh()
+  // invalidates the whole client Router Cache, not just the current route —
+  // and the destination may have been prefetched *before* the write, so
+  // skipping can leave the new page showing pre-write data with nothing
+  // left to correct it. One extra refetch is the cheaper mistake.
   pendingRouter?.refresh();
 }
 
@@ -59,7 +57,6 @@ export function useCoalescedRefresh(): () => void {
 
   return useCallback(() => {
     pendingRouter = router;
-    pendingLocation = currentLocation();
 
     const now = Date.now();
     const sinceLast = now - lastRefreshAt;

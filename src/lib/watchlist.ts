@@ -65,5 +65,23 @@ export async function addToWatchlist(
     );
   }
 
-  return { added: addable.length, skippedWatched: unique.length - addable.length };
+  // The check above and the writes below it aren't one atomic step, and the
+  // gap is reachable: marking a film watched from the poster overlay hits a
+  // route that removes it from the watchlist, and the two buttons sit next
+  // to each other. Land that request in between and it finds no row to
+  // remove, then this adds one for a film that is now watched — reproduced
+  // by firing both at once. Re-checking after the write closes that
+  // ordering; the opposite one already closes itself, since a mark-watched
+  // arriving after this deletes the row on its own way through.
+  const racedIntoWatched = await getWatchedMovieIds(userId, addable);
+  if (racedIntoWatched.size > 0) {
+    await prisma.watchlistItem.deleteMany({
+      where: { userId, movieId: { in: [...racedIntoWatched] } },
+    });
+  }
+
+  return {
+    added: addable.length - racedIntoWatched.size,
+    skippedWatched: unique.length - addable.length + racedIntoWatched.size,
+  };
 }

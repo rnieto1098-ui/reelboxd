@@ -153,7 +153,15 @@ export async function syncLetterboxdWatchlist(
   ]);
 
   const seenSlugs = new Set(alreadySynced.map((r) => r.filmSlug));
-  const newEntries = entries.filter((e) => !seenSlugs.has(e.slug));
+  // Deduplicated before anything is written. The crawl walks up to 60 pages
+  // one request at a time, so a film added or removed on Letterboxd midway
+  // through shifts items across page boundaries and the same slug can be
+  // read twice. LetterboxdWatchlistItem is unique on (userId, filmSlug), so
+  // the second insert would throw and take the whole run down with it —
+  // leaving letterboxdWatchlistSyncedAt un-advanced and every remaining
+  // film unsynced, quietly, on every subsequent run.
+  const uniqueEntries = [...new Map(entries.map((e) => [e.slug, e])).values()];
+  const newEntries = uniqueEntries.filter((e) => !seenSlugs.has(e.slug));
   const toProcess = newEntries.slice(0, MAX_NEW_FILMS_PER_RUN);
 
   const unmatched: string[] = [];
@@ -171,13 +179,18 @@ export async function syncLetterboxdWatchlist(
         }
 
         const movie = await ensureMovieCached(tmdbId);
-        // A film already watched here is skipped, not added (see
-        // addToWatchlist) — but it's still recorded as synced, or every run
-        // from now on would re-resolve the same slug and re-skip it forever.
-        const [{ added: addedNow }] = await Promise.all([
-          addToWatchlist(userId, [movie.id]),
-          prisma.letterboxdWatchlistItem.create({ data: { userId, filmSlug: entry.slug } }),
-        ]);
+        // Sequenced, not Promise.all: both would already be in flight, so a
+        // failed add would still leave the slug marked synced — and since
+        // this sync is add-only and skips anything already recorded, that
+        // film would never be retried on any future run. Marking it synced
+        // only after the add succeeds means a failure just retries next time.
+        const { added: addedNow } = await addToWatchlist(userId, [movie.id]);
+        // A film already watched here is skipped rather than added, but is
+        // still recorded as synced — otherwise every future run would
+        // re-resolve the same slug just to skip it again.
+        await prisma.letterboxdWatchlistItem.create({
+          data: { userId, filmSlug: entry.slug },
+        });
         if (addedNow > 0) added++;
         else skippedWatched++;
       })

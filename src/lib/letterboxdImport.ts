@@ -201,8 +201,6 @@ export async function importLetterboxdZip(
   const unmatched: { title: string; year: string }[] = [];
   const movieByKey = new Map<FilmKey, Movie>();
   let ratingsImported = 0;
-  let watchlistImported = 0;
-  let watchlistSkippedWatched = 0;
 
   const entries = [...filmsToMatch.entries()];
 
@@ -229,14 +227,6 @@ export async function importLetterboxdZip(
           ratingsImported++;
         }
 
-        if (watchlistKeys.has(key)) {
-          // Films already watched here are left off — see addToWatchlist.
-          // Counted separately so the summary doesn't claim to have imported
-          // a film it deliberately skipped.
-          const { added } = await addToWatchlist(userId, [movie.id]);
-          if (added > 0) watchlistImported++;
-          else watchlistSkippedWatched++;
-        }
       })
     );
   }
@@ -277,6 +267,18 @@ export async function importLetterboxdZip(
       diaryImported++;
     }
   }
+
+  // Deliberately after the diary pass, not folded into the per-film loop
+  // above: a film in both watchlist.csv and diary.csv is one the user has
+  // now logged, so addToWatchlist skips it. Doing this first instead added
+  // the row, let createDiaryEntry delete it moments later, and still counted
+  // it as imported — a summary that claimed films the watchlist never kept.
+  // One call rather than one per film, so the watched lookup runs once.
+  const { added: watchlistImported, skippedWatched: watchlistSkippedWatched } =
+    await addToWatchlist(
+      userId,
+      [...watchlistKeys].map((key) => movieByKey.get(key)?.id).filter((id) => id != null)
+    );
 
   const [completedChallenges, completedGoal] = await Promise.all([
     diffNewlyCompletedChallenges(userId, challengesCompletedBefore),

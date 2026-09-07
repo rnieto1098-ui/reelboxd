@@ -17,11 +17,19 @@ type SyncSummary = {
   completedChallenges?: { id: string; title: string }[];
   completedGoal?: { year: number; target: number } | null;
   watchlistAdded?: number;
+  watchlistSkippedWatched?: number;
   watchlistError?: string | null;
 };
 
 function hasNewData(body: SyncSummary) {
-  return body.imported > 0 || (body.watchlistAdded ?? 0) > 0;
+  return (
+    body.imported > 0 ||
+    (body.watchlistAdded ?? 0) > 0 ||
+    // Skipping films you've already watched is a real outcome, not nothing
+    // happening — without this a sync of a watchlist you've since watched
+    // reports "already up to date" and never explains itself.
+    (body.watchlistSkippedWatched ?? 0) > 0
+  );
 }
 
 function summaryMessage(body: SyncSummary) {
@@ -33,7 +41,21 @@ function summaryMessage(body: SyncSummary) {
   if (body.watchlistAdded) {
     parts.push(`${body.watchlistAdded} watchlist item${body.watchlistAdded === 1 ? "" : "s"}`);
   }
-  return `Synced ${parts.join(", ")} from Letterboxd`;
+
+  const skipped = body.watchlistSkippedWatched ?? 0;
+  const skippedNote =
+    skipped > 0 ? ` (skipped ${skipped} watchlist film${skipped === 1 ? "" : "s"} you've already watched)` : "";
+
+  // Everything the sync found was a film already watched here, so there's
+  // nothing to list — saying "Synced  from Letterboxd" would be worse than
+  // saying what actually happened.
+  if (parts.length === 0) {
+    return `Nothing new to add — skipped ${skipped} watchlist film${
+      skipped === 1 ? "" : "s"
+    } you've already watched.`;
+  }
+
+  return `Synced ${parts.join(", ")} from Letterboxd${skippedNote}`;
 }
 
 export function LetterboxdSyncCard({

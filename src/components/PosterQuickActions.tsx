@@ -121,13 +121,14 @@ export function PosterQuickActions({
       showToast("Something went wrong — try again.", "error");
       return;
     }
-    setWatchlistSaving(false);
     if (res.status === 401) {
+      setWatchlistSaving(false);
       setInWatchlist(previousInWatchlist);
       router.push("/login");
       return;
     }
     if (!res.ok) {
+      setWatchlistSaving(false);
       setInWatchlist(previousInWatchlist);
       showToast("Something went wrong — try again.", "error");
       return;
@@ -135,8 +136,10 @@ export function PosterQuickActions({
 
     // The route declines to watchlist a film you've already seen, so the
     // optimistic flip has to be taken back and explained — otherwise the
-    // bookmark sits lit for something that was never added.
+    // bookmark sits lit for something that was never added. Parsed before
+    // clearing `saving`, so it can't be re-clicked mid-reconcile.
     const body = await res.json().catch(() => null);
+    setWatchlistSaving(false);
     if (body?.blockedByWatched) {
       setInWatchlist(false);
       showToast("You've already watched this — it's not going on your watchlist.");
@@ -170,19 +173,21 @@ export function PosterQuickActions({
       showToast("Something went wrong — try again.", "error");
       return;
     }
-    setWatchedSaving(false);
     if (res.status === 401) {
+      setWatchedSaving(false);
       setWatched(wasWatched);
       router.push("/login");
       return;
     }
     if (!res.ok) {
+      setWatchedSaving(false);
       setWatched(wasWatched);
       showToast("Something went wrong — try again.", "error");
       return;
     }
 
     const body = await res.json().catch(() => null);
+    setWatchedSaving(false);
     setWatched(body?.watched ?? !wasWatched);
     refresh();
 

@@ -30,20 +30,37 @@ export function StarRating({
       router.push("/login");
       return;
     }
+    // Ignore clicks while a rating is in flight. Without this, rating 3 then
+    // 5 quickly sends two overlapping requests that can commit out of order,
+    // and the second click's rollback value would be the first click's
+    // unconfirmed score — a value the server never held.
+    if (saving) return;
+
     // Clicking the same rating again clears it.
     const nextScore = newScore === score ? 0 : newScore;
     const previousScore = score;
     setScore(nextScore);
     setSaving(true);
 
-    const res =
-      nextScore === 0
-        ? await fetch(`/api/movies/${tmdbId}/rating`, { method: "DELETE" })
-        : await fetch(`/api/movies/${tmdbId}/rating`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ score: nextScore }),
-          });
+    let res: Response;
+    try {
+      res =
+        nextScore === 0
+          ? await fetch(`/api/movies/${tmdbId}/rating`, { method: "DELETE" })
+          : await fetch(`/api/movies/${tmdbId}/rating`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ score: nextScore }),
+            });
+    } catch {
+      // Without this the rejection escaped the function entirely: `saving`
+      // stayed true so "saving..." was pinned on screen for good, and the
+      // stars kept showing a rating that was never persisted.
+      setSaving(false);
+      setScore(previousScore);
+      showToast("Couldn't save that rating — try again.", "error");
+      return;
+    }
 
     setSaving(false);
 

@@ -23,17 +23,31 @@ export function StreamingServiceToggle({
   const [saving, setSaving] = useState(false);
 
   async function toggle() {
-    setSaving(true);
+    // Flipped immediately, not after the round trip — this grid is
+    // usually clicked through rapidly while setting up services, and a
+    // round trip per tile before the ring highlight moves reads as
+    // sluggish. Rolled back on failure, same as every other toggle in the
+    // app; the failure toast is still needed since a silent revert alone
+    // would look like the click just didn't register.
     const next = !selected;
+    setSelected(next);
+    setSaving(true);
 
-    const res = next
-      ? await fetch(`/api/streaming-services/${providerId}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ providerName, logoPath }),
-        })
-      : await fetch(`/api/streaming-services/${providerId}`, { method: "DELETE" });
-
+    let res: Response;
+    try {
+      res = next
+        ? await fetch(`/api/streaming-services/${providerId}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ providerName, logoPath }),
+          })
+        : await fetch(`/api/streaming-services/${providerId}`, { method: "DELETE" });
+    } catch {
+      setSaving(false);
+      setSelected(!next);
+      showToast(`Couldn't update ${providerName} — try again.`, "error");
+      return;
+    }
     setSaving(false);
 
     // No success toast here on purpose — this grid is usually clicked
@@ -42,11 +56,11 @@ export function StreamingServiceToggle({
     // failure still needs a toast since the toggle would otherwise look
     // like it worked.
     if (!res.ok) {
+      setSelected(!next);
       showToast(`Couldn't update ${providerName} — try again.`, "error");
       return;
     }
 
-    setSelected(next);
     router.refresh();
   }
 

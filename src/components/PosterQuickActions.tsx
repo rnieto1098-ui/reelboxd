@@ -52,51 +52,84 @@ export function PosterQuickActions({
   // documented pattern for "adjusting state when a prop changes") rather
   // than in a useEffect, so the stale value never paints even for a frame.
   const [prevInitialOwned, setPrevInitialOwned] = useState(initialOwned);
-  if (initialOwned !== prevInitialOwned) {
+  if (initialOwned !== prevInitialOwned && !ownedSaving) {
     setPrevInitialOwned(initialOwned);
     setOwned(initialOwned);
   }
   const [prevInitialInWatchlist, setPrevInitialInWatchlist] = useState(initialInWatchlist);
-  if (initialInWatchlist !== prevInitialInWatchlist) {
+  if (initialInWatchlist !== prevInitialInWatchlist && !watchlistSaving) {
     setPrevInitialInWatchlist(initialInWatchlist);
     setInWatchlist(initialInWatchlist);
   }
   const [prevInitialWatched, setPrevInitialWatched] = useState(initialWatched);
-  if (initialWatched !== prevInitialWatched) {
+  if (initialWatched !== prevInitialWatched && !watchedSaving) {
     setPrevInitialWatched(initialWatched);
     setWatched(initialWatched);
   }
 
   // Owned/watchlist are real toggles (unlike logging a dated diary watch,
   // new event each click) — clicking again removes it, same as the buttons
-  // on the movie page itself.
+  // on the movie page itself. Both flip immediately and roll back on
+  // failure, same pattern as useToggleAction (see that file's doc comment
+  // for why "flip, then check the response" beats "flip after the response
+  // without checking it" — this used to do the latter).
   async function toggleOwned(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
+    const previousOwned = owned;
+    setOwned(!previousOwned);
     setOwnedSaving(true);
-    const res = await fetch(`/api/movies/${tmdbId}/owned`, { method: owned ? "DELETE" : "POST" });
+    let res: Response;
+    try {
+      res = await fetch(`/api/movies/${tmdbId}/owned`, { method: previousOwned ? "DELETE" : "POST" });
+    } catch {
+      setOwnedSaving(false);
+      setOwned(previousOwned);
+      showToast("Something went wrong — try again.", "error");
+      return;
+    }
     setOwnedSaving(false);
     if (res.status === 401) {
+      setOwned(previousOwned);
       router.push("/login");
       return;
     }
-    setOwned((v) => !v);
+    if (!res.ok) {
+      setOwned(previousOwned);
+      showToast("Something went wrong — try again.", "error");
+      return;
+    }
     router.refresh();
   }
 
   async function toggleWatchlist(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
+    const previousInWatchlist = inWatchlist;
+    setInWatchlist(!previousInWatchlist);
     setWatchlistSaving(true);
-    const res = await fetch(`/api/movies/${tmdbId}/watchlist`, {
-      method: inWatchlist ? "DELETE" : "POST",
-    });
+    let res: Response;
+    try {
+      res = await fetch(`/api/movies/${tmdbId}/watchlist`, {
+        method: previousInWatchlist ? "DELETE" : "POST",
+      });
+    } catch {
+      setWatchlistSaving(false);
+      setInWatchlist(previousInWatchlist);
+      showToast("Something went wrong — try again.", "error");
+      return;
+    }
     setWatchlistSaving(false);
     if (res.status === 401) {
+      setInWatchlist(previousInWatchlist);
       router.push("/login");
       return;
     }
-    setInWatchlist((v) => !v);
+    if (!res.ok) {
+      setInWatchlist(previousInWatchlist);
+      showToast("Something went wrong — try again.", "error");
+      return;
+    }
     router.refresh();
   }
 
@@ -105,24 +138,40 @@ export function PosterQuickActions({
   // challenges but never a TIMEFRAME one, which needs a date this doesn't
   // have. This is the only quick action here that reads the response body,
   // to surface a challenge-completion toast when this click was the one
-  // that finished it.
+  // that finished it, and to reconcile the optimistic flip against the
+  // server's answer — a DELETE can still land back on `true` if the film
+  // is also rated or logged (see WatchedButton's doc comment).
   async function toggleWatched(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
+    const wasWatched = watched;
+    setWatched(!wasWatched);
     setWatchedSaving(true);
-    const res = await fetch(`/api/movies/${tmdbId}/watched`, {
-      method: watched ? "DELETE" : "POST",
-    });
+    let res: Response;
+    try {
+      res = await fetch(`/api/movies/${tmdbId}/watched`, {
+        method: wasWatched ? "DELETE" : "POST",
+      });
+    } catch {
+      setWatchedSaving(false);
+      setWatched(wasWatched);
+      showToast("Something went wrong — try again.", "error");
+      return;
+    }
     setWatchedSaving(false);
     if (res.status === 401) {
+      setWatched(wasWatched);
       router.push("/login");
       return;
     }
-    // Next state comes from the response, not a local flip: removing the
-    // mark from a film that's also in the diary leaves it watched.
+    if (!res.ok) {
+      setWatched(wasWatched);
+      showToast("Something went wrong — try again.", "error");
+      return;
+    }
+
     const body = await res.json().catch(() => null);
-    const wasWatched = watched;
-    setWatched(body?.watched ?? !watched);
+    setWatched(body?.watched ?? !wasWatched);
     router.refresh();
 
     if (!wasWatched) {

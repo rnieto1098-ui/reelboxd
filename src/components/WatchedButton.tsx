@@ -19,10 +19,12 @@ const STILL_WATCHED_MESSAGE: Record<string, string> = {
  * every dated stat.
  *
  * Lit whenever the film counts as watched at all, including via a diary
- * entry or rating, so it never contradicts the rest of the page. Unlike the
- * other toggles this takes its next state from the response instead of
- * flipping locally: removing the mark from a film that's also logged leaves
- * it watched, and the button has to be able to say so.
+ * entry or rating, so it never contradicts the rest of the page. The click
+ * flips it immediately for a responsive feel, then reconciles against the
+ * response rather than trusting the flip outright: removing the mark from a
+ * film that's also logged leaves it watched, and only the server knows
+ * that, so a successful DELETE can still land back on `true`. A failed
+ * request reverts to whatever the button showed before the click.
  */
 export function WatchedButton({
   tmdbId,
@@ -39,7 +41,7 @@ export function WatchedButton({
   const [saving, setSaving] = useState(false);
 
   const [prevInitial, setPrevInitial] = useState(initialWatched);
-  if (initialWatched !== prevInitial) {
+  if (initialWatched !== prevInitial && !saving) {
     setPrevInitial(initialWatched);
     setWatched(initialWatched);
   }
@@ -49,27 +51,43 @@ export function WatchedButton({
       router.push("/login");
       return;
     }
+
+    const previousWatched = watched;
+    setWatched(!previousWatched);
     setSaving(true);
-    const res = await fetch(`/api/movies/${tmdbId}/watched`, {
-      method: watched ? "DELETE" : "POST",
-    });
+
+    let res: Response;
+    try {
+      res = await fetch(`/api/movies/${tmdbId}/watched`, {
+        method: previousWatched ? "DELETE" : "POST",
+      });
+    } catch {
+      setSaving(false);
+      setWatched(previousWatched);
+      showToast("Something went wrong — try again.", "error");
+      return;
+    }
     setSaving(false);
 
     if (res.status === 401) {
+      setWatched(previousWatched);
       router.push("/login");
       return;
     }
     if (!res.ok) {
+      setWatched(previousWatched);
       showToast("Something went wrong — try again.", "error");
       return;
     }
 
     const body = await res.json().catch(() => null);
-    const nextWatched = body?.watched ?? !watched;
-    setWatched(nextWatched);
+    // Reconciled against the server's answer, not assumed from the optimistic
+    // flip — see the component doc comment for why a DELETE can still land
+    // back on `true`.
+    setWatched(body?.watched ?? !previousWatched);
     router.refresh();
 
-    if (!watched) {
+    if (!previousWatched) {
       showToast("Marked as watched");
       for (const challenge of body?.completedChallenges ?? []) {
         showToast(`🎉 Challenge complete: ${challenge.title}`);

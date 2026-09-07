@@ -16,6 +16,7 @@ export type WatchlistGridEntry = {
     };
   };
   owned?: boolean;
+  watched?: boolean;
 };
 
 export function WatchlistGrid({ entries }: { entries: WatchlistGridEntry[] }) {
@@ -27,7 +28,7 @@ export function WatchlistGrid({ entries }: { entries: WatchlistGridEntry[] }) {
         <ShuffleButton onClick={shuffle} disabled={entries.length < 2} />
       </div>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-6">
-        {order.map(({ item, owned }) => (
+        {order.map(({ item, owned, watched }) => (
           <div key={item.id}>
             <MovieCard
               tmdbId={item.movie.tmdbId}
@@ -36,6 +37,7 @@ export function WatchlistGrid({ entries }: { entries: WatchlistGridEntry[] }) {
               year={item.movie.releaseDate?.slice(0, 4)}
               owned={owned}
               inWatchlist
+              watched={watched}
             />
             {owned && (
               <span className="mt-1 inline-block rounded-full border border-accent-green px-2 py-0.5 text-xs text-accent-green">

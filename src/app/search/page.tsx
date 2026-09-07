@@ -3,6 +3,7 @@ import { searchMovies } from "@/lib/tmdb";
 import { applyPosterOverrides, getCustomPosterMap } from "@/lib/customPosters";
 import { getUserWatchlistedTmdbIds } from "@/lib/movies";
 import { getUserOwnedTmdbIds } from "@/lib/streaming";
+import { getWatchedTmdbIds } from "@/lib/recommendations";
 import { SearchResultsGrid } from "@/components/SearchResultsGrid";
 import { Pagination } from "@/components/Pagination";
 
@@ -22,10 +23,11 @@ export default async function SearchPage({
     auth(),
   ]);
 
-  const [posterOverrides, ownedIds, watchlistIds] = await Promise.all([
+  const [posterOverrides, ownedIds, watchlistIds, watchedIds] = await Promise.all([
     getCustomPosterMap(session?.user?.id, results?.results.map((m) => m.id) ?? []),
     getUserOwnedTmdbIds(session?.user?.id),
     getUserWatchlistedTmdbIds(session?.user?.id),
+    getWatchedTmdbIds(session?.user?.id),
   ]);
   const movies = applyPosterOverrides(results?.results ?? [], posterOverrides);
   const totalPages = results ? Math.min(results.total_pages, MAX_PAGE) : 0;
@@ -53,6 +55,7 @@ export default async function SearchPage({
           movies={movies}
           ownedIds={[...ownedIds]}
           watchlistIds={[...watchlistIds]}
+          watchedIds={[...watchedIds]}
         />
       )}
 

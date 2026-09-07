@@ -35,6 +35,9 @@ export function RecentlyLoggedRow({ entries }: { entries: RecentlyLoggedEntry[] 
             year={e.year}
             owned={e.owned}
             inWatchlist={e.inWatchlist}
+            // Every entry here came from a rating or a diary log, so it's
+            // definitionally watched.
+            watched
           />
           <p className="mt-1 text-xs text-accent-green">
             {e.score != null ? `${e.score.toFixed(1)} ★` : "Logged"}

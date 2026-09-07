@@ -9,14 +9,17 @@ export function SearchResultsGrid({
   movies,
   ownedIds,
   watchlistIds,
+  watchedIds,
 }: {
   movies: TmdbMovieSummary[];
   ownedIds: number[];
   watchlistIds: number[];
+  watchedIds: number[];
 }) {
   const { order, shuffle } = useShuffle(movies, (m) => m.id);
   const ownedSet = new Set(ownedIds);
   const watchlistSet = new Set(watchlistIds);
+  const watchedSet = new Set(watchedIds);
 
   return (
     <div>
@@ -35,6 +38,7 @@ export function SearchResultsGrid({
             year={movie.release_date?.slice(0, 4)}
             owned={ownedSet.has(movie.id)}
             inWatchlist={watchlistSet.has(movie.id)}
+            watched={watchedSet.has(movie.id)}
           />
         ))}
       </div>

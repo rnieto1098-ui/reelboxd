@@ -11,6 +11,7 @@ export type OwnedGridEntry = {
   posterPath: string | null;
   year: string | undefined;
   inWatchlist: boolean;
+  watched: boolean;
 };
 
 export function OwnedMovieGrid({ entries }: { entries: OwnedGridEntry[] }) {
@@ -31,6 +32,7 @@ export function OwnedMovieGrid({ entries }: { entries: OwnedGridEntry[] }) {
             year={entry.year}
             owned
             inWatchlist={entry.inWatchlist}
+            watched={entry.watched}
           />
         ))}
       </div>

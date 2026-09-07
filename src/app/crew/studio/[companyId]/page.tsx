@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { discoverMoviesByCompany, getCompanyDetails, logoUrl } from "@/lib/tmdb";
 import { getUserWatchlistedTmdbIds } from "@/lib/movies";
 import { getUserOwnedTmdbIds } from "@/lib/streaming";
+import { getWatchedTmdbIds } from "@/lib/recommendations";
 import { MovieCard } from "@/components/MovieCard";
 
 export default async function StudioPage({
@@ -16,11 +17,12 @@ export default async function StudioPage({
   const session = await auth();
   const userId = session?.user?.id;
 
-  const [details, movies, ownedIds, watchlistIds] = await Promise.all([
+  const [details, movies, ownedIds, watchlistIds, watchedIds] = await Promise.all([
     getCompanyDetails(companyId).catch(() => null),
     discoverMoviesByCompany(companyId).catch(() => ({ results: [] })),
     getUserOwnedTmdbIds(userId),
     getUserWatchlistedTmdbIds(userId),
+    getWatchedTmdbIds(userId),
   ]);
 
   if (!details) notFound();
@@ -74,6 +76,7 @@ export default async function StudioPage({
               year={movie.release_date?.slice(0, 4)}
               owned={ownedIds.has(movie.id)}
               inWatchlist={watchlistIds.has(movie.id)}
+              watched={watchedIds.has(movie.id)}
             />
           ))}
         </div>

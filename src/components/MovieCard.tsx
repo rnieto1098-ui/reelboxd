@@ -18,7 +18,9 @@ export function MovieCard({
   year?: string;
   owned?: boolean;
   inWatchlist?: boolean;
-  // Left undefined by callers that don't track it — see PosterQuickActions.
+  // Left undefined by callers whose movies are unwatched by construction
+  // (recommendations, upcoming releases) — PosterQuickActions defaults it
+  // to false, which is correct there.
   watched?: boolean;
 }) {
   const src = posterUrl(posterPath);

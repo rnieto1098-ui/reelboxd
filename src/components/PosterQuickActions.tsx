@@ -5,18 +5,8 @@ import { createPortal } from "react-dom";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { posterUrl, type TmdbImage } from "@/lib/tmdb";
-import { BookmarkIcon, CalendarIcon, EyeIcon, ImageIcon, ShoppingBagIcon } from "@/components/icons";
+import { BookmarkIcon, EyeIcon, ImageIcon, ShoppingBagIcon } from "@/components/icons";
 import { useToast } from "@/components/Toast";
-
-type ActionState = "idle" | "saving" | "done";
-
-function CheckIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-4 w-4">
-      <path d="M5 12l5 5L19 8" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
 
 function actionButtonClass(active: boolean) {
   const base =
@@ -32,10 +22,10 @@ export function PosterQuickActions({
   tmdbId,
   initialOwned = false,
   initialInWatchlist = false,
-  // Undefined means the caller doesn't track watched state, so the toggle
-  // is hidden rather than shown permanently unlit — a grid that can't know
-  // whether you've seen a film shouldn't imply you haven't.
-  initialWatched,
+  // Callers that don't actually track watched state (a recommendation row,
+  // an upcoming release) pass nothing, which is the right default: those
+  // rows are unwatched by construction, never "unknown."
+  initialWatched = false,
 }: {
   tmdbId: number;
   initialOwned?: boolean;
@@ -44,12 +34,11 @@ export function PosterQuickActions({
 }) {
   const router = useRouter();
   const showToast = useToast();
-  const [diaryState, setDiaryState] = useState<ActionState>("idle");
   const [owned, setOwned] = useState(initialOwned);
   const [ownedSaving, setOwnedSaving] = useState(false);
   const [inWatchlist, setInWatchlist] = useState(initialInWatchlist);
   const [watchlistSaving, setWatchlistSaving] = useState(false);
-  const [watched, setWatched] = useState(initialWatched ?? false);
+  const [watched, setWatched] = useState(initialWatched);
   const [watchedSaving, setWatchedSaving] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [posters, setPosters] = useState<TmdbImage[] | null>(null);
@@ -75,46 +64,10 @@ export function PosterQuickActions({
   const [prevInitialWatched, setPrevInitialWatched] = useState(initialWatched);
   if (initialWatched !== prevInitialWatched) {
     setPrevInitialWatched(initialWatched);
-    setWatched(initialWatched ?? false);
+    setWatched(initialWatched);
   }
 
-  // Log watch is its own function rather than a generic runAction helper —
-  // it's the only quick action that needs to read the response
-  // body, to surface a challenge/goal-completion toast when this log was
-  // the one that pushed it over. Every other quick action here stays silent
-  // on success (see StreamingServiceToggle for the "would spam" reasoning);
-  // this one only ever toasts on the rare completion, not on the routine log.
-  async function logDiaryWatch(e: React.MouseEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-    setDiaryState("saving");
-    const res = await fetch("/api/diary", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tmdbId }),
-    });
-    if (res.status === 401) {
-      router.push("/login");
-      return;
-    }
-    setDiaryState("done");
-    router.refresh();
-    setTimeout(() => setDiaryState("idle"), 1500);
-
-    const body = await res.json().catch(() => null);
-    if (body?.alreadyLogged) {
-      showToast("Already logged today");
-      return;
-    }
-    for (const challenge of body?.completedChallenges ?? []) {
-      showToast(`🎉 Challenge complete: ${challenge.title}`);
-    }
-    if (body?.completedGoal) {
-      showToast(`🎉 ${body.completedGoal.year} watch goal complete!`);
-    }
-  }
-
-  // Owned/watchlist are real toggles (unlike Log watch, which just logs a
+  // Owned/watchlist are real toggles (unlike logging a dated diary watch,
   // new event each click) — clicking again removes it, same as the buttons
   // on the movie page itself.
   async function toggleOwned(e: React.MouseEvent) {
@@ -147,9 +100,12 @@ export function PosterQuickActions({
     router.refresh();
   }
 
-  // Undated counterpart to Log watch above — marking a film seen without
-  // putting a date on it. Reads the response for the same reason
-  // logDiaryWatch does: this can be the click that finishes a challenge.
+  // Marks a film seen without putting a date on it — no diary entry, and
+  // (per checkNewlyCompletedChallenges) counts toward genre/crew/list
+  // challenges but never a TIMEFRAME one, which needs a date this doesn't
+  // have. This is the only quick action here that reads the response body,
+  // to surface a challenge-completion toast when this click was the one
+  // that finished it.
   async function toggleWatched(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
@@ -236,31 +192,17 @@ export function PosterQuickActions({
       </div>
 
       <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-between p-1.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            title="Log watch"
-            aria-label="Log watch"
-            disabled={diaryState === "saving"}
-            onClick={logDiaryWatch}
-            className={actionButtonClass(false)}
-          >
-            {diaryState === "done" ? <CheckIcon /> : <CalendarIcon />}
-          </button>
-          {initialWatched !== undefined && (
-            <button
-              type="button"
-              title={watched ? "Marked watched — click to undo" : "Mark watched (no date)"}
-              aria-label="Mark watched"
-              aria-pressed={watched}
-              disabled={watchedSaving}
-              onClick={toggleWatched}
-              className={actionButtonClass(watched)}
-            >
-              <EyeIcon />
-            </button>
-          )}
-        </div>
+        <button
+          type="button"
+          title={watched ? "Marked watched — click to undo" : "Mark as watched (no date, no diary entry)"}
+          aria-label="Mark watched"
+          aria-pressed={watched}
+          disabled={watchedSaving}
+          onClick={toggleWatched}
+          className={actionButtonClass(watched)}
+        >
+          <EyeIcon />
+        </button>
         <button
           type="button"
           title={inWatchlist ? "On watchlist — click to remove" : "Add to watchlist"}

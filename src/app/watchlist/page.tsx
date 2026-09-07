@@ -10,6 +10,7 @@ import {
   isAvailableOnServiceIds,
 } from "@/lib/streaming";
 import { WatchlistGrid } from "@/components/WatchlistGrid";
+import { getWatchedTmdbIds } from "@/lib/recommendations";
 import { WatchlistImportForm } from "@/components/WatchlistImportForm";
 import { AvailabilityFilterLinks } from "@/components/AvailabilityFilterLinks";
 import { SortChips } from "@/components/SortChips";
@@ -59,7 +60,7 @@ export default async function WatchlistPage({ searchParams }: PageProps<"/watchl
   const sortKey: SortKey = typeof sort === "string" && sort in SORT_OPTIONS ? (sort as SortKey) : "added";
   const sortDir: SortDir = dir === "asc" ? "asc" : "desc";
 
-  const [items, userProviderIds, ownedTmdbIds] = await Promise.all([
+  const [items, userProviderIds, ownedTmdbIds, watchedTmdbIds] = await Promise.all([
     prisma.watchlistItem.findMany({
       where: { userId: session.user.id },
       include: {
@@ -71,6 +72,10 @@ export default async function WatchlistPage({ searchParams }: PageProps<"/watchl
     }),
     getUserProviderIds(session.user.id),
     getUserOwnedTmdbIds(session.user.id),
+    // Almost always empty here — logging, rating, or marking a film watched
+    // already drops it from the watchlist — but a rewatch can be re-added
+    // afterward, so this can't just be assumed false.
+    getWatchedTmdbIds(session.user.id),
   ]);
 
   // One snapshot query for the whole list instead of a TMDB request per
@@ -84,6 +89,7 @@ export default async function WatchlistPage({ searchParams }: PageProps<"/watchl
     item,
     providerIds: providerIdsByTmdbId.get(item.movie.tmdbId) ?? new Set<number>(),
     owned: ownedTmdbIds.has(item.movie.tmdbId),
+    watched: watchedTmdbIds.has(item.movie.tmdbId),
   }));
 
   const hasServicesConfigured = userProviderIds.size > 0;

@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getCustomPosterMap } from "@/lib/customPosters";
 import { getUserWatchlistedTmdbIds } from "@/lib/movies";
+import { getWatchedTmdbIds } from "@/lib/recommendations";
 import { OwnedMovieGrid, type OwnedGridEntry } from "@/components/OwnedMovieGrid";
 import { Pagination } from "@/components/Pagination";
 
@@ -29,7 +30,7 @@ export default async function OwnedMoviesPage({
   const requestedPage = Number(pageParam);
   const page = Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
 
-  const [owned, totalCount, watchlistedTmdbIds] = await Promise.all([
+  const [owned, totalCount, watchlistedTmdbIds, watchedTmdbIds] = await Promise.all([
     prisma.ownedItem.findMany({
       where: { userId: user.id },
       include: { movie: true },
@@ -38,10 +39,11 @@ export default async function OwnedMoviesPage({
       take: PAGE_SIZE,
     }),
     prisma.ownedItem.count({ where: { userId: user.id } }),
-    // The viewer's own watchlist, not necessarily the profile owner's — same
-    // convention as everywhere else a poster's quick-action state reflects
-    // whoever is looking, not whoever the page belongs to.
+    // The viewer's own watchlist/watched state, not necessarily the profile
+    // owner's — same convention as everywhere else a poster's quick-action
+    // state reflects whoever is looking, not whoever the page belongs to.
     getUserWatchlistedTmdbIds(session?.user?.id),
+    getWatchedTmdbIds(session?.user?.id),
   ]);
 
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
@@ -58,6 +60,7 @@ export default async function OwnedMoviesPage({
     posterPath: posterOverrides.get(o.movie.tmdbId) ?? o.movie.posterPath,
     year: o.movie.releaseDate?.slice(0, 4),
     inWatchlist: watchlistedTmdbIds.has(o.movie.tmdbId),
+    watched: watchedTmdbIds.has(o.movie.tmdbId),
   }));
 
   return (

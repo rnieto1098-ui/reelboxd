@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { logoUrl } from "@/lib/tmdb";
 import { useToast } from "@/components/Toast";
@@ -17,7 +16,6 @@ export function StreamingServiceToggle({
   logoPath: string | null;
   initialSelected: boolean;
 }) {
-  const router = useRouter();
   const showToast = useToast();
   const [selected, setSelected] = useState(initialSelected);
   const [saving, setSaving] = useState(false);
@@ -61,7 +59,14 @@ export function StreamingServiceToggle({
       return;
     }
 
-    router.refresh();
+    // No router.refresh() either, unlike the other toggles in this app.
+    // /streaming renders nothing but these tiles and static copy — the only
+    // server-derived state on the page is which ones are selected, which the
+    // ring above already tracks. Refreshing re-rendered the whole route to
+    // arrive back at what was already on screen, once per tile, on the exact
+    // screen people click through fastest. Pages that *do* derive something
+    // from a user's services (watchlist availability, the homepage filter)
+    // fetch it on their own next load.
   }
 
   const logo = logoUrl(logoPath, "w92");

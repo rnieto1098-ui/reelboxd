@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/Toast";
+import { useCoalescedRefresh } from "@/lib/useCoalescedRefresh";
 
 /**
  * Shared logic behind every per-user-per-movie toggle button (watchlist,
@@ -39,6 +40,7 @@ export function useToggleAction(
   toastLabels?: [onLabel: string, offLabel: string]
 ) {
   const router = useRouter();
+  const refresh = useCoalescedRefresh();
   const showToast = useToast();
   const [active, setActive] = useState(initialActive);
   const [saving, setSaving] = useState(false);
@@ -83,7 +85,7 @@ export function useToggleAction(
     }
 
     if (toastLabels) showToast(nextActive ? toastLabels[0] : toastLabels[1]);
-    router.refresh();
+    refresh();
   }
 
   return { active, saving, toggle };

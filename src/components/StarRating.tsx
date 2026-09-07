@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/Toast";
+import { useCoalescedRefresh } from "@/lib/useCoalescedRefresh";
 
 const STAR_COUNT = 5;
 
@@ -16,6 +17,7 @@ export function StarRating({
   signedIn: boolean;
 }) {
   const router = useRouter();
+  const refresh = useCoalescedRefresh();
   const showToast = useToast();
   const [score, setScore] = useState(initialScore ?? 0);
   const [hoverScore, setHoverScore] = useState<number | null>(null);
@@ -52,7 +54,7 @@ export function StarRating({
     }
 
     showToast(nextScore === 0 ? "Rating removed" : `Rated ${nextScore} stars`);
-    router.refresh();
+    refresh();
   }
 
   function handleMouseMove(e: React.MouseEvent<HTMLDivElement>, star: number) {

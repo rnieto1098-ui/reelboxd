@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/Toast";
 import { EyeIcon } from "@/components/icons";
+import { useCoalescedRefresh } from "@/lib/useCoalescedRefresh";
 
 // Why a film can still count as watched after its mark is removed — the
 // route reports this so the button never claims something the data doesn't.
@@ -36,6 +37,7 @@ export function WatchedButton({
   signedIn: boolean;
 }) {
   const router = useRouter();
+  const refresh = useCoalescedRefresh();
   const showToast = useToast();
   const [watched, setWatched] = useState(initialWatched);
   const [saving, setSaving] = useState(false);
@@ -85,7 +87,7 @@ export function WatchedButton({
     // flip — see the component doc comment for why a DELETE can still land
     // back on `true`.
     setWatched(body?.watched ?? !previousWatched);
-    router.refresh();
+    refresh();
 
     if (!previousWatched) {
       showToast("Marked as watched");

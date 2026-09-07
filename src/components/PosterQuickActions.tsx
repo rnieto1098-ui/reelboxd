@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { posterUrl, type TmdbImage } from "@/lib/tmdb";
 import { BookmarkIcon, EyeIcon, ImageIcon, ShoppingBagIcon } from "@/components/icons";
 import { useToast } from "@/components/Toast";
+import { useCoalescedRefresh } from "@/lib/useCoalescedRefresh";
 
 function actionButtonClass(active: boolean) {
   const base =
@@ -33,6 +34,7 @@ export function PosterQuickActions({
   initialWatched?: boolean;
 }) {
   const router = useRouter();
+  const refresh = useCoalescedRefresh();
   const showToast = useToast();
   const [owned, setOwned] = useState(initialOwned);
   const [ownedSaving, setOwnedSaving] = useState(false);
@@ -99,7 +101,7 @@ export function PosterQuickActions({
       showToast("Something went wrong — try again.", "error");
       return;
     }
-    router.refresh();
+    refresh();
   }
 
   async function toggleWatchlist(e: React.MouseEvent) {
@@ -130,7 +132,7 @@ export function PosterQuickActions({
       showToast("Something went wrong — try again.", "error");
       return;
     }
-    router.refresh();
+    refresh();
   }
 
   // Marks a film seen without putting a date on it — no diary entry, and
@@ -172,7 +174,7 @@ export function PosterQuickActions({
 
     const body = await res.json().catch(() => null);
     setWatched(body?.watched ?? !wasWatched);
-    router.refresh();
+    refresh();
 
     if (!wasWatched) {
       for (const challenge of body?.completedChallenges ?? []) {
@@ -212,6 +214,10 @@ export function PosterQuickActions({
       return;
     }
     setPickerOpen(false);
+    // Immediate, not coalesced like the toggles above: the poster itself is
+    // server-rendered, so this refresh *is* the visible result of the click.
+    // Delaying it would just leave the old poster sitting there. It's also a
+    // one-off from a modal, never a burst, so there's nothing to collapse.
     router.refresh();
   }
 

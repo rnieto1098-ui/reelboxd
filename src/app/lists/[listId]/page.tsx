@@ -13,6 +13,7 @@ import {
   hasStreamingAvailability,
 } from "@/lib/streaming";
 import { getUserWatchlistedTmdbIds } from "@/lib/movies";
+import { getWatchedTmdbIds } from "@/lib/recommendations";
 import { compareNullableNumbers, type SortDir } from "@/lib/sortComparator";
 import { ListMovieGrid } from "@/components/ListMovieGrid";
 import { DeleteListButton } from "@/components/DeleteListButton";
@@ -136,7 +137,7 @@ export default async function ListDetailPage({
 
   const isOwner = !!userId && list.ownerId === userId;
 
-  const [ratingMap, userProviderIds, ownedTmdbIds, watchlistTmdbIds, personalCover] = await Promise.all([
+  const [ratingMap, userProviderIds, ownedTmdbIds, watchlistTmdbIds, personalCover, watchedTmdbIds] = await Promise.all([
     userId && list.items.length > 0
       ? prisma.rating
           .findMany({
@@ -149,12 +150,15 @@ export default async function ListDetailPage({
     getUserOwnedTmdbIds(userId),
     getUserWatchlistedTmdbIds(userId),
     getPersonalListCover(userId, listId),
+    getWatchedTmdbIds(userId),
   ]);
 
-  // ratingMap is already scoped to exactly this list's tmdbIds — a rating
-  // there means "watched," same convention as everywhere else in the app.
+  // Rating a film still counts as having seen it, but it's no longer the
+  // only way to say so — getWatchedTmdbIds unions ratings, diary entries and
+  // explicit watched marks, so this badge tracks all three.
+  const watchedInList = list.items.filter((i) => watchedTmdbIds.has(i.tmdbId)).length;
   const watchedPercent =
-    userId && list.items.length > 0 ? Math.round((ratingMap.size / list.items.length) * 100) : null;
+    userId && list.items.length > 0 ? Math.round((watchedInList / list.items.length) * 100) : null;
 
   const coverSrc =
     personalCover ?? list.coverImage ?? posterUrl(list.items[0]?.posterPath ?? null, "w200");
@@ -189,7 +193,7 @@ export default async function ListDetailPage({
         year: item.releaseDate?.slice(0, 4),
         owned: ownedTmdbIds.has(item.tmdbId),
         inWatchlist: watchlistTmdbIds.has(item.tmdbId),
-        watched: ratingMap.has(item.tmdbId),
+        watched: watchedTmdbIds.has(item.tmdbId),
       }))}
     />
   );
@@ -247,7 +251,7 @@ export default async function ListDetailPage({
                   <circle cx="12" cy="12" r="3" />
                 </svg>
                 <span>
-                  {watchedPercent}% watched ({ratingMap.size}/{list.items.length})
+                  {watchedPercent}% watched ({watchedInList}/{list.items.length})
                 </span>
               </div>
             )}

@@ -42,6 +42,7 @@ export function ListMovieGrid({
               year={entry.year}
               owned={entry.owned}
               inWatchlist={entry.inWatchlist}
+              watched={entry.watched}
             />
             {isOwner && <RemoveFromListButton listId={listId} tmdbId={entry.tmdbId} />}
           </div>

@@ -10,6 +10,7 @@ export function MovieCard({
   year,
   owned,
   inWatchlist,
+  watched,
 }: {
   tmdbId: number;
   title: string;
@@ -17,6 +18,8 @@ export function MovieCard({
   year?: string;
   owned?: boolean;
   inWatchlist?: boolean;
+  // Left undefined by callers that don't track it — see PosterQuickActions.
+  watched?: boolean;
 }) {
   const src = posterUrl(posterPath);
 
@@ -44,7 +47,12 @@ export function MovieCard({
             </div>
           )}
         </Link>
-        <PosterQuickActions tmdbId={tmdbId} initialOwned={owned} initialInWatchlist={inWatchlist} />
+        <PosterQuickActions
+          tmdbId={tmdbId}
+          initialOwned={owned}
+          initialInWatchlist={inWatchlist}
+          initialWatched={watched}
+        />
       </div>
       <Link
         href={href}

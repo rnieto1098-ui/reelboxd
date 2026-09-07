@@ -55,13 +55,16 @@ export async function getCrewFilmography(
     : dedupeById(credits.cast);
 }
 
+// A genre quota asks how many films of a genre you've seen, not when, so an
+// undated "watched" mark counts here the same as a diary entry — unlike
+// timeframeCount below, which is a date range by definition.
 async function genreCount(userId: string, genreName: string): Promise<number> {
-  const rows = await prisma.diaryEntry.findMany({
-    where: { userId, movie: { genres: { contains: genreName } } },
-    select: { movieId: true },
-    distinct: ["movieId"],
-  });
-  return rows.length;
+  const where = { userId, movie: { genres: { contains: genreName } } };
+  const [logged, marked] = await Promise.all([
+    prisma.diaryEntry.findMany({ where, select: { movieId: true }, distinct: ["movieId"] }),
+    prisma.watchedItem.findMany({ where, select: { movieId: true } }),
+  ]);
+  return new Set([...logged, ...marked].map((r) => r.movieId)).size;
 }
 
 async function timeframeCount(userId: string, startDate: Date, endDate: Date): Promise<number> {
@@ -116,16 +119,34 @@ export async function getListChallengeTmdbIds(listId: string): Promise<number[]>
   return items.map((i) => i.tmdbId);
 }
 
-// How many distinct films from a set the user has logged. Shared by the LIST
-// and CREW paths, which ask the same question of different sets.
+// How many distinct films from a set the user has seen. Shared by the LIST
+// and CREW paths, which ask the same question of different sets. Counts an
+// undated "watched" mark as well as a diary entry — these are completionist
+// goals ("have I seen all of these"), so when you saw it is beside the
+// point. TIMEFRAME challenges and watch goals deliberately don't come
+// through here, since they can't count something with no date.
+export async function getWatchedAmong(
+  userId: string,
+  tmdbIds: number[]
+): Promise<Set<number>> {
+  if (tmdbIds.length === 0) return new Set();
+  const select = { movie: { select: { tmdbId: true } } } as const;
+  const [logged, marked] = await Promise.all([
+    prisma.diaryEntry.findMany({
+      where: { userId, movie: { tmdbId: { in: tmdbIds } } },
+      select,
+      distinct: ["movieId"],
+    }),
+    prisma.watchedItem.findMany({
+      where: { userId, movie: { tmdbId: { in: tmdbIds } } },
+      select,
+    }),
+  ]);
+  return new Set([...logged, ...marked].map((l) => l.movie.tmdbId));
+}
+
 async function watchedCountAmong(userId: string, tmdbIds: number[]): Promise<number> {
-  if (tmdbIds.length === 0) return 0;
-  const logged = await prisma.diaryEntry.findMany({
-    where: { userId, movie: { tmdbId: { in: tmdbIds } } },
-    select: { movie: { select: { tmdbId: true } } },
-    distinct: ["movieId"],
-  });
-  return new Set(logged.map((l) => l.movie.tmdbId)).size;
+  return (await getWatchedAmong(userId, tmdbIds)).size;
 }
 
 async function listProgress(
@@ -165,7 +186,9 @@ export type ChallengeCompletion = { id: string; title: string };
 export async function checkNewlyCompletedChallenges(
   userId: string,
   movie: { tmdbId: number; genres: string | null },
-  watchedDate: Date
+  // Null when the film was marked watched without a date — every other
+  // challenge type still applies, but a date range can't judge it.
+  watchedDate: Date | null
 ): Promise<ChallengeCompletion[]> {
   const challenges = await prisma.challenge.findMany({ where: { userId } });
   if (challenges.length === 0) return [];
@@ -178,7 +201,7 @@ export async function checkNewlyCompletedChallenges(
       const count = await genreCount(userId, c.genreName);
       if (count === c.target) completions.push({ id: c.id, title: c.title });
     } else if (c.type === "TIMEFRAME" && c.startDate && c.endDate && c.target) {
-      if (watchedDate < c.startDate || watchedDate > c.endDate) continue;
+      if (!watchedDate || watchedDate < c.startDate || watchedDate > c.endDate) continue;
       const count = await timeframeCount(userId, c.startDate, c.endDate);
       if (count === c.target) completions.push({ id: c.id, title: c.title });
     } else if (c.type === "CREW" && c.personId != null) {

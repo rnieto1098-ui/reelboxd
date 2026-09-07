@@ -45,15 +45,30 @@ function topIds(scores: Map<number, number>, count: number): number[] {
     .map(([id]) => id);
 }
 
+/**
+ * Every film this user has seen, by whichever of the three ways the app
+ * records that: rating it, logging it in the diary, or marking it watched
+ * outright (WatchedItem, for films they can't put a date to).
+ *
+ * This used to read ratings alone, which quietly meant a film you'd logged
+ * but never rated could still be recommended back to you.
+ *
+ * "Have you seen it" only — anything that needs to know *when* stays on
+ * diary entries, since the other two sources carry no date.
+ */
 export async function getWatchedTmdbIds(userId: string | undefined): Promise<Set<number>> {
   if (!userId) return new Set();
 
-  const ratings = await prisma.rating.findMany({
-    where: { userId },
-    select: { movie: { select: { tmdbId: true } } },
-  });
+  const select = { movie: { select: { tmdbId: true } } } as const;
+  const [ratings, diaryEntries, watchedMarks] = await Promise.all([
+    prisma.rating.findMany({ where: { userId }, select }),
+    prisma.diaryEntry.findMany({ where: { userId }, select, distinct: ["movieId"] }),
+    prisma.watchedItem.findMany({ where: { userId }, select }),
+  ]);
 
-  return new Set(ratings.map((r) => r.movie.tmdbId));
+  return new Set(
+    [...ratings, ...diaryEntries, ...watchedMarks].map((r) => r.movie.tmdbId)
+  );
 }
 
 /**

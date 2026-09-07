@@ -28,6 +28,7 @@ model User {
   watchlist         WatchlistItem[]
   likes             Like[]
   owned             OwnedItem[]
+  watched           WatchedItem[]
   diaryEntries      DiaryEntry[]
   customPosters     CustomPoster[]
   customListCovers  CustomListCover[]
@@ -170,6 +171,7 @@ model Movie {
   watchlist     WatchlistItem[]
   likes         Like[]
   owned         OwnedItem[]
+  watched       WatchedItem[]
   diaryEntries  DiaryEntry[]
   customPosters CustomPoster[]
   providerSnapshot   MovieProviderSnapshot?
@@ -254,6 +256,25 @@ model Like {
 model OwnedItem {
   id        String   @id @default(cuid())
   addedAt   DateTime @default(now())
+
+  userId  String
+  user    User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  movieId String
+  movie   Movie @relation(fields: [movieId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, movieId])
+}
+
+// "I've seen this, I just can't tell you when." A DiaryEntry can't express
+// that — every entry needs a date, which is what makes the diary a diary —
+// so films watched years ago had no way to be recorded without inventing a
+// date that would then pollute the dated stats. Rating a film still implies
+// watched on its own, as it always has; this covers the case where there's
+// no rating either. Deliberately undated, which is why nothing year- or
+// month-scoped (watch goals, busiest month, Year in Review) counts it.
+model WatchedItem {
+  id      String   @id @default(cuid())
+  addedAt DateTime @default(now())
 
   userId  String
   user    User  @relation(fields: [userId], references: [id], onDelete: Cascade)

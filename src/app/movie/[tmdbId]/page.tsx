@@ -20,6 +20,7 @@ import { StarRating } from "@/components/StarRating";
 import { WatchlistButton } from "@/components/WatchlistButton";
 import { LikeButton } from "@/components/LikeButton";
 import { OwnedButton } from "@/components/OwnedButton";
+import { WatchedButton } from "@/components/WatchedButton";
 import { LogWatchButton } from "@/components/LogWatchButton";
 import { CastList } from "@/components/CastList";
 import { PosterPicker } from "@/components/PosterPicker";
@@ -103,6 +104,9 @@ export default async function MovieDetailPage({
           owned: session?.user?.id
             ? { where: { userId: session.user.id } }
             : false,
+          watched: session?.user?.id
+            ? { where: { userId: session.user.id } }
+            : false,
           diaryEntries: session?.user?.id
             ? { where: { userId: session.user.id }, orderBy: { watchedDate: "desc" } }
             : false,
@@ -157,6 +161,12 @@ export default async function MovieDetailPage({
   const isLiked = (localMovie?.likes?.length ?? 0) > 0;
   const likeCount = localMovie?._count.likes ?? 0;
   const isOwned = (localMovie?.owned?.length ?? 0) > 0;
+  // Lit for any of the three ways the app knows you've seen a film, so it
+  // can't sit unlit next to a diary entry saying you watched it twice.
+  const isWatched =
+    (localMovie?.watched?.length ?? 0) > 0 ||
+    (localMovie?.diaryEntries?.length ?? 0) > 0 ||
+    myRating != null;
   const diaryEntries = localMovie?.diaryEntries ?? [];
 
   const flatrateProviders = watchAvailability.flatrate ?? [];
@@ -252,6 +262,11 @@ export default async function MovieDetailPage({
             />
             <OwnedButton tmdbId={tmdbId} initialOwned={isOwned} signedIn={!!session?.user} />
             <LogWatchButton tmdbId={tmdbId} signedIn={!!session?.user} />
+            <WatchedButton
+              tmdbId={tmdbId}
+              initialWatched={isWatched}
+              signedIn={!!session?.user}
+            />
             {session?.user && (
               <AddToListButton
                 tmdbId={tmdbId}

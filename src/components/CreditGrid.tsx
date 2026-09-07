@@ -50,6 +50,7 @@ export function CreditGrid({ title, credits }: { title: string; credits: CreditD
               year={credit.year}
               owned={credit.owned}
               inWatchlist={credit.inWatchlist}
+              watched={credit.watched}
             />
           </div>
         ))}

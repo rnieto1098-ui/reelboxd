@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { posterUrl, type TmdbImage } from "@/lib/tmdb";
-import { BookmarkIcon, CalendarIcon, ImageIcon, ShoppingBagIcon } from "@/components/icons";
+import { BookmarkIcon, CalendarIcon, EyeIcon, ImageIcon, ShoppingBagIcon } from "@/components/icons";
 import { useToast } from "@/components/Toast";
 
 type ActionState = "idle" | "saving" | "done";
@@ -32,10 +32,15 @@ export function PosterQuickActions({
   tmdbId,
   initialOwned = false,
   initialInWatchlist = false,
+  // Undefined means the caller doesn't track watched state, so the toggle
+  // is hidden rather than shown permanently unlit — a grid that can't know
+  // whether you've seen a film shouldn't imply you haven't.
+  initialWatched,
 }: {
   tmdbId: number;
   initialOwned?: boolean;
   initialInWatchlist?: boolean;
+  initialWatched?: boolean;
 }) {
   const router = useRouter();
   const showToast = useToast();
@@ -44,6 +49,8 @@ export function PosterQuickActions({
   const [ownedSaving, setOwnedSaving] = useState(false);
   const [inWatchlist, setInWatchlist] = useState(initialInWatchlist);
   const [watchlistSaving, setWatchlistSaving] = useState(false);
+  const [watched, setWatched] = useState(initialWatched ?? false);
+  const [watchedSaving, setWatchedSaving] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [posters, setPosters] = useState<TmdbImage[] | null>(null);
   const [loadingPosters, setLoadingPosters] = useState(false);
@@ -64,6 +71,11 @@ export function PosterQuickActions({
   if (initialInWatchlist !== prevInitialInWatchlist) {
     setPrevInitialInWatchlist(initialInWatchlist);
     setInWatchlist(initialInWatchlist);
+  }
+  const [prevInitialWatched, setPrevInitialWatched] = useState(initialWatched);
+  if (initialWatched !== prevInitialWatched) {
+    setPrevInitialWatched(initialWatched);
+    setWatched(initialWatched ?? false);
   }
 
   // Log watch is its own function rather than a generic runAction helper —
@@ -135,6 +147,39 @@ export function PosterQuickActions({
     router.refresh();
   }
 
+  // Undated counterpart to Log watch above — marking a film seen without
+  // putting a date on it. Reads the response for the same reason
+  // logDiaryWatch does: this can be the click that finishes a challenge.
+  async function toggleWatched(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setWatchedSaving(true);
+    const res = await fetch(`/api/movies/${tmdbId}/watched`, {
+      method: watched ? "DELETE" : "POST",
+    });
+    setWatchedSaving(false);
+    if (res.status === 401) {
+      router.push("/login");
+      return;
+    }
+    // Next state comes from the response, not a local flip: removing the
+    // mark from a film that's also in the diary leaves it watched.
+    const body = await res.json().catch(() => null);
+    const wasWatched = watched;
+    setWatched(body?.watched ?? !watched);
+    router.refresh();
+
+    if (!wasWatched) {
+      for (const challenge of body?.completedChallenges ?? []) {
+        showToast(`🎉 Challenge complete: ${challenge.title}`);
+      }
+    } else if (body?.stillWatchedBecause === "diary") {
+      showToast("Still watched — it's logged in your diary.");
+    } else if (body?.stillWatchedBecause === "rating") {
+      showToast("Still watched — you've rated it.");
+    }
+  }
+
   function openPosterPicker(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
@@ -191,16 +236,31 @@ export function PosterQuickActions({
       </div>
 
       <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-between p-1.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-        <button
-          type="button"
-          title="Log watch"
-          aria-label="Log watch"
-          disabled={diaryState === "saving"}
-          onClick={logDiaryWatch}
-          className={actionButtonClass(false)}
-        >
-          {diaryState === "done" ? <CheckIcon /> : <CalendarIcon />}
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            title="Log watch"
+            aria-label="Log watch"
+            disabled={diaryState === "saving"}
+            onClick={logDiaryWatch}
+            className={actionButtonClass(false)}
+          >
+            {diaryState === "done" ? <CheckIcon /> : <CalendarIcon />}
+          </button>
+          {initialWatched !== undefined && (
+            <button
+              type="button"
+              title={watched ? "Marked watched — click to undo" : "Mark watched (no date)"}
+              aria-label="Mark watched"
+              aria-pressed={watched}
+              disabled={watchedSaving}
+              onClick={toggleWatched}
+              className={actionButtonClass(watched)}
+            >
+              <EyeIcon />
+            </button>
+          )}
+        </div>
         <button
           type="button"
           title={inWatchlist ? "On watchlist — click to remove" : "Add to watchlist"}

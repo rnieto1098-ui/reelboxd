@@ -5,7 +5,11 @@ import { prisma } from "@/lib/prisma";
 import { getUserOwnedTmdbIds } from "@/lib/streaming";
 import { getUserWatchlistedTmdbIds } from "@/lib/movies";
 import { formatTimeLeft } from "@/lib/dates";
-import { getChallengeSuggestions, getCrewFilmography } from "@/lib/challenges";
+import {
+  getChallengeSuggestions,
+  getCrewFilmography,
+  getWatchedAmong,
+} from "@/lib/challenges";
 import { CreditGrid, type CreditDisplay } from "@/components/CreditGrid";
 import { FadeWatchedControl } from "@/components/FadeWatchedControl";
 import { MovieRow } from "@/components/MovieRow";
@@ -54,12 +58,10 @@ export default async function ChallengeDetailPage({
     const filmography = await getCrewFilmography(challenge.personId, challenge.department);
     target = filmography.length;
 
-    const logged = await prisma.diaryEntry.findMany({
-      where: { userId: ownerId, movie: { tmdbId: { in: filmography.map((c) => c.id) } } },
-      select: { movie: { select: { tmdbId: true } } },
-      distinct: ["movieId"],
-    });
-    const watchedTmdbIds = new Set(logged.map((l) => l.movie.tmdbId));
+    const watchedTmdbIds = await getWatchedAmong(
+      ownerId,
+      filmography.map((c) => c.id)
+    );
 
     credits = filmography
       .slice()
@@ -85,12 +87,10 @@ export default async function ChallengeDetailPage({
     });
     target = items.length;
 
-    const logged = await prisma.diaryEntry.findMany({
-      where: { userId: ownerId, movie: { tmdbId: { in: items.map((i) => i.tmdbId) } } },
-      select: { movie: { select: { tmdbId: true } } },
-      distinct: ["movieId"],
-    });
-    const watchedTmdbIds = new Set(logged.map((l) => l.movie.tmdbId));
+    const watchedTmdbIds = await getWatchedAmong(
+      ownerId,
+      items.map((i) => i.tmdbId)
+    );
 
     credits = items.map((item) => ({
       id: item.tmdbId,

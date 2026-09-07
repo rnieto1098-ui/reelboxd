@@ -165,12 +165,13 @@ async function crewProgress(
   const filmography = await getCrewFilmography(personId, department);
   if (filmography.length === 0) return { count: 0, target: 0 };
 
-  const logged = await prisma.diaryEntry.findMany({
-    where: { userId, movie: { tmdbId: { in: filmography.map((c) => c.id) } } },
-    select: { movie: { select: { tmdbId: true } } },
-    distinct: ["movieId"],
-  });
-  return { count: new Set(logged.map((l) => l.movie.tmdbId)).size, target: filmography.length };
+  return {
+    count: await watchedCountAmong(
+      userId,
+      filmography.map((c) => c.id)
+    ),
+    target: filmography.length,
+  };
 }
 
 export type ChallengeCompletion = { id: string; title: string };

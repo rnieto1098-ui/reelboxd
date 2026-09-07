@@ -13,6 +13,7 @@ export function MovieRow({
   emptyMessage,
   ownedIds,
   watchlistIds,
+  watchedIds,
   headerExtra,
 }: {
   title: string;
@@ -22,6 +23,12 @@ export function MovieRow({
   // Client Component boundary this component now sits behind.
   ownedIds?: number[];
   watchlistIds?: number[];
+  // Omitted by rows whose movies are unwatched by construction
+  // (recommendations, upcoming releases already exclude anything seen) —
+  // MovieCard's own default (unwatched) is correct there. Pass this only
+  // when the row can actually contain already-watched films, e.g. a
+  // collection like "Owned movies".
+  watchedIds?: number[];
   // Extra header content shown alongside the shuffle button (e.g. an
   // import link) — most rows don't need this, so it's optional.
   headerExtra?: ReactNode;
@@ -29,6 +36,7 @@ export function MovieRow({
   const { order, shuffle } = useShuffle(movies, (m) => m.id);
   const ownedSet = useMemo(() => new Set(ownedIds), [ownedIds]);
   const watchlistSet = useMemo(() => new Set(watchlistIds), [watchlistIds]);
+  const watchedSet = useMemo(() => new Set(watchedIds), [watchedIds]);
 
   return (
     <HorizontalScroller
@@ -53,6 +61,7 @@ export function MovieRow({
             year={movie.release_date?.slice(0, 4)}
             owned={ownedSet.has(movie.id)}
             inWatchlist={watchlistSet.has(movie.id)}
+            watched={watchedSet.has(movie.id)}
           />
         </div>
       ))}

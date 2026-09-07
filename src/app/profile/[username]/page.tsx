@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { getCustomPosterMap } from "@/lib/customPosters";
 import { getUserWatchlistedTmdbIds } from "@/lib/movies";
 import { getUserOwnedTmdbIds } from "@/lib/streaming";
+import { getWatchedTmdbIds } from "@/lib/recommendations";
 import { getGoalProgress } from "@/lib/goals";
 import { getChallengesWithProgress, type ChallengeSummary } from "@/lib/challenges";
 import { MovieRow } from "@/components/MovieRow";
@@ -193,16 +194,21 @@ export default async function ProfilePage({
   // poster is a personal preference that follows you wherever a film shows up.
   // Same reasoning for owned/watchlist highlighting below: it reflects
   // whoever is looking, not necessarily this profile's owner.
-  const [posterOverrides, viewerOwnedIds, viewerWatchlistIds, goal, challenges] = await Promise.all([
-    getCustomPosterMap(session?.user?.id, [
-      ...recentEntries.map((e) => e.movie.tmdbId),
-      ...user.owned.map((o) => o.movie.tmdbId),
-    ]),
-    getUserOwnedTmdbIds(session?.user?.id),
-    getUserWatchlistedTmdbIds(session?.user?.id),
-    getGoalProgress(user.id, currentYearUTC()),
-    getChallengesWithProgress(user.id),
-  ]);
+  const [posterOverrides, viewerOwnedIds, viewerWatchlistIds, viewerWatchedIds, goal, challenges] =
+    await Promise.all([
+      getCustomPosterMap(session?.user?.id, [
+        ...recentEntries.map((e) => e.movie.tmdbId),
+        ...user.owned.map((o) => o.movie.tmdbId),
+      ]),
+      getUserOwnedTmdbIds(session?.user?.id),
+      getUserWatchlistedTmdbIds(session?.user?.id),
+      // Owned movies are plausibly already watched, unlike a recommendation
+      // row — the "Owned movies" MovieRow below needs this to show the
+      // right state, same convention as the dedicated /owned page.
+      getWatchedTmdbIds(session?.user?.id),
+      getGoalProgress(user.id, currentYearUTC()),
+      getChallengesWithProgress(user.id),
+    ]);
 
   return (
     <div>
@@ -355,6 +361,7 @@ export default async function ProfilePage({
           emptyMessage="No owned movies marked yet."
           ownedIds={[...viewerOwnedIds]}
           watchlistIds={[...viewerWatchlistIds]}
+          watchedIds={[...viewerWatchedIds]}
           headerExtra={
             (isOwnProfile || user.owned.length > 0) && (
               <>

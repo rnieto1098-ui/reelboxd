@@ -1,55 +1,56 @@
 import Image from "next/image";
 import Link from "next/link";
 import { posterUrl } from "@/lib/tmdb";
-import type { YearMovieEntry } from "@/lib/stats";
+import type { RankedMovie } from "@/lib/statsCompute";
+import { Card, CardLabel } from "@/components/stats/StatsPrimitives";
 
-function Row({ entry, badge }: { entry: YearMovieEntry; badge: string }) {
+function Row({ entry, badge }: { entry: RankedMovie; badge: string }) {
   const poster = posterUrl(entry.posterPath, "w200");
   return (
     <Link
       href={`/movie/${entry.tmdbId}`}
-      className="group flex items-center gap-3 rounded-md p-1.5 -mx-1.5 transition-colors hover:bg-surface-hover"
+      className="group -mx-1.5 flex items-center gap-3 rounded-md p-1.5 transition-colors hover:bg-surface-hover"
     >
-      <div className="h-16 w-11 shrink-0 overflow-hidden rounded border border-border bg-background">
+      <div className="h-14 w-10 shrink-0 overflow-hidden rounded border border-border bg-background">
         {poster && (
           <Image
             src={poster}
             alt={entry.title}
-            width={44}
-            height={64}
+            width={40}
+            height={56}
             className="h-full w-full object-cover transition-transform group-hover:scale-105"
           />
         )}
       </div>
       <p className="min-w-0 flex-1 truncate text-sm group-hover:text-accent-green">{entry.title}</p>
-      <span className="shrink-0 text-xs font-medium text-accent-green">{badge}</span>
+      <span className="shrink-0 text-xs font-medium tabular-nums text-accent-green">{badge}</span>
     </Link>
   );
 }
 
-export function YearMovieList({
-  title,
+export function MovieRankList({
+  label,
   entries,
   badgeFor,
   emptyMessage,
 }: {
-  title: string;
-  entries: YearMovieEntry[];
-  badgeFor: (entry: YearMovieEntry) => string;
+  label: string;
+  entries: RankedMovie[];
+  badgeFor: (entry: RankedMovie) => string;
   emptyMessage: string;
 }) {
   return (
-    <div className="rounded-lg border border-border bg-surface p-4">
-      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">{title}</p>
+    <Card>
+      <CardLabel>{label}</CardLabel>
       {entries.length === 0 ? (
         <p className="text-sm text-muted">{emptyMessage}</p>
       ) : (
-        <div className="space-y-1">
+        <div className="space-y-0.5">
           {entries.map((entry) => (
             <Row key={entry.tmdbId} entry={entry} badge={badgeFor(entry)} />
           ))}
         </div>
       )}
-    </div>
+    </Card>
   );
 }

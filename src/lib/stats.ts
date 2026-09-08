@@ -1,7 +1,28 @@
 import { prisma } from "@/lib/prisma";
 import { parseGenres } from "@/lib/movies";
+import {
+  buildHeatmap,
+  certificationProfile,
+  compareToCrowd,
+  decadeProfile,
+  favoriteDecade,
+  genreProfile,
+  leaderboards,
+  ratingHistogram,
+  releaseYearDistribution,
+  runtimeProfile,
+  streakStats,
+  summarize,
+  watchlistHealth,
+  weekdayRhythm,
+  monthRhythm,
+  type StatsInput,
+  type StatsMovie,
+} from "@/lib/statsCompute";
 
-const RATING_BUCKETS = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5];
+export { formatWatchTime } from "@/lib/statsCompute";
+export type { ReleaseYearBucket, RankedMovie } from "@/lib/statsCompute";
+
 export const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
@@ -9,8 +30,7 @@ export const MONTH_NAMES = [
 
 // Counts genres across a set of (movieId, movie.genres) rows, counting each
 // unique movie once regardless of how many times it appears (e.g. rewatches
-// in a diary). Shared by getUserStats and getYearInReview, whose entries
-// have the same shape for this purpose.
+// in a diary). Used by getYearInReview, whose entries have this shape.
 export function topGenreCounts(
   entries: { movieId: string; movie: { genres: string | null } }[],
   limit = 5
@@ -30,169 +50,106 @@ export function topGenreCounts(
     .map(([name, count]) => ({ name, count }));
 }
 
-export type UserStats = {
-  totalLogged: number;
-  uniqueFilms: number;
-  rewatches: number;
-  totalWatchMinutes: number;
-  averageRating: number | null;
-  ratingDistribution: { score: number; count: number }[];
-  topGenres: { name: string; count: number }[];
-  busiestMonth: string | null;
-};
+const STATS_MOVIE_SELECT = {
+  id: true,
+  tmdbId: true,
+  title: true,
+  posterPath: true,
+  releaseDate: true,
+  runtime: true,
+  genres: true,
+  certification: true,
+  voteAverage: true,
+} as const;
 
-export async function getUserStats(userId: string): Promise<UserStats> {
-  const [entries, ratings] = await Promise.all([
-    prisma.diaryEntry.findMany({
-      where: { userId },
-      select: { movieId: true, rewatch: true, watchedDate: true, movie: { select: { runtime: true, genres: true } } },
-    }),
-    prisma.rating.findMany({
-      where: { userId },
-      select: { score: true },
-    }),
-  ]);
+export type ProfileStats = ReturnType<typeof computeProfileStats>;
 
-  const uniqueMovieIds = new Set(entries.map((e) => e.movieId));
-  const rewatches = entries.filter((e) => e.rewatch).length;
-  const totalWatchMinutes = entries.reduce((sum, e) => sum + (e.movie.runtime ?? 0), 0);
+function computeProfileStats(input: StatsInput) {
+  const { movieById, diaryEntries, ratings, watchedMovieIds, now } = input;
 
-  const averageRating =
-    ratings.length > 0 ? ratings.reduce((sum, r) => sum + r.score, 0) / ratings.length : null;
-
-  const ratingDistribution = RATING_BUCKETS.map((score) => ({
-    score,
-    count: ratings.filter((r) => r.score === score).length,
-  }));
-
-  const topGenres = topGenreCounts(entries);
-
-  const monthCounts = new Array(12).fill(0);
-  // UTC, not local time — same convention as every other date bucketing in
-  // this app (dayRangeUTC in diary.ts, yearBounds in dates.ts), so a watch
-  // logged near a month boundary doesn't land in the wrong month depending
-  // on the server's timezone.
-  for (const entry of entries) monthCounts[entry.watchedDate.getUTCMonth()]++;
-  const maxMonthCount = Math.max(0, ...monthCounts);
-  const busiestMonth = maxMonthCount > 0 ? MONTH_NAMES[monthCounts.indexOf(maxMonthCount)] : null;
+  const decades = decadeProfile(watchedMovieIds, movieById, ratings);
 
   return {
-    totalLogged: entries.length,
-    uniqueFilms: uniqueMovieIds.size,
-    rewatches,
-    totalWatchMinutes,
-    averageRating,
-    ratingDistribution,
-    topGenres,
-    busiestMonth,
+    summary: summarize(input),
+    ratings: ratingHistogram(ratings),
+    crowd: compareToCrowd(ratings, movieById),
+    heatmap: buildHeatmap(diaryEntries, now),
+    streaks: streakStats(diaryEntries, now),
+    weekdays: weekdayRhythm(diaryEntries),
+    months: monthRhythm(diaryEntries),
+    genres: genreProfile(watchedMovieIds, movieById, ratings),
+    decades,
+    favoriteDecade: favoriteDecade(decades),
+    runtimes: runtimeProfile(watchedMovieIds, movieById),
+    certifications: certificationProfile(watchedMovieIds, movieById),
+    releaseYears: releaseYearDistribution(watchedMovieIds, movieById),
+    leaderboards: leaderboards(diaryEntries, ratings, movieById),
+    watchlist: watchlistHealth(input.watchlistAddedAt, diaryEntries, now),
   };
 }
 
-export type ReleaseYearBucket = { year: number; count: number };
+/**
+ * Loads everything the stats page needs in one pass, then computes every cut
+ * from it in memory.
+ *
+ * The page shows a dozen different views of the same three tables, and the
+ * previous version queried the diary separately for each one. Reading it
+ * once costs a single round trip no matter how many stats get added on top,
+ * and keeps every number on the page derived from an identical snapshot —
+ * two queries a second apart could otherwise disagree with each other.
+ *
+ * `now` is a parameter so the date-relative stats (streaks, the heatmap
+ * window, watchlist ages) are pinnable in tests.
+ */
+export async function getProfileStats(userId: string, now: Date = new Date()): Promise<ProfileStats> {
+  const [diaryRows, ratingRows, watchedRows, likeCount, watchlistRows] = await Promise.all([
+    prisma.diaryEntry.findMany({
+      where: { userId },
+      select: { movieId: true, watchedDate: true, rewatch: true, movie: { select: STATS_MOVIE_SELECT } },
+    }),
+    prisma.rating.findMany({
+      where: { userId },
+      select: { movieId: true, score: true, updatedAt: true, movie: { select: STATS_MOVIE_SELECT } },
+    }),
+    prisma.watchedItem.findMany({
+      where: { userId },
+      select: { movieId: true, movie: { select: STATS_MOVIE_SELECT } },
+    }),
+    prisma.like.count({ where: { userId } }),
+    prisma.watchlistItem.findMany({ where: { userId }, select: { addedAt: true } }),
+  ]);
 
-// Distribution of release years across every distinct film the user has
-// ever logged — a rewatch doesn't count twice, since the question is "what
-// eras do you watch," not "how many times."
-export async function getReleaseYearDistribution(userId: string): Promise<ReleaseYearBucket[]> {
-  const entries = await prisma.diaryEntry.findMany({
-    where: { userId },
-    select: { movieId: true, movie: { select: { releaseDate: true } } },
-  });
-
-  const seenMovieIds = new Set<string>();
-  const counts = new Map<number, number>();
-  for (const entry of entries) {
-    if (seenMovieIds.has(entry.movieId)) continue;
-    seenMovieIds.add(entry.movieId);
-    const year = entry.movie.releaseDate ? Number(entry.movie.releaseDate.slice(0, 4)) : NaN;
-    if (!Number.isFinite(year)) continue;
-    counts.set(year, (counts.get(year) ?? 0) + 1);
+  const movieById = new Map<string, StatsMovie>();
+  for (const row of [...diaryRows, ...ratingRows, ...watchedRows]) {
+    // Genres are split here rather than inside statsCompute so that module
+    // stays import-free and therefore unit-testable.
+    movieById.set(row.movie.id, { ...row.movie, genres: parseGenres(row.movie.genres) });
   }
 
-  if (counts.size === 0) return [];
+  // The app-wide definition of watched, matching getWatchedTmdbIds in
+  // recommendations.ts: a rating, a dated diary entry, or an undated mark
+  // each count on their own.
+  const watchedMovieIds = new Set([
+    ...diaryRows.map((r) => r.movieId),
+    ...ratingRows.map((r) => r.movieId),
+    ...watchedRows.map((r) => r.movieId),
+  ]);
 
-  // Zero-fill the gaps within the span so the chart reads as a real
-  // timeline instead of skipping years with no watches, which would
-  // visually compress decades of gaps into nothing.
-  const years = [...counts.keys()];
-  const minYear = Math.min(...years);
-  const maxYear = Math.max(...years);
-  const buckets: ReleaseYearBucket[] = [];
-  for (let y = minYear; y <= maxYear; y++) {
-    buckets.push({ year: y, count: counts.get(y) ?? 0 });
-  }
-  return buckets;
-}
-
-export type YearMovieEntry = {
-  tmdbId: number;
-  title: string;
-  posterPath: string | null;
-  watchCount: number;
-  rating: number | null;
-};
-
-export type YearMovieLists = {
-  mostWatched: YearMovieEntry[];
-  highestRated: YearMovieEntry[];
-};
-
-const YEAR_LIST_LIMIT = 10;
-
-// "For the year": movies logged within that calendar year specifically —
-// distinct from all-time stats above. Most-watched counts rewatches within
-// the year; highest-rated uses the user's current rating for each film
-// (a rating isn't itself dated, so this reflects their rating now, not
-// necessarily what they'd have said the day they logged it).
-export async function getYearMovieLists(userId: string, year: number): Promise<YearMovieLists> {
-  const start = new Date(Date.UTC(year, 0, 1));
-  const end = new Date(Date.UTC(year + 1, 0, 1));
-
-  const entries = await prisma.diaryEntry.findMany({
-    where: { userId, watchedDate: { gte: start, lt: end } },
-    select: {
-      movieId: true,
-      movie: { select: { tmdbId: true, title: true, posterPath: true } },
-    },
+  return computeProfileStats({
+    movieById,
+    diaryEntries: diaryRows.map((r) => ({
+      movieId: r.movieId,
+      watchedDate: r.watchedDate,
+      rewatch: r.rewatch,
+    })),
+    ratings: ratingRows.map((r) => ({
+      movieId: r.movieId,
+      score: r.score,
+      updatedAt: r.updatedAt,
+    })),
+    watchedMovieIds,
+    likeCount,
+    watchlistAddedAt: watchlistRows.map((r) => r.addedAt),
+    now,
   });
-  if (entries.length === 0) return { mostWatched: [], highestRated: [] };
-
-  const watchCounts = new Map<string, number>();
-  const movieById = new Map<string, { tmdbId: number; title: string; posterPath: string | null }>();
-  for (const entry of entries) {
-    watchCounts.set(entry.movieId, (watchCounts.get(entry.movieId) ?? 0) + 1);
-    movieById.set(entry.movieId, entry.movie);
-  }
-
-  const ratings = await prisma.rating.findMany({
-    where: { userId, movieId: { in: [...movieById.keys()] } },
-    select: { movieId: true, score: true },
-  });
-  const ratingByMovieId = new Map(ratings.map((r) => [r.movieId, r.score]));
-
-  const allEntries: YearMovieEntry[] = [...movieById.entries()].map(([movieId, movie]) => ({
-    tmdbId: movie.tmdbId,
-    title: movie.title,
-    posterPath: movie.posterPath,
-    watchCount: watchCounts.get(movieId) ?? 0,
-    rating: ratingByMovieId.get(movieId) ?? null,
-  }));
-
-  const mostWatched = [...allEntries]
-    .sort((a, b) => b.watchCount - a.watchCount)
-    .slice(0, YEAR_LIST_LIMIT);
-
-  const highestRated = allEntries
-    .filter((e) => e.rating != null)
-    .sort((a, b) => (b.rating as number) - (a.rating as number))
-    .slice(0, YEAR_LIST_LIMIT);
-
-  return { mostWatched, highestRated };
-}
-
-export function formatWatchTime(minutes: number): string {
-  const days = Math.floor(minutes / (60 * 24));
-  const hours = Math.floor((minutes % (60 * 24)) / 60);
-  if (days > 0) return `${days}d ${hours}h`;
-  return `${hours}h ${minutes % 60}m`;
 }

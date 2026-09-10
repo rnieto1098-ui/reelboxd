@@ -12,7 +12,16 @@ export function DeleteChallengeButton({ challengeId }: { challengeId: string }) 
 
   async function handleDelete() {
     setDeleting(true);
-    const res = await fetch(`/api/challenges/${challengeId}`, { method: "DELETE" });
+
+    let res: Response;
+    try {
+      res = await fetch(`/api/challenges/${challengeId}`, { method: "DELETE" });
+    } catch {
+      setDeleting(false);
+      showToast("Couldn't remove that challenge — try again.", "error");
+      return;
+    }
+
     setDeleting(false);
 
     // 404 means it's already gone (double-click, or removed in another tab),

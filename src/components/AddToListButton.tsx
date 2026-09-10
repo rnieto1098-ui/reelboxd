@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useToast } from "@/components/Toast";
 import { ListPlusIcon } from "@/components/icons";
 
 type ListEntry = { id: string; title: string; hasMovie: boolean };
@@ -20,6 +21,7 @@ export function AddToListButton({
   lists: ListEntry[];
 }) {
   const router = useRouter();
+  const showToast = useToast();
   const [open, setOpen] = useState(false);
   const [entries, setEntries] = useState(lists);
   const [newListName, setNewListName] = useState("");
@@ -27,19 +29,36 @@ export function AddToListButton({
 
   async function toggle(listId: string, currentlyIn: boolean) {
     setSaving(true);
-    if (currentlyIn) {
-      await fetch(`/api/lists/${listId}/items/${tmdbId}`, { method: "DELETE" });
-    } else {
-      await fetch(`/api/lists/${listId}/items`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tmdbId, title, posterPath, releaseDate }),
-      });
+
+    let res: Response;
+    try {
+      res = currentlyIn
+        ? await fetch(`/api/lists/${listId}/items/${tmdbId}`, { method: "DELETE" })
+        : await fetch(`/api/lists/${listId}/items`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ tmdbId, title, posterPath, releaseDate }),
+          });
+    } catch {
+      setSaving(false);
+      showToast("Something went wrong — try again.", "error");
+      return;
     }
+
+    setSaving(false);
+
+    // Flipped only on success — this used to flip unconditionally, so a
+    // failed request left the checkbox showing a membership that was never
+    // actually saved, with nothing to reveal the mismatch until the next
+    // full page load.
+    if (!res.ok) {
+      showToast("Something went wrong — try again.", "error");
+      return;
+    }
+
     setEntries((prev) =>
       prev.map((l) => (l.id === listId ? { ...l, hasMovie: !currentlyIn } : l))
     );
-    setSaving(false);
     router.refresh();
   }
 
@@ -47,24 +66,50 @@ export function AddToListButton({
     if (!newListName.trim()) return;
     setSaving(true);
 
-    const res = await fetch("/api/lists", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: newListName }),
-    });
-    const list = await res.json();
+    let res: Response;
+    try {
+      res = await fetch("/api/lists", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: newListName }),
+      });
+    } catch {
+      setSaving(false);
+      showToast("Couldn't create that list — try again.", "error");
+      return;
+    }
 
-    if (res.ok) {
-      await fetch(`/api/lists/${list.id}/items`, {
+    const list = await res.json().catch(() => null);
+
+    if (!res.ok || !list) {
+      setSaving(false);
+      showToast("Couldn't create that list — try again.", "error");
+      return;
+    }
+
+    let addRes: Response | null;
+    try {
+      addRes = await fetch(`/api/lists/${list.id}/items`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tmdbId, title, posterPath, releaseDate }),
       });
-      setEntries((prev) => [...prev, { id: list.id, title: list.title, hasMovie: true }]);
-      setNewListName("");
+    } catch {
+      addRes = null;
     }
 
+    // The list itself exists either way by this point — only whether this
+    // film landed in it is in question, so hasMovie has to reflect that
+    // rather than being assumed true. Previously this fetch had no res.ok
+    // check at all, so a failed add still showed the film as added.
+    setEntries((prev) => [...prev, { id: list.id, title: list.title, hasMovie: !!addRes?.ok }]);
+    setNewListName("");
     setSaving(false);
+
+    if (!addRes?.ok) {
+      showToast(`Created "${list.title}", but couldn't add this film to it — try again.`, "error");
+    }
+
     router.refresh();
   }
 

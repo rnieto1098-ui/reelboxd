@@ -19,16 +19,25 @@ export function ChangePasswordForm() {
     }
 
     setSaving(true);
-    const res = await fetch("/api/account/password", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ currentPassword, newPassword }),
-    });
-    const data = await res.json();
+
+    let res: Response;
+    try {
+      res = await fetch("/api/account/password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+    } catch {
+      setSaving(false);
+      showToast("Something went wrong — try again.", "error");
+      return;
+    }
+
+    const data = await res.json().catch(() => null);
     setSaving(false);
 
     if (!res.ok) {
-      showToast(data.error ?? "Something went wrong", "error");
+      showToast(data?.error ?? "Something went wrong", "error");
       return;
     }
 

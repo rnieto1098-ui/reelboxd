@@ -16,11 +16,20 @@ export function LogWatchButton({ tmdbId, signedIn }: { tmdbId: number; signedIn:
       return;
     }
     setSaving(true);
-    const res = await fetch("/api/diary", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tmdbId }),
-    });
+
+    let res: Response;
+    try {
+      res = await fetch("/api/diary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tmdbId }),
+      });
+    } catch {
+      setSaving(false);
+      showToast("Couldn't log that watch — try again.", "error");
+      return;
+    }
+
     setSaving(false);
 
     if (!res.ok) {

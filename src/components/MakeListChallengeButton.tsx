@@ -14,11 +14,20 @@ export function MakeListChallengeButton({ listId }: { listId: string }) {
 
   async function create() {
     setSaving(true);
-    const res = await fetch("/api/challenges", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type: "LIST", listId }),
-    });
+
+    let res: Response;
+    try {
+      res = await fetch("/api/challenges", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "LIST", listId }),
+      });
+    } catch {
+      setSaving(false);
+      showToast("Couldn't make that a challenge — try again.", "error");
+      return;
+    }
+
     const body = await res.json().catch(() => null);
     setSaving(false);
 

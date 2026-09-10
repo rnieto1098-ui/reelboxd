@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { useToast } from "@/components/Toast";
 import { posterUrl, type TmdbImage } from "@/lib/tmdb";
 
 export function PosterPicker({
@@ -13,6 +14,7 @@ export function PosterPicker({
   hasCustomPoster: boolean;
 }) {
   const router = useRouter();
+  const showToast = useToast();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -38,20 +40,50 @@ export function PosterPicker({
 
   async function choosePoster(posterPath: string) {
     setSaving(true);
-    await fetch(`/api/movies/${tmdbId}/poster`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ posterPath }),
-    });
+
+    let res: Response;
+    try {
+      res = await fetch(`/api/movies/${tmdbId}/poster`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ posterPath }),
+      });
+    } catch {
+      setSaving(false);
+      showToast("Couldn't set that poster — try again.", "error");
+      return;
+    }
+
     setSaving(false);
+
+    if (!res.ok) {
+      showToast("Couldn't set that poster — try again.", "error");
+      return;
+    }
+
     setOpen(false);
     router.refresh();
   }
 
   async function resetPoster() {
     setSaving(true);
-    await fetch(`/api/movies/${tmdbId}/poster`, { method: "DELETE" });
+
+    let res: Response;
+    try {
+      res = await fetch(`/api/movies/${tmdbId}/poster`, { method: "DELETE" });
+    } catch {
+      setSaving(false);
+      showToast("Couldn't reset the poster — try again.", "error");
+      return;
+    }
+
     setSaving(false);
+
+    if (!res.ok) {
+      showToast("Couldn't reset the poster — try again.", "error");
+      return;
+    }
+
     setOpen(false);
     router.refresh();
   }

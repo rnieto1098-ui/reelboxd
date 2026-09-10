@@ -86,9 +86,21 @@ export function NewChallengeForm({ genres }: { genres: string[] }) {
   async function searchPeople() {
     if (!personQuery.trim()) return;
     setSearching(true);
-    const res = await fetch(`/api/challenges/people?q=${encodeURIComponent(personQuery.trim())}`);
-    const body = await res.json();
-    setPersonResults(body.results ?? []);
+
+    let body: { results?: PersonResult[] } | null;
+    try {
+      const res = await fetch(`/api/challenges/people?q=${encodeURIComponent(personQuery.trim())}`);
+      body = await res.json();
+    } catch {
+      // Without the catch, a thrown fetch skipped setSearching(false) below
+      // and left the Search button reading "Searching..." and disabled for
+      // the rest of the page's life.
+      setSearching(false);
+      showToast("Search failed — try again.", "error");
+      return;
+    }
+
+    setPersonResults(body?.results ?? []);
     setSearching(false);
   }
 
@@ -98,9 +110,21 @@ export function NewChallengeForm({ genres }: { genres: string[] }) {
     setDepartments(null);
     setDepartment(null);
     setLoadingDepartments(true);
-    const res = await fetch(`/api/challenges/people/${person.id}/departments`);
-    const body = await res.json();
-    const options: DepartmentOption[] = body.departments ?? [];
+
+    let options: DepartmentOption[];
+    try {
+      const res = await fetch(`/api/challenges/people/${person.id}/departments`);
+      const body = await res.json();
+      options = body.departments ?? [];
+    } catch {
+      // Same failure shape as searchPeople: an uncaught throw here left
+      // "Loading filmography..." on screen permanently, with no departments
+      // ever set and no way forward except the "Change" button.
+      setLoadingDepartments(false);
+      showToast("Couldn't load that person's filmography — try again.", "error");
+      return;
+    }
+
     setDepartments(options);
     // Default to this person's known department (their actual craft) rather
     // than whichever department happens to have the most credits — a
@@ -144,16 +168,25 @@ export function NewChallengeForm({ genres }: { genres: string[] }) {
     if (customTitle.trim()) payload.title = customTitle.trim();
 
     setSaving(true);
-    const res = await fetch("/api/challenges", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const body = await res.json();
+
+    let res: Response;
+    try {
+      res = await fetch("/api/challenges", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    } catch {
+      setSaving(false);
+      showToast("Couldn't create that challenge — try again.", "error");
+      return;
+    }
+
+    const body = await res.json().catch(() => null);
     setSaving(false);
 
     if (!res.ok) {
-      showToast(body.error ?? "Couldn't create that challenge", "error");
+      showToast(body?.error ?? "Couldn't create that challenge", "error");
       return;
     }
 

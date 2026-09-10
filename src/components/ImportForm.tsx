@@ -33,12 +33,22 @@ export function ImportForm() {
     const formData = new FormData();
     formData.append("file", file);
 
-    const res = await fetch("/api/import/letterboxd", { method: "POST", body: formData });
-    const data = await res.json();
+    let res: Response;
+    try {
+      res = await fetch("/api/import/letterboxd", { method: "POST", body: formData });
+    } catch {
+      setLoading(false);
+      setError("Something went wrong — try again.");
+      return;
+    }
+
+    const data = await res.json().catch(() => null);
     setLoading(false);
 
     if (!res.ok) {
-      setError(data.error ?? "Something went wrong");
+      // A file over the server's upload limit fails before the handler ever
+      // runs, so the body isn't the JSON error shape it usually is.
+      setError(data?.error ?? "Something went wrong");
       return;
     }
 

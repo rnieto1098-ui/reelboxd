@@ -12,7 +12,16 @@ export function DeleteListButton({ listId }: { listId: string }) {
 
   async function handleDelete() {
     setDeleting(true);
-    const res = await fetch(`/api/lists/${listId}`, { method: "DELETE" });
+
+    let res: Response;
+    try {
+      res = await fetch(`/api/lists/${listId}`, { method: "DELETE" });
+    } catch {
+      setDeleting(false);
+      showToast("Couldn't delete that list — try again.", "error");
+      return;
+    }
+
     setDeleting(false);
 
     if (!res.ok) {

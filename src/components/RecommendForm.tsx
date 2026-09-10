@@ -152,16 +152,24 @@ export function RecommendForm() {
     const isRepeat = criteria === lastCriteriaRef.current;
     const excludeIds = isRepeat ? shownIdsRef.current : [];
 
-    const res = await fetch("/api/recommend", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...payload, excludeIds }),
-    });
-    const body = await res.json();
+    let res: Response;
+    try {
+      res = await fetch("/api/recommend", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...payload, excludeIds }),
+      });
+    } catch {
+      setLoading(false);
+      setError("Something went wrong — try again.");
+      return;
+    }
+
+    const body = await res.json().catch(() => null);
     setLoading(false);
 
-    if (!res.ok) {
-      setError(body.error ?? "Something went wrong");
+    if (!res.ok || !body) {
+      setError(body?.error ?? "Something went wrong");
       return;
     }
 
@@ -185,16 +193,24 @@ export function RecommendForm() {
 
     const payload = buildPayload(hasSelection ? prompt : "surprise me");
 
-    const res = await fetch("/api/recommend", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...payload, excludeIds: [] }),
-    });
-    const body = await res.json();
-
-    if (!res.ok || !body.results?.length) {
+    let res: Response;
+    try {
+      res = await fetch("/api/recommend", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...payload, excludeIds: [] }),
+      });
+    } catch {
       setSurprising(false);
-      setError(body.error ?? "Couldn't find anything — try again?");
+      setError("Something went wrong — try again.");
+      return;
+    }
+
+    const body = await res.json().catch(() => null);
+
+    if (!res.ok || !body?.results?.length) {
+      setSurprising(false);
+      setError(body?.error ?? "Couldn't find anything — try again?");
       return;
     }
 

@@ -15,15 +15,23 @@ export function ChangeUsernameForm({ currentUsername }: { currentUsername: strin
     if (username === currentUsername) return;
     setSaving(true);
 
-    const res = await fetch("/api/account/username", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username }),
-    });
-    const data = await res.json();
+    let res: Response;
+    try {
+      res = await fetch("/api/account/username", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username }),
+      });
+    } catch {
+      setSaving(false);
+      showToast("Something went wrong — try again.", "error");
+      return;
+    }
+
+    const data = await res.json().catch(() => null);
 
     if (!res.ok) {
-      showToast(data.error ?? "Something went wrong", "error");
+      showToast(data?.error ?? "Something went wrong", "error");
       setSaving(false);
       return;
     }

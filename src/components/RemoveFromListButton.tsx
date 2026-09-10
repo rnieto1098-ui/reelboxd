@@ -11,7 +11,16 @@ export function RemoveFromListButton({ listId, tmdbId }: { listId: string; tmdbI
 
   async function handleRemove() {
     setRemoving(true);
-    const res = await fetch(`/api/lists/${listId}/items/${tmdbId}`, { method: "DELETE" });
+
+    let res: Response;
+    try {
+      res = await fetch(`/api/lists/${listId}/items/${tmdbId}`, { method: "DELETE" });
+    } catch {
+      setRemoving(false);
+      showToast("Couldn't remove that movie — try again.", "error");
+      return;
+    }
+
     setRemoving(false);
 
     if (!res.ok) {

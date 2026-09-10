@@ -28,12 +28,20 @@ export function ProfileImageUpload({
     formData.append("file", file);
     formData.append("type", type);
 
-    const res = await fetch("/api/profile/image", { method: "POST", body: formData });
-    const body = await res.json();
+    let res: Response;
+    try {
+      res = await fetch("/api/profile/image", { method: "POST", body: formData });
+    } catch {
+      setSaving(false);
+      setError("Upload failed — try again.");
+      return;
+    }
+
+    const body = await res.json().catch(() => null);
     setSaving(false);
 
     if (!res.ok) {
-      setError(body.error ?? "Upload failed");
+      setError(body?.error ?? "Upload failed");
       return;
     }
 
@@ -42,8 +50,27 @@ export function ProfileImageUpload({
 
   async function handleRemove() {
     setSaving(true);
-    await fetch(`/api/profile/image?type=${type}`, { method: "DELETE" });
+    setError(null);
+
+    let res: Response;
+    try {
+      res = await fetch(`/api/profile/image?type=${type}`, { method: "DELETE" });
+    } catch {
+      setSaving(false);
+      setError("Couldn't remove that — try again.");
+      return;
+    }
+
     setSaving(false);
+
+    // Previously unchecked, unlike handleFileChange above — a failed delete
+    // still refreshed as if it had succeeded, leaving the stale image in
+    // place with nothing to say the request hadn't actually landed.
+    if (!res.ok) {
+      setError("Couldn't remove that — try again.");
+      return;
+    }
+
     router.refresh();
   }
 

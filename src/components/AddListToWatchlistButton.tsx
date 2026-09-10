@@ -11,7 +11,16 @@ export function AddListToWatchlistButton({ listId }: { listId: string }) {
 
   async function handleClick() {
     setSaving(true);
-    const res = await fetch(`/api/lists/${listId}/add-to-watchlist`, { method: "POST" });
+
+    let res: Response;
+    try {
+      res = await fetch(`/api/lists/${listId}/add-to-watchlist`, { method: "POST" });
+    } catch {
+      setSaving(false);
+      showToast("Couldn't add this list to your watchlist.", "error");
+      return;
+    }
+
     const body = await res.json().catch(() => null);
     setSaving(false);
 

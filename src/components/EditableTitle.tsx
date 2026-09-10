@@ -50,11 +50,20 @@ export function EditableTitle({
     }
 
     setSaving(true);
-    const res = await fetch(endpoint, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: trimmed }),
-    });
+
+    let res: Response;
+    try {
+      res = await fetch(endpoint, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: trimmed }),
+      });
+    } catch {
+      setSaving(false);
+      showToast("Couldn't rename that — try again.", "error");
+      return;
+    }
+
     setSaving(false);
 
     if (!res.ok) {

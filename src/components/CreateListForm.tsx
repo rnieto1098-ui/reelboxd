@@ -19,20 +19,28 @@ export function CreateListForm() {
 
     setSaving(true);
 
-    const res = await fetch("/api/lists", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title,
-        description: description || undefined,
-        tags: tags || undefined,
-      }),
-    });
-    const body = await res.json();
+    let res: Response;
+    try {
+      res = await fetch("/api/lists", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          description: description || undefined,
+          tags: tags || undefined,
+        }),
+      });
+    } catch {
+      setSaving(false);
+      showToast("Couldn't create that list — try again.", "error");
+      return;
+    }
+
+    const body = await res.json().catch(() => null);
     setSaving(false);
 
     if (!res.ok) {
-      showToast(body.error ?? "Couldn't create that list", "error");
+      showToast(body?.error ?? "Couldn't create that list", "error");
       return;
     }
 

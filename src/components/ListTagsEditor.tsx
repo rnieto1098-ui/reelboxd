@@ -22,11 +22,20 @@ export function ListTagsEditor({
   async function save(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
-    const res = await fetch(`/api/lists/${listId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tags: value }),
-    });
+
+    let res: Response;
+    try {
+      res = await fetch(`/api/lists/${listId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tags: value }),
+      });
+    } catch {
+      setSaving(false);
+      showToast("Couldn't save tags — try again.", "error");
+      return;
+    }
+
     setSaving(false);
 
     if (!res.ok) {

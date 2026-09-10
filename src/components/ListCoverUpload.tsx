@@ -29,12 +29,20 @@ export function ListCoverUpload({
     const formData = new FormData();
     formData.append("file", file);
 
-    const res = await fetch(endpoint, { method: "POST", body: formData });
-    const body = await res.json();
+    let res: Response;
+    try {
+      res = await fetch(endpoint, { method: "POST", body: formData });
+    } catch {
+      setSaving(false);
+      setError("Upload failed — try again.");
+      return;
+    }
+
+    const body = await res.json().catch(() => null);
     setSaving(false);
 
     if (!res.ok) {
-      setError(body.error ?? "Upload failed");
+      setError(body?.error ?? "Upload failed");
       return;
     }
 
@@ -43,8 +51,26 @@ export function ListCoverUpload({
 
   async function handleRemove() {
     setSaving(true);
-    await fetch(endpoint, { method: "DELETE" });
+    setError(null);
+
+    let res: Response;
+    try {
+      res = await fetch(endpoint, { method: "DELETE" });
+    } catch {
+      setSaving(false);
+      setError("Couldn't remove that — try again.");
+      return;
+    }
+
     setSaving(false);
+
+    // Previously unchecked — a failed delete still refreshed as if it had
+    // succeeded, leaving the old cover in place with nothing to say so.
+    if (!res.ok) {
+      setError("Couldn't remove that — try again.");
+      return;
+    }
+
     router.refresh();
   }
 

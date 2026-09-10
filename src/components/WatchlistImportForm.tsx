@@ -28,12 +28,20 @@ export function WatchlistImportForm() {
     const formData = new FormData();
     formData.append("file", file);
 
-    const res = await fetch("/api/watchlist/import", { method: "POST", body: formData });
-    const data = await res.json();
+    let res: Response;
+    try {
+      res = await fetch("/api/watchlist/import", { method: "POST", body: formData });
+    } catch {
+      setLoading(false);
+      setError("Something went wrong — try again.");
+      return;
+    }
+
+    const data = await res.json().catch(() => null);
     setLoading(false);
 
     if (!res.ok) {
-      setError(data.error ?? "Something went wrong");
+      setError(data?.error ?? "Something went wrong");
       return;
     }
 

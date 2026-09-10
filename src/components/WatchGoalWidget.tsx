@@ -31,11 +31,20 @@ export function WatchGoalWidget({
     const n = Number(value);
     if (!Number.isFinite(n) || n < 1) return;
     setSaving(true);
-    const res = await fetch("/api/goals", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ year, target: Math.round(n) }),
-    });
+
+    let res: Response;
+    try {
+      res = await fetch("/api/goals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ year, target: Math.round(n) }),
+      });
+    } catch {
+      setSaving(false);
+      showToast("Couldn't save that goal — try again.", "error");
+      return;
+    }
+
     setSaving(false);
 
     if (!res.ok) {
@@ -49,7 +58,16 @@ export function WatchGoalWidget({
 
   async function remove() {
     setSaving(true);
-    const res = await fetch(`/api/goals?year=${year}`, { method: "DELETE" });
+
+    let res: Response;
+    try {
+      res = await fetch(`/api/goals?year=${year}`, { method: "DELETE" });
+    } catch {
+      setSaving(false);
+      showToast("Couldn't remove that goal — try again.", "error");
+      return;
+    }
+
     setSaving(false);
 
     if (!res.ok) {

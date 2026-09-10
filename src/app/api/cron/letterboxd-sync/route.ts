@@ -1,22 +1,18 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { syncLetterboxdDiary } from "@/lib/letterboxdSync";
+import { isAuthorizedCronRequest } from "@/lib/cronAuth";
 
 // Runs on Vercel's cron schedule (see vercel.json) to sync every connected
 // account without anyone needing to visit the site and click "Sync now" —
 // this is what makes a Letterboxd log "just show up" in Flixtally on its
-// own. Vercel signs cron requests with `Authorization: Bearer $CRON_SECRET`;
-// set CRON_SECRET in the project's environment variables so this can't be
-// triggered by anyone who finds the URL.
+// own. See lib/cronAuth.ts for how a real cron trigger is told apart from
+// anyone who finds the URL.
 const SYNC_CONCURRENCY = 3;
 
 export async function GET(request: Request) {
-  const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret) {
-    const auth = request.headers.get("authorization");
-    if (auth !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  if (!isAuthorizedCronRequest(request)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const users = await prisma.user.findMany({

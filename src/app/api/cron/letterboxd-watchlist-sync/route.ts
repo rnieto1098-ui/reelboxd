@@ -2,20 +2,19 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { syncLetterboxdWatchlist, LetterboxdWatchlistBrokenError } from "@/lib/letterboxdWatchlistSync";
 import { sendLetterboxdWatchlistBrokenEmail } from "@/lib/email";
+import { isAuthorizedCronRequest } from "@/lib/cronAuth";
 
 // Runs daily (see vercel.json) for every connected Letterboxd account —
 // reuses the same letterboxdUsername the diary sync already has, so
 // connecting once covers both. See letterboxdWatchlistSync.ts for why this
 // is meaningfully more fragile than the diary sync and add-only by design.
+// See lib/cronAuth.ts for how a real cron trigger is told apart from anyone
+// who finds the URL.
 const SYNC_CONCURRENCY = 3;
 
 export async function GET(request: Request) {
-  const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret) {
-    const auth = request.headers.get("authorization");
-    if (auth !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  if (!isAuthorizedCronRequest(request)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const users = await prisma.user.findMany({

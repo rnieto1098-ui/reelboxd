@@ -8,7 +8,7 @@ import { getCustomPosterMap } from "@/lib/customPosters";
 import { getYearInReview } from "@/lib/yearInReview";
 import { getGoalProgress } from "@/lib/goals";
 import { formatWatchTime } from "@/lib/stats";
-import { currentYearUTC } from "@/lib/dates";
+import { currentYearUTC, parseYearParam } from "@/lib/dates";
 
 function HighlightTile({ label, value }: { label: string; value: string | number }) {
   return (
@@ -72,10 +72,7 @@ export default async function YearInReviewPage({
   if (!user) notFound();
 
   const currentYear = currentYearUTC();
-  const year =
-    typeof yearParam === "string" && Number.isFinite(Number(yearParam))
-      ? Number(yearParam)
-      : currentYear;
+  const year = parseYearParam(yearParam) ?? currentYear;
 
   const [review, goal] = await Promise.all([
     getYearInReview(user.id, year),

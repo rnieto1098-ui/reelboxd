@@ -464,6 +464,14 @@ model Challenge {
 
   @@index([userId])
   @@index([listId])
+  // Backs the "one LIST challenge per list per user" dedupe in the POST
+  // /api/challenges handler, which a plain pre-check can't guarantee on its
+  // own (one-click creation makes a double-click easy, and both requests
+  // clear the check before either write lands). Only constrains LIST
+  // challenges in practice: SQLite treats NULLs as distinct in a unique
+  // index, and listId is null for every other type — so a user can still
+  // have as many GENRE/TIMEFRAME/CREW challenges as they like.
+  @@unique([userId, type, listId])
 }
 
 model ListItem {

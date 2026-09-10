@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -33,10 +34,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "That username is already taken" }, { status: 409 });
   }
 
-  await prisma.user.update({
-    where: { id: session.user.id },
-    data: { username },
-  });
+  // Not atomic with the check above: two users can both clear it while
+  // claiming the same free username, and the loser hits User.username's
+  // @unique constraint. Catching P2002 turns that into the same 409 the
+  // check itself would have returned, rather than an uncaught 500.
+  try {
+    await prisma.user.update({
+      where: { id: session.user.id },
+      data: { username },
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return NextResponse.json({ error: "That username is already taken" }, { status: 409 });
+    }
+    throw error;
+  }
 
   return NextResponse.json({ ok: true }, { status: 200 });
 }

@@ -55,16 +55,20 @@ export async function getCrewFilmography(
     : dedupeById(credits.cast);
 }
 
-// A genre quota asks how many films of a genre you've seen, not when, so an
-// undated "watched" mark counts here the same as a diary entry — unlike
-// timeframeCount below, which is a date range by definition.
+// A genre quota asks how many films of a genre you've seen, not when, so
+// every signal that means "watched" counts here — an undated mark and a
+// rating both count the same as a diary entry, matching getWatchedTmdbIds in
+// recommendations.ts and the schema's note on WatchedItem that "rating a film
+// still implies watched." Unlike timeframeCount below, which is a date range
+// by definition and so can only ever count dated entries.
 async function genreCount(userId: string, genreName: string): Promise<number> {
   const where = { userId, movie: { genres: { contains: genreName } } };
-  const [logged, marked] = await Promise.all([
+  const [logged, marked, rated] = await Promise.all([
     prisma.diaryEntry.findMany({ where, select: { movieId: true }, distinct: ["movieId"] }),
     prisma.watchedItem.findMany({ where, select: { movieId: true } }),
+    prisma.rating.findMany({ where, select: { movieId: true } }),
   ]);
-  return new Set([...logged, ...marked].map((r) => r.movieId)).size;
+  return new Set([...logged, ...marked, ...rated].map((r) => r.movieId)).size;
 }
 
 async function timeframeCount(userId: string, startDate: Date, endDate: Date): Promise<number> {
@@ -120,29 +124,29 @@ export async function getListChallengeTmdbIds(listId: string): Promise<number[]>
 }
 
 // How many distinct films from a set the user has seen. Shared by the LIST
-// and CREW paths, which ask the same question of different sets. Counts an
-// undated "watched" mark as well as a diary entry — these are completionist
-// goals ("have I seen all of these"), so when you saw it is beside the
-// point. TIMEFRAME challenges and watch goals deliberately don't come
-// through here, since they can't count something with no date.
+// and CREW paths, which ask the same question of different sets. These are
+// completionist goals ("have I seen all of these"), so when you saw it is
+// beside the point and all three watched signals count: a diary entry, an
+// undated mark, and a rating. That last one is the app-wide rule — see
+// getWatchedTmdbIds in recommendations.ts and the WatchedItem note in the
+// schema — and leaving it out used to strand these challenges short:
+// deleting the diary entry that a first rating auto-creates leaves a film
+// that counts as watched everywhere else but nowhere here. TIMEFRAME
+// challenges and watch goals deliberately don't come through this function,
+// since they can't count something with no date.
 export async function getWatchedAmong(
   userId: string,
   tmdbIds: number[]
 ): Promise<Set<number>> {
   if (tmdbIds.length === 0) return new Set();
   const select = { movie: { select: { tmdbId: true } } } as const;
-  const [logged, marked] = await Promise.all([
-    prisma.diaryEntry.findMany({
-      where: { userId, movie: { tmdbId: { in: tmdbIds } } },
-      select,
-      distinct: ["movieId"],
-    }),
-    prisma.watchedItem.findMany({
-      where: { userId, movie: { tmdbId: { in: tmdbIds } } },
-      select,
-    }),
+  const where = { userId, movie: { tmdbId: { in: tmdbIds } } };
+  const [logged, marked, rated] = await Promise.all([
+    prisma.diaryEntry.findMany({ where, select, distinct: ["movieId"] }),
+    prisma.watchedItem.findMany({ where, select }),
+    prisma.rating.findMany({ where, select }),
   ]);
-  return new Set([...logged, ...marked].map((l) => l.movie.tmdbId));
+  return new Set([...logged, ...marked, ...rated].map((l) => l.movie.tmdbId));
 }
 
 async function watchedCountAmong(userId: string, tmdbIds: number[]): Promise<number> {

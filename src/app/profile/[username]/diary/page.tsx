@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { posterUrl } from "@/lib/tmdb";
 import { getCustomPosterMap } from "@/lib/customPosters";
 import { getGoalProgress } from "@/lib/goals";
-import { yearBounds } from "@/lib/dates";
+import { yearBounds, parseYearParam } from "@/lib/dates";
 import { DeleteDiaryEntryButton } from "@/components/DeleteDiaryEntryButton";
 import { Pagination } from "@/components/Pagination";
 
@@ -30,10 +30,7 @@ export default async function DiaryPage({
 
   const isOwnProfile = session?.user?.id === user.id;
 
-  const year =
-    typeof yearParam === "string" && Number.isFinite(Number(yearParam))
-      ? Number(yearParam)
-      : null;
+  const year = parseYearParam(yearParam);
   const goal = year != null ? await getGoalProgress(user.id, year) : null;
   const bounds = year != null ? yearBounds(year) : null;
 

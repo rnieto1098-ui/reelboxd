@@ -49,6 +49,28 @@ type RecentEntry = {
   lastActivityAt: number;
 };
 
+/**
+ * How to order each candidate fetch so its first page contains the rows that
+ * will actually survive `sortEntries` below.
+ *
+ * "rating" is the asymmetric one: only the Rating table carries a score, so
+ * the diary side has no meaningful order to contribute and just supplies the
+ * unrated tail — which `compareNullableNumbers` parks at the end regardless
+ * of direction, exactly as it did when this read the whole history.
+ */
+function candidateOrder(sortKey: SortKey, dir: SortDir) {
+  if (sortKey === "rating") {
+    return { rating: { score: dir }, diary: { watchedDate: "desc" as const } };
+  }
+  if (sortKey === "release") {
+    return { rating: { movie: { releaseDate: dir } }, diary: { movie: { releaseDate: dir } } };
+  }
+  if (sortKey === "popularity") {
+    return { rating: { movie: { popularity: dir } }, diary: { movie: { popularity: dir } } };
+  }
+  return { rating: { createdAt: dir }, diary: { watchedDate: dir } };
+}
+
 function sortEntries(entries: RecentEntry[], sortKey: SortKey, dir: SortDir): RecentEntry[] {
   const valueOf = (e: RecentEntry): number | null => {
     if (sortKey === "recent") return e.lastActivityAt;
@@ -142,13 +164,10 @@ export default async function ProfilePage({
   const sortDir: SortDir = dir === "asc" ? "asc" : "desc";
 
   const session = await auth();
-  const isOwnProfile = session?.user?.name === username;
 
   const user = await prisma.user.findUnique({
     where: { username },
     include: {
-      ratings: { include: { movie: true } },
-      diaryEntries: { include: { movie: true } },
       owned: {
         include: { movie: true },
         orderBy: { addedAt: "desc" },
@@ -162,32 +181,86 @@ export default async function ProfilePage({
 
   if (!user) notFound();
 
+  // Compared by id, like every other ownership check in the app (the diary
+  // page, lists, challenges). This used to compare session.user.name against
+  // the URL's username, which reads the JWT's cached name — stale after a
+  // rename until the session is reissued, so the owner of a just-renamed
+  // profile could look at their own page and be treated as a stranger.
+  const isOwnProfile = session?.user?.id === user.id;
+
+  // Candidates for the row, pulled in the active sort's own order so the
+  // top slice can be taken without reading the whole history. This page used
+  // to include every rating and every diary entry the user had ever made,
+  // each joined to its full Movie row, only to slice 60 items out of them in
+  // JS — the one page in the app that grows without bound as an account ages,
+  // on the URL most likely to be opened by someone else.
+  //
+  // Taking ROW_PREVIEW_LIMIT from each table is enough to be correct: a movie
+  // in the true top N is there because of a rating or a log, and that row has
+  // to be within its own table's top N by the same key. Rewatches are the one
+  // wrinkle — several rows can collapse to one movie — so the diary side
+  // fetches double to leave headroom rather than paying for a `distinct` that
+  // this connector applies in memory anyway.
+  const order = candidateOrder(sortKey, sortDir);
+  const [ratingCandidates, diaryCandidates] = await Promise.all([
+    prisma.rating.findMany({
+      where: { userId: user.id },
+      include: { movie: true },
+      orderBy: order.rating,
+      take: ROW_PREVIEW_LIMIT,
+    }),
+    prisma.diaryEntry.findMany({
+      where: { userId: user.id },
+      include: { movie: true },
+      orderBy: order.diary,
+      take: ROW_PREVIEW_LIMIT * 2,
+    }),
+  ]);
+
   const byMovie = new Map<string, RecentEntry>();
-  for (const r of user.ratings) {
-    const activityAt = r.createdAt.getTime();
-    const existing = byMovie.get(r.movieId);
-    if (existing) {
-      existing.score = r.score;
-      existing.lastActivityAt = Math.max(existing.lastActivityAt, activityAt);
-    } else {
-      byMovie.set(r.movieId, { movie: r.movie, score: r.score, logCount: 0, lastActivityAt: activityAt });
+  for (const r of ratingCandidates) {
+    byMovie.set(r.movieId, {
+      movie: r.movie,
+      score: r.score,
+      logCount: 0,
+      lastActivityAt: r.createdAt.getTime(),
+    });
+  }
+  for (const d of diaryCandidates) {
+    if (!byMovie.has(d.movieId)) {
+      byMovie.set(d.movieId, { movie: d.movie, score: null, logCount: 0, lastActivityAt: 0 });
     }
   }
-  for (const d of user.diaryEntries) {
-    const activityAt = d.watchedDate.getTime();
-    const existing = byMovie.get(d.movieId);
-    if (existing) {
-      existing.logCount++;
-      existing.lastActivityAt = Math.max(existing.lastActivityAt, activityAt);
-    } else {
-      byMovie.set(d.movieId, {
-        movie: d.movie,
-        score: null,
-        logCount: 1,
-        lastActivityAt: activityAt,
-      });
-    }
+
+  // The candidate fetches answer "which movies", not "what are their totals":
+  // a film can surface on the diary side while its rating sits outside the
+  // rating slice (or the reverse), and a rewatch count can't be read off a
+  // truncated list at all. Both are filled in exactly here, for the candidate
+  // set only, so the badges match what a full scan would have said.
+  const candidateMovieIds = [...byMovie.keys()];
+  const [exactRatings, exactLogs] = await Promise.all([
+    prisma.rating.findMany({
+      where: { userId: user.id, movieId: { in: candidateMovieIds } },
+      select: { movieId: true, score: true, createdAt: true },
+    }),
+    prisma.diaryEntry.findMany({
+      where: { userId: user.id, movieId: { in: candidateMovieIds } },
+      select: { movieId: true, watchedDate: true },
+    }),
+  ]);
+  for (const r of exactRatings) {
+    const entry = byMovie.get(r.movieId);
+    if (!entry) continue;
+    entry.score = r.score;
+    entry.lastActivityAt = Math.max(entry.lastActivityAt, r.createdAt.getTime());
   }
+  for (const d of exactLogs) {
+    const entry = byMovie.get(d.movieId);
+    if (!entry) continue;
+    entry.logCount++;
+    entry.lastActivityAt = Math.max(entry.lastActivityAt, d.watchedDate.getTime());
+  }
+
   const recentEntries = sortEntries([...byMovie.values()], sortKey, sortDir).slice(0, ROW_PREVIEW_LIMIT);
 
   // Use the viewer's own poster choices, not the profile owner's — a custom

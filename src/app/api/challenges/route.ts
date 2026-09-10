@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { createChallenge } from "@/lib/challenges";
@@ -95,13 +96,28 @@ export async function POST(request: Request) {
       return NextResponse.json({ ...existing, alreadyExisted: true });
     }
 
-    const challenge = await createChallenge(session.user.id, {
-      type: "LIST",
-      listId: list.id,
-      listTitle: list.title,
-      title: data.title,
-    });
-    return NextResponse.json(challenge, { status: 201 });
+    // The check above and this create aren't atomic, and a double-click is
+    // exactly how you'd hit the gap. @@unique([userId, type, listId]) is the
+    // real guarantee; losing the race lands here, where handing back the row
+    // the winner created gives the loser the same response the pre-check
+    // would have.
+    try {
+      const challenge = await createChallenge(session.user.id, {
+        type: "LIST",
+        listId: list.id,
+        listTitle: list.title,
+        title: data.title,
+      });
+      return NextResponse.json(challenge, { status: 201 });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        const winner = await prisma.challenge.findFirst({
+          where: { userId: session.user.id, type: "LIST", listId: list.id },
+        });
+        if (winner) return NextResponse.json({ ...winner, alreadyExisted: true });
+      }
+      throw error;
+    }
   }
 
   const challenge = await createChallenge(session.user.id, data);

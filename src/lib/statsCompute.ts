@@ -573,13 +573,23 @@ export type RuntimeProfile = {
   longest: { tmdbId: number; title: string; posterPath: string | null; runtime: number } | null;
 };
 
-const RUNTIME_BUCKETS: { label: string; max: number }[] = [
+// Exported so the watchlist filter bar (watchlistFilters.ts) buckets runtime
+// the same way this page does — one vocabulary for "how long is this film"
+// across the app, rather than two slightly different bucket sets drifting
+// apart over time.
+export const RUNTIME_BUCKETS: { label: string; max: number }[] = [
   { label: "Under 90m", max: 90 },
   { label: "90–119m", max: 120 },
   { label: "2h–2h29", max: 150 },
   { label: "2h30–2h59", max: 180 },
   { label: "3h and up", max: Infinity },
 ];
+
+/** Which RUNTIME_BUCKETS label a runtime falls into, or null if unknown. */
+export function runtimeBucketLabel(runtime: number | null | undefined): string | null {
+  if (!runtime || runtime <= 0) return null;
+  return RUNTIME_BUCKETS.find((b) => runtime < b.max)?.label ?? null;
+}
 
 export function runtimeProfile(
   watchedMovieIds: Set<string>,
@@ -593,7 +603,7 @@ export function runtimeProfile(
     const movie = movieById.get(movieId);
     if (!movie?.runtime || movie.runtime <= 0) continue;
     runtimes.push(movie.runtime);
-    buckets[RUNTIME_BUCKETS.findIndex((b) => movie.runtime! < b.max)].count++;
+    buckets[RUNTIME_BUCKETS.findIndex((b) => b.label === runtimeBucketLabel(movie.runtime))].count++;
     if (!longest || movie.runtime > longest.runtime) {
       longest = {
         tmdbId: movie.tmdbId,
@@ -609,8 +619,10 @@ export function runtimeProfile(
 
 // Ordered by how restrictive the rating is, so the bars read as a spectrum
 // rather than as a leaderboard. Anything TMDB reports that isn't on this
-// list (foreign boards, oddities) lands at the end, alphabetically.
-const CERTIFICATION_ORDER = ["G", "PG", "PG-13", "R", "NC-17", "NR"];
+// list (foreign boards, oddities) lands at the end, alphabetically. Exported
+// for the same reason as RUNTIME_BUCKETS above — the watchlist filter bar
+// orders its rating dropdown the same way.
+export const CERTIFICATION_ORDER = ["G", "PG", "PG-13", "R", "NC-17", "NR"];
 
 export function certificationProfile(
   watchedMovieIds: Set<string>,

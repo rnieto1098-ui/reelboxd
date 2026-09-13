@@ -2,7 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { getUserOwnedTmdbIds } from "@/lib/streaming";
+import {
+  filterMoviesByStreaming,
+  getUserOwnedTmdbIds,
+  getUserProviderIds,
+  hasStreamingAvailability,
+} from "@/lib/streaming";
 import { getUserWatchlistedTmdbIds } from "@/lib/movies";
 import { formatTimeLeft } from "@/lib/dates";
 import {
@@ -13,6 +18,11 @@ import {
 import { CreditGrid, type CreditDisplay } from "@/components/CreditGrid";
 import { FadeWatchedControl } from "@/components/FadeWatchedControl";
 import { MovieRow } from "@/components/MovieRow";
+import { AvailabilityFilterLinks } from "@/components/AvailabilityFilterLinks";
+
+function buildHref(id: string, streamingOnly: boolean) {
+  return streamingOnly ? `/challenges/${id}?streaming=1` : `/challenges/${id}`;
+}
 
 const TYPE_LABEL: Record<string, string> = {
   GENRE: "Genre challenge",
@@ -23,8 +33,11 @@ const TYPE_LABEL: Record<string, string> = {
 
 export default async function ChallengeDetailPage({
   params,
+  searchParams,
 }: PageProps<"/challenges/[id]">) {
   const { id } = await params;
+  const { streaming } = await searchParams;
+  const streamingOnly = streaming === "1";
   const session = await auth();
   const viewerId = session?.user?.id;
 
@@ -44,10 +57,14 @@ export default async function ChallengeDetailPage({
   const ownerId = challenge.userId;
   const isOwner = viewerId === ownerId;
 
-  const [ownedIds, watchlistIds, suggestions] = await Promise.all([
+  const [ownedIds, watchlistIds, suggestions, userProviderIds] = await Promise.all([
     getUserOwnedTmdbIds(viewerId),
     getUserWatchlistedTmdbIds(viewerId),
     viewerId ? getChallengeSuggestions(viewerId, challenge) : Promise.resolve([]),
+    // Reflects whoever is looking, same as owned/watchlist above — the
+    // question is "what can *this viewer* watch right now," regardless of
+    // whose challenge it is.
+    getUserProviderIds(viewerId),
   ]);
 
   let credits: CreditDisplay[];
@@ -133,6 +150,20 @@ export default async function ChallengeDetailPage({
     }
   }
 
+  // Only CREW and LIST challenges show films still to watch — GENRE and
+  // TIMEFRAME only ever list films already logged (see the `watched: true`
+  // branch above), and "is it streaming" is meaningless for something
+  // already watched. target/subtitle above are computed from the full,
+  // unfiltered set on purpose — filtering narrows what the grid *shows*,
+  // not the challenge's actual progress.
+  const filterableType = challenge.type === "CREW" || challenge.type === "LIST";
+  const totalCredits = credits.length;
+  const canFilterByAvailability = !!viewerId && hasStreamingAvailability(userProviderIds, ownedIds);
+  const applyStreamingFilter = filterableType && streamingOnly && canFilterByAvailability;
+  if (applyStreamingFilter) {
+    credits = await filterMoviesByStreaming(credits, userProviderIds, ownedIds);
+  }
+
   return (
     <div>
       <Link
@@ -157,13 +188,25 @@ export default async function ChallengeDetailPage({
       )}
       <div className="mb-8" />
 
+      {filterableType && viewerId && totalCredits > 0 && (
+        <AvailabilityFilterLinks
+          className="mb-6"
+          allHref={buildHref(id, false)}
+          streamingHref={buildHref(id, true)}
+          streamingOnly={streamingOnly}
+          canFilterByAvailability={canFilterByAvailability}
+        />
+      )}
+
       {credits.length === 0 ? (
         <p className="text-muted">
-          {challenge.type === "CREW"
-            ? "No movie credits found for this person."
-            : challenge.type === "LIST"
-              ? "That list doesn't have any movies in it yet."
-              : "No movies have contributed to this challenge yet."}
+          {applyStreamingFilter
+            ? "None of these movies are on your streaming services or owned right now."
+            : challenge.type === "CREW"
+              ? "No movie credits found for this person."
+              : challenge.type === "LIST"
+                ? "That list doesn't have any movies in it yet."
+                : "No movies have contributed to this challenge yet."}
         </p>
       ) : challenge.type === "CREW" || challenge.type === "LIST" ? (
         <FadeWatchedControl>

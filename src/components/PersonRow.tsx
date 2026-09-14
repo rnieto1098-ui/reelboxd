@@ -12,15 +12,15 @@ export function PersonRow({ title, people }: { title: string; people: TmdbPerson
           <Link
             key={person.id}
             href={`/crew/person/${person.id}`}
-            className="group w-24 flex-shrink-0 text-center sm:w-28"
+            className="group w-28 flex-shrink-0 text-center sm:w-32 md:w-36"
           >
-            <div className="mx-auto h-24 w-24 overflow-hidden rounded-full border border-border bg-surface sm:h-28 sm:w-28">
+            <div className="mx-auto h-28 w-28 overflow-hidden rounded-full border border-border bg-surface sm:h-32 sm:w-32 md:h-36 md:w-36">
               {photo ? (
                 <Image
                   src={photo}
                   alt={person.name}
-                  width={112}
-                  height={112}
+                  width={144}
+                  height={144}
                   className="h-full w-full object-cover"
                 />
               ) : (
@@ -29,7 +29,10 @@ export function PersonRow({ title, people }: { title: string; people: TmdbPerson
                 </div>
               )}
             </div>
-            <p className="mt-1.5 truncate text-sm font-medium group-hover:text-accent-green">
+            <p
+              title={person.name}
+              className="mt-1.5 truncate text-sm font-medium group-hover:text-accent-green"
+            >
               {person.name}
             </p>
           </Link>

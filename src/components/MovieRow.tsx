@@ -53,7 +53,7 @@ export function MovieRow({
       emptyMessage={emptyMessage}
     >
       {order.map((movie) => (
-        <div key={movie.id} className="w-24 flex-shrink-0 sm:w-28">
+        <div key={movie.id} className="w-28 flex-shrink-0 sm:w-32 md:w-36">
           <MovieCard
             tmdbId={movie.id}
             title={movie.title}

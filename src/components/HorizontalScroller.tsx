@@ -92,18 +92,24 @@ export function HorizontalScroller({
         <p className="text-sm text-muted">{emptyMessage}</p>
       ) : (
         <div className="group/row relative">
+          {/* w-10 here has to match the scroller's own sm:px-10 gutter below
+              exactly — otherwise the arrow sits on top of the edge card
+              instead of in the space reserved for it. Mobile keeps the
+              existing edge-to-edge bleed (-mx-4/px-4): these arrows only
+              ever show on hover, which touch devices don't have, so there's
+              no real overlap to guard against there. */}
           <button
             type="button"
             onClick={() => scroll("left")}
             aria-label="Scroll left"
-            className="absolute inset-y-0 left-0 z-10 flex w-10 items-center justify-center bg-gradient-to-r from-background to-transparent text-foreground opacity-0 transition-opacity group-hover/row:opacity-100"
+            className="absolute inset-y-0 left-0 z-10 hidden w-10 items-center justify-center bg-gradient-to-r from-background to-transparent text-foreground opacity-0 transition-opacity group-hover/row:opacity-100 sm:flex"
           >
             <ChevronIcon direction="left" />
           </button>
 
           <div
             ref={scrollerRef}
-            className="no-scrollbar -mx-4 flex gap-3 overflow-x-auto px-4 pb-2 sm:mx-0 sm:px-0"
+            className="no-scrollbar -mx-4 flex gap-4 overflow-x-auto px-4 pb-2 sm:mx-0 sm:px-10"
           >
             {children}
           </div>
@@ -112,7 +118,7 @@ export function HorizontalScroller({
             type="button"
             onClick={() => scroll("right")}
             aria-label="Scroll right"
-            className="absolute inset-y-0 right-0 z-10 flex w-10 items-center justify-center bg-gradient-to-l from-background to-transparent text-foreground opacity-0 transition-opacity group-hover/row:opacity-100"
+            className="absolute inset-y-0 right-0 z-10 hidden w-10 items-center justify-center bg-gradient-to-l from-background to-transparent text-foreground opacity-0 transition-opacity group-hover/row:opacity-100 sm:flex"
           >
             <ChevronIcon direction="right" />
           </button>

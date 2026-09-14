@@ -1,7 +1,7 @@
-import Image from "next/image";
 import Link from "next/link";
 import { posterUrl } from "@/lib/tmdb";
 import { PosterQuickActions } from "@/components/PosterQuickActions";
+import { PosterImage } from "@/components/PosterImage";
 
 export function MovieCard({
   tmdbId,
@@ -35,19 +35,7 @@ export function MovieCard({
             inside it — nesting them worked in some browsers but not
             reliably, since it's invalid HTML with undefined click behavior. */}
         <Link href={href} className="absolute inset-0">
-          {src ? (
-            <Image
-              src={src}
-              alt={title}
-              width={342}
-              height={513}
-              className="h-full w-full object-cover transition-transform group-hover:scale-105"
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center p-2 text-center text-xs text-muted">
-              {title}
-            </div>
-          )}
+          <PosterImage src={src} alt={title} />
         </Link>
         <PosterQuickActions
           tmdbId={tmdbId}
@@ -56,9 +44,16 @@ export function MovieCard({
           initialWatched={watched}
         />
       </div>
+      {/* min-h reserves a full two lines regardless of the actual title's
+          length, so a row of short and long titles still bottom-align —
+          line-clamp-2 alone would let each card's height follow its own
+          title, and this row's flex container stretches every card to the
+          tallest one anyway. title= is a plain native tooltip backstop for
+          anything long enough to still clip at two lines. */}
       <Link
         href={href}
-        className="mt-1.5 block truncate text-sm font-medium group-hover:text-accent-green transition-colors"
+        title={title}
+        className="mt-1.5 block line-clamp-2 min-h-[2.5rem] text-sm font-medium group-hover:text-accent-green transition-colors"
       >
         {title}
       </Link>

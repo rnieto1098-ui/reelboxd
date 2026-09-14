@@ -1,6 +1,6 @@
-import Image from "next/image";
 import Link from "next/link";
 import { HorizontalScroller } from "@/components/HorizontalScroller";
+import { PosterImage } from "@/components/PosterImage";
 import { posterUrl } from "@/lib/tmdb";
 import type { ListCard } from "@/lib/systemLists";
 
@@ -13,24 +13,15 @@ export function ListRow({ title, lists }: { title: string; lists: ListCard[] }) 
           <Link
             key={list.id}
             href={`/lists/${list.id}`}
-            className="group w-24 flex-shrink-0 sm:w-28"
+            className="group w-28 flex-shrink-0 sm:w-32 md:w-36"
           >
             <div className="aspect-[2/3] w-full overflow-hidden rounded-md border border-border bg-surface">
-              {cover ? (
-                <Image
-                  src={cover}
-                  alt={list.title}
-                  width={342}
-                  height={513}
-                  className="h-full w-full object-cover transition-transform group-hover:scale-105"
-                />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center p-2 text-center text-xs text-muted">
-                  {list.title}
-                </div>
-              )}
+              <PosterImage src={cover} alt={list.title} />
             </div>
-            <p className="mt-1.5 truncate text-sm font-medium group-hover:text-accent-green transition-colors">
+            <p
+              title={list.title}
+              className="mt-1.5 line-clamp-2 min-h-[2.5rem] text-sm font-medium group-hover:text-accent-green transition-colors"
+            >
               {list.title}
             </p>
             <p className="text-xs text-muted">

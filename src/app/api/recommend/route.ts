@@ -5,6 +5,7 @@ import { getPromptRecommendations } from "@/lib/promptRecommender";
 import { applyPosterOverrides, getCustomPosterMap } from "@/lib/customPosters";
 import { getUserWatchlistedTmdbIds } from "@/lib/movies";
 import { getUserOwnedTmdbIds } from "@/lib/streaming";
+import { cleanMovieList } from "@/lib/movieListHygiene";
 
 const promptSchema = z
   .object({
@@ -66,7 +67,7 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     ...recommendation,
-    results: applyPosterOverrides(recommendation.results, posterOverrides),
+    results: cleanMovieList(applyPosterOverrides(recommendation.results, posterOverrides)),
     ownedIds: [...ownedIds],
     watchlistIds: [...watchlistIds],
   });

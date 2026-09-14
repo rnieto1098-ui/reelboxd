@@ -5,6 +5,7 @@ import { discoverMoviesByCompany, getCompanyDetails, logoUrl } from "@/lib/tmdb"
 import { getUserWatchlistedTmdbIds } from "@/lib/movies";
 import { getUserOwnedTmdbIds } from "@/lib/streaming";
 import { getWatchedTmdbIds } from "@/lib/recommendations";
+import { cleanMovieList } from "@/lib/movieListHygiene";
 import { MovieCard } from "@/components/MovieCard";
 
 export default async function StudioPage({
@@ -27,6 +28,7 @@ export default async function StudioPage({
 
   if (!details) notFound();
 
+  const cleanedMovies = cleanMovieList(movies.results);
   const logo = logoUrl(details.logo_path, "w154");
 
   return (
@@ -63,11 +65,11 @@ export default async function StudioPage({
       </div>
 
       <h2 className="mb-3 text-lg font-semibold">Movies</h2>
-      {movies.results.length === 0 ? (
+      {cleanedMovies.length === 0 ? (
         <p className="text-muted">No movies found.</p>
       ) : (
         <div className="grid grid-cols-3 gap-4 sm:grid-cols-4 md:grid-cols-6">
-          {movies.results.map((movie) => (
+          {cleanedMovies.map((movie) => (
             <MovieCard
               key={movie.id}
               tmdbId={movie.id}

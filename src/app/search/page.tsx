@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { searchMovies } from "@/lib/tmdb";
 import { applyPosterOverrides, getCustomPosterMap } from "@/lib/customPosters";
+import { cleanMovieList } from "@/lib/movieListHygiene";
 import { getUserWatchlistedTmdbIds } from "@/lib/movies";
 import { getUserOwnedTmdbIds } from "@/lib/streaming";
 import { getWatchedTmdbIds } from "@/lib/recommendations";
@@ -29,7 +30,7 @@ export default async function SearchPage({
     getUserWatchlistedTmdbIds(session?.user?.id),
     getWatchedTmdbIds(session?.user?.id),
   ]);
-  const movies = applyPosterOverrides(results?.results ?? [], posterOverrides);
+  const movies = cleanMovieList(applyPosterOverrides(results?.results ?? [], posterOverrides));
   const totalPages = results ? Math.min(results.total_pages, MAX_PAGE) : 0;
 
   function pageHref(targetPage: number) {

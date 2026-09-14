@@ -21,6 +21,7 @@ import {
   hasStreamingAvailability,
 } from "@/lib/streaming";
 import { getHomepageListCards, getCuratedListsProgress } from "@/lib/systemLists";
+import { cleanMovieList } from "@/lib/movieListHygiene";
 import { getGoalProgress } from "@/lib/goals";
 import { getRecentlyAddedForUser } from "@/lib/providerSnapshot";
 import { excludeShortFilms } from "@/lib/runtimeFilter";
@@ -332,18 +333,26 @@ async function HomeMovieRows({
     ...genreRows.flatMap((row) => row.movies.map((m) => m.id)),
   ]);
 
-  const recommendedWithPosters = applyPosterOverrides(recommended, posterOverrides);
-  const popularWithPosters = applyPosterOverrides(popular, posterOverrides);
-  const trendingWithPosters = applyPosterOverrides(trending, posterOverrides);
-  const highestRatedWithPosters = applyPosterOverrides(highestRated, posterOverrides);
-  const discoverWithPosters = applyPosterOverrides(discover, posterOverrides);
-  const rentBuyWithPosters = applyPosterOverrides(rentBuy, posterOverrides);
-  const recentlyAddedWithPosters = applyPosterOverrides(recentlyAdded, posterOverrides);
-  const upcomingReleasesWithPosters = applyPosterOverrides(upcomingReleases, posterOverrides);
-  const comingSoonWithPosters = applyPosterOverrides(comingSoonRaw.results, posterOverrides);
+  // cleanMovieList is the last thing every row passes through before it
+  // reaches a card — a final backstop against a title-less TMDB entry (an
+  // unannounced/withdrawn placeholder) or the same movie surfacing twice in
+  // one row, regardless of which upstream step let it through.
+  const recommendedWithPosters = cleanMovieList(applyPosterOverrides(recommended, posterOverrides));
+  const popularWithPosters = cleanMovieList(applyPosterOverrides(popular, posterOverrides));
+  const trendingWithPosters = cleanMovieList(applyPosterOverrides(trending, posterOverrides));
+  const highestRatedWithPosters = cleanMovieList(applyPosterOverrides(highestRated, posterOverrides));
+  const discoverWithPosters = cleanMovieList(applyPosterOverrides(discover, posterOverrides));
+  const rentBuyWithPosters = cleanMovieList(applyPosterOverrides(rentBuy, posterOverrides));
+  const recentlyAddedWithPosters = cleanMovieList(applyPosterOverrides(recentlyAdded, posterOverrides));
+  const upcomingReleasesWithPosters = cleanMovieList(
+    applyPosterOverrides(upcomingReleases, posterOverrides)
+  );
+  const comingSoonWithPosters = cleanMovieList(
+    applyPosterOverrides(comingSoonRaw.results, posterOverrides)
+  );
   const genreRowsWithPosters = genreRows.map((row) => ({
     ...row,
-    movies: applyPosterOverrides(row.movies, posterOverrides),
+    movies: cleanMovieList(applyPosterOverrides(row.movies, posterOverrides)),
   }));
 
   const discoverEmptyMessage = !canFilterByAvailability ? (

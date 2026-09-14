@@ -20,6 +20,7 @@ import {
   hasStreamingAvailability,
 } from "@/lib/streaming";
 import { compareNullableNumbers, type SortDir } from "@/lib/sortComparator";
+import { cleanMovieList } from "@/lib/movieListHygiene";
 import { FadeWatchedControl } from "@/components/FadeWatchedControl";
 import { AvailabilityFilterLinks } from "@/components/AvailabilityFilterLinks";
 import { CreditGrid, type CreditDisplay } from "@/components/CreditGrid";
@@ -97,14 +98,6 @@ function buildHref(personId: number, sortKey: SortKey, dir: SortDir, streamingOn
   if (streamingOnly) params.set("streaming", "1");
   const qs = params.toString();
   return `/crew/person/${personId}${qs ? `?${qs}` : ""}`;
-}
-
-function dedupeById<T extends { id: number }>(items: T[]): T[] {
-  const seen = new Map<number, T>();
-  for (const item of items) {
-    if (!seen.has(item.id)) seen.set(item.id, item);
-  }
-  return [...seen.values()];
 }
 
 export default async function PersonPage({
@@ -219,7 +212,7 @@ async function PersonCredits({
   // Deduped only for now — the actual sort (which needs ratingMap and
   // possibly runtimeMap, fetched further down) is applied once those are
   // available.
-  const actingCredits = dedupeById(credits.cast);
+  const actingCredits = cleanMovieList(credits.cast);
 
   const crewByDepartment = new Map<string, TmdbCrewCredit[]>();
   for (const credit of credits.crew) {
@@ -228,7 +221,7 @@ async function PersonCredits({
     crewByDepartment.set(credit.department, list);
   }
   for (const [dept, list] of crewByDepartment) {
-    crewByDepartment.set(dept, dedupeById(list));
+    crewByDepartment.set(dept, cleanMovieList(list));
   }
 
   const orderedDepartments = [

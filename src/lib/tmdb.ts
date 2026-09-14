@@ -300,6 +300,11 @@ export function discoverMoviesByGenre(genreId: number, page = 1) {
 
 export function discoverMovies(params: {
   genreIds?: number[];
+  // TMDB has no "Superhero" genre (or similar fine-grained categories) —
+  // its own keyword tagging (e.g. id 9715, "superhero") is the precise
+  // signal for those, versus with_genres matching on the much broader
+  // Action/Adventure genre a superhero movie also happens to carry.
+  keywordIds?: number[];
   minVoteAverage?: number;
   minVoteCount?: number;
   minRuntime?: number;
@@ -327,6 +332,8 @@ export function discoverMovies(params: {
     {
       with_genres:
         params.genreIds && params.genreIds.length > 0 ? params.genreIds.join(",") : undefined,
+      with_keywords:
+        params.keywordIds && params.keywordIds.length > 0 ? params.keywordIds.join(",") : undefined,
       "vote_average.gte": params.minVoteAverage,
       "vote_count.gte": params.minVoteCount ?? 100,
       "with_runtime.gte": params.minRuntime,

@@ -21,7 +21,7 @@ import {
   hasStreamingAvailability,
 } from "@/lib/streaming";
 import { getHomepageListCards, getCuratedListsProgress } from "@/lib/systemLists";
-import { cleanMovieList } from "@/lib/movieListHygiene";
+import { cleanMovieList, isPrimaryGenre } from "@/lib/movieListHygiene";
 import { getGoalProgress } from "@/lib/goals";
 import { getRecentlyAddedForUser } from "@/lib/providerSnapshot";
 import { excludeShortFilms } from "@/lib/runtimeFilter";
@@ -43,9 +43,21 @@ const WELCOME_PHRASES = [
   "Curated just for your taste in film.",
 ];
 
-// TMDB doesn't have a "Superhero" genre, so it's approximated with Action.
-const GENRE_ROWS = [
-  { title: "Superhero", genreName: "Action" },
+// TMDB doesn't have a "Superhero" genre — approximating it with the Action
+// genre dumped in everything from Lord of the Rings to Facing El Chapo,
+// since a fantasy epic or a crime documentary can carry Action as one of
+// several tags without being about superheroes at all. TMDB's own keyword
+// tagging (id 9715, "superhero") is a real curated signal for this instead.
+const SUPERHERO_KEYWORD_ID = 9715;
+
+// The three genre-based rows below filter on *primary* genre (see
+// isPrimaryGenre) rather than "has this genre anywhere in its tags" — a
+// with_genres match alone let Despicable Me (Animation, Comedy, Crime, ...)
+// into Crime and Cars 3 / Inside Out (Animation, Drama, ...) into Drama,
+// genre only as a distant, secondary label.
+type GenreRow = { title: string; genreName?: string; keywordId?: number };
+const GENRE_ROWS: GenreRow[] = [
+  { title: "Superhero", keywordId: SUPERHERO_KEYWORD_ID },
   { title: "Comedy", genreName: "Comedy" },
   { title: "Drama", genreName: "Drama" },
   { title: "Crime", genreName: "Crime" },
@@ -58,6 +70,10 @@ const GENRE_ROWS = [
 // collapsing down to a handful of movies.
 const BASE_ROW_PAGES = 3; // ~60 movies unfiltered
 const STREAMING_ROW_PAGES = 8; // ~160 movies to filter down when narrowed
+// Extra pages fetched only for the primary-genre-filtered rows (Comedy,
+// Drama, Crime) — see the isPrimaryGenre filter below for why they need
+// more pool depth than a row that keeps everything it's sent.
+const GENRE_ROW_EXTRA_PAGES = 3;
 const BASE_RECOMMEND_COUNT = 12;
 const STREAMING_RECOMMEND_COUNT = 36;
 // Highest Rated and the genre rows barely shift hour to hour, unlike
@@ -273,13 +289,24 @@ async function HomeMovieRows({
       rowPages
     ).then(excludeShortFilms),
     ...GENRE_ROWS.map((row) => {
-      const genreId = genreIdByName.get(row.genreName);
-      return genreId
-        ? discoverMoviesMultiPage(
-            { genreIds: [genreId], revalidateSeconds: SLOW_ROW_CACHE_SECONDS },
-            rowPages
-          ).then(excludeShortFilms)
-        : Promise.resolve([] as TmdbMovieSummary[]);
+      if (row.keywordId != null) {
+        return discoverMoviesMultiPage(
+          { keywordIds: [row.keywordId], revalidateSeconds: SLOW_ROW_CACHE_SECONDS },
+          rowPages
+        ).then(excludeShortFilms);
+      }
+      const genreId = row.genreName ? genreIdByName.get(row.genreName) : undefined;
+      if (!genreId) return Promise.resolve([] as TmdbMovieSummary[]);
+      // Extra pages up front — filtering to primary genre below throws away
+      // a real chunk of each page's raw with_genres matches (e.g. a family
+      // animated film tagged Drama fourth), so the fetch needs more pool
+      // depth than a row that keeps everything it's sent.
+      return discoverMoviesMultiPage(
+        { genreIds: [genreId], revalidateSeconds: SLOW_ROW_CACHE_SECONDS },
+        rowPages + GENRE_ROW_EXTRA_PAGES
+      )
+        .then((movies) => movies.filter((m) => isPrimaryGenre(m, genreId)))
+        .then(excludeShortFilms);
     }),
   ]);
 

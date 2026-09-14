@@ -1,7 +1,7 @@
 // Run with: npm test
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { cleanMovieList } from "./movieListHygiene.ts";
+import { cleanMovieList, isPrimaryGenre } from "./movieListHygiene.ts";
 
 test("drops a movie with an empty title", () => {
   const result = cleanMovieList([
@@ -42,4 +42,17 @@ test("an already-clean list is unchanged", () => {
 
 test("an empty list stays empty", () => {
   assert.deepEqual(cleanMovieList([]), []);
+});
+
+// Real TMDB data: Despicable Me is tagged [Animation, Comedy, Crime, ...] —
+// Crime is real but a distant fourth, which is exactly the case this exists
+// to reject.
+test("isPrimaryGenre is true only when the genre leads the list", () => {
+  assert.equal(isPrimaryGenre({ genre_ids: [18, 35] }, 18), true);
+  assert.equal(isPrimaryGenre({ genre_ids: [16, 35, 80, 878, 10751] }, 80), false);
+});
+
+test("isPrimaryGenre is false with no genres at all", () => {
+  assert.equal(isPrimaryGenre({}, 18), false);
+  assert.equal(isPrimaryGenre({ genre_ids: [] }, 18), false);
 });

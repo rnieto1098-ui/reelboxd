@@ -24,3 +24,17 @@ export function cleanMovieList<T extends { id: number; title: string }>(movies: 
   }
   return cleaned;
 }
+
+/**
+ * Whether `genreId` is a movie's most prominent genre, not just one it
+ * happens to carry. TMDB returns `genre_ids` in an order that puts the
+ * defining genre first — a `with_genres` discover query matches ANY genre
+ * a movie has though, which is how an animated family film tagged
+ * [Animation, Drama, Family] (Drama a distant afterthought) ends up in a
+ * row literally titled "Drama" next to films that are actually about
+ * something. This narrows a genre-tagged row down to films where the
+ * genre is the point, not a secondary label.
+ */
+export function isPrimaryGenre(movie: { genre_ids?: number[] }, genreId: number): boolean {
+  return movie.genre_ids?.[0] === genreId;
+}

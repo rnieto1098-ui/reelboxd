@@ -21,6 +21,19 @@ export default async function RewatchPage({ searchParams }: PageProps<"/rewatch"
         </>
       }
       allInWatchlist={false}
+      headerActions={(itemCount) =>
+        itemCount > 0 && (
+          // A plain <a>, not <Link>: this is a file download from an API
+          // route, not a page navigation.
+          <a
+            href="/api/rewatch/export"
+            download
+            className="text-sm text-muted hover:text-accent-green hover:underline"
+          >
+            Export as CSV
+          </a>
+        )
+      }
       loadItems={(orderBy) =>
         prisma.rewatchItem.findMany({
           where: { userId },

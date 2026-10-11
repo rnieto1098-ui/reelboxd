@@ -1,0 +1,4 @@
+# Store and check out text files with LF endings on every OS. The repo
+# already stores everything as LF; without this, Windows checkouts with
+# core.autocrlf=true end up with a mix of LF and CRLF working-copy files.
+* text=auto eol=lf

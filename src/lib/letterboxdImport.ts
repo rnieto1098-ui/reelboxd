@@ -5,6 +5,7 @@ import { searchMovies } from "@/lib/tmdb";
 import { ensureMovieCached } from "@/lib/movies";
 import { createDiaryEntry } from "@/lib/diary";
 import { addToWatchlist } from "@/lib/watchlist";
+import { unguardSpreadsheetCell } from "@/lib/csv";
 import {
   diffNewlyCompletedChallenges,
   getCompletedChallengeIds,
@@ -71,7 +72,10 @@ function normalizeTitleYearRows(rows: CsvRow[]): CsvRow[] {
 // Name/Year off that row's column positions — a blank leading column or two
 // just becomes an ignored index, not something that has to match exactly.
 function parseTitleYearCsv(text: string): CsvRow[] {
-  const { data: rows } = Papa.parse<string[]>(text, { skipEmptyLines: "greedy" });
+  const { data: rows } = Papa.parse<string[]>(text, {
+    skipEmptyLines: "greedy",
+    transform: unguardSpreadsheetCell,
+  });
 
   const headerIndex = rows.findIndex((row) =>
     row.some((cell) => TITLE_HEADER_CANDIDATES.includes(cell.trim().toLowerCase()))
@@ -95,12 +99,29 @@ async function readCsv(zip: JSZip, filename: string): Promise<CsvRow[] | null> {
   if (!entry) return null;
 
   const text = stripBom(await entry.async("string"));
-  const { data } = Papa.parse<CsvRow>(text, { header: true, skipEmptyLines: true });
+  const { data } = Papa.parse<CsvRow>(text, {
+    header: true,
+    skipEmptyLines: true,
+    transform: unguardSpreadsheetCell,
+  });
   return data;
 }
 
 async function matchTmdbId(name: string, year: string): Promise<number | null> {
   try {
+    // A plain title search ranks by relevance across all years, which goes
+    // badly for short or symbolic titles: "+1" (2013) returns Kill Bill and
+    // Godzilla Minus One, and taking the first hit imports the wrong film.
+    // A year-filtered search with an exact title match is far more reliable,
+    // so it's tried first; the looser search below stays as the fallback.
+    const yearNum = Number(year);
+    if (year && Number.isInteger(yearNum)) {
+      const target = name.trim().toLowerCase();
+      const { results: inYear } = await searchMovies(name, 1, yearNum);
+      const exact = inYear.find((m) => m.title.trim().toLowerCase() === target);
+      if (exact) return exact.id;
+    }
+
     const { results } = await searchMovies(name);
     if (results.length === 0) return null;
     if (year) {

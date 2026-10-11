@@ -1,17 +1,24 @@
 import JSZip from "jszip";
 import { prisma } from "@/lib/prisma";
+import { toCsv } from "@/lib/csv";
 
 // Mirrors the columns letterboxdImport.ts reads (Name, Year, Rating) — an
 // export can be re-imported straight back into Flixtally, and uses the same
 // header names Letterboxd's own export uses, so it's a reasonable stand-in
 // there too even though full compatibility with Letterboxd's own importer
 // isn't guaranteed.
-function csvEscape(value: string): string {
-  return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
-}
 
-function toCsv(headers: string[], rows: string[][]): string {
-  return [headers, ...rows].map((row) => row.map(csvEscape).join(",")).join("\n");
+type DatedMovieRow = { addedAt: Date; movie: { title: string; releaseDate: string | null } };
+
+function savedMoviesCsv(rows: DatedMovieRow[]): string {
+  return toCsv(
+    ["Date", "Name", "Year"],
+    rows.map((r) => [
+      r.addedAt.toISOString().slice(0, 10),
+      r.movie.title,
+      r.movie.releaseDate?.slice(0, 4) ?? "",
+    ])
+  );
 }
 
 export async function exportWatchlistCsv(userId: string): Promise<string> {
@@ -20,24 +27,27 @@ export async function exportWatchlistCsv(userId: string): Promise<string> {
     include: { movie: true },
     orderBy: { addedAt: "asc" },
   });
-  return toCsv(
-    ["Date", "Name", "Year"],
-    watchlist.map((w) => [
-      w.addedAt.toISOString().slice(0, 10),
-      w.movie.title,
-      w.movie.releaseDate?.slice(0, 4) ?? "",
-    ])
-  );
+  return savedMoviesCsv(watchlist);
+}
+
+export async function exportRewatchCsv(userId: string): Promise<string> {
+  const rewatch = await prisma.rewatchItem.findMany({
+    where: { userId },
+    include: { movie: true },
+    orderBy: { addedAt: "asc" },
+  });
+  return savedMoviesCsv(rewatch);
 }
 
 export async function exportUserDataZip(userId: string): Promise<Buffer> {
-  const [ratings, watchlistCsv, diaryEntries] = await Promise.all([
+  const [ratings, watchlistCsv, rewatchCsv, diaryEntries] = await Promise.all([
     prisma.rating.findMany({
       where: { userId },
       include: { movie: true },
       orderBy: { createdAt: "asc" },
     }),
     exportWatchlistCsv(userId),
+    exportRewatchCsv(userId),
     prisma.diaryEntry.findMany({
       where: { userId },
       include: { movie: true },
@@ -61,6 +71,7 @@ export async function exportUserDataZip(userId: string): Promise<Buffer> {
   );
 
   zip.file("watchlist.csv", watchlistCsv);
+  zip.file("rewatch.csv", rewatchCsv);
 
   zip.file(
     "diary.csv",

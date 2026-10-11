@@ -24,6 +24,11 @@ function dayRangeUTC(date: Date): { start: Date; end: Date } {
  * it's logged as watched it doesn't belong on a "want to watch" list
  * anymore. A no-op if it was never there.
  *
+ * And from the rewatch list — logging is the only thing that does (rating
+ * or marking watched leave it alone). Only when the logged watch happened on
+ * or after the day the film was added there, though: backfilling an old
+ * diary entry (a Letterboxd import) isn't the rewatch you queued up.
+ *
  * Returns `created: false` (with the pre-existing entry) if this movie was
  * already logged today — callers should treat that as nothing having
  * happened: no watchlist removal, no challenge/goal re-checks, no second
@@ -75,6 +80,7 @@ export async function createDiaryEntry({
         },
       }),
       prisma.watchlistItem.deleteMany({ where: { userId, movieId } }),
+      prisma.rewatchItem.deleteMany({ where: { userId, movieId, addedAt: { lt: end } } }),
     ]);
 
     return { entry, created: true };

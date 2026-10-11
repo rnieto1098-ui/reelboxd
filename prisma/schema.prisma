@@ -29,6 +29,7 @@ model User {
   likes             Like[]
   owned             OwnedItem[]
   watched           WatchedItem[]
+  rewatchList       RewatchItem[]
   diaryEntries      DiaryEntry[]
   customPosters     CustomPoster[]
   customListCovers  CustomListCover[]
@@ -172,6 +173,7 @@ model Movie {
   likes         Like[]
   owned         OwnedItem[]
   watched       WatchedItem[]
+  rewatchList   RewatchItem[]
   diaryEntries  DiaryEntry[]
   customPosters CustomPoster[]
   providerSnapshot   MovieProviderSnapshot?
@@ -273,6 +275,22 @@ model OwnedItem {
 // no rating either. Deliberately undated, which is why nothing year- or
 // month-scoped (watch goals, busiest month, Year in Review) counts it.
 model WatchedItem {
+  id      String   @id @default(cuid())
+  addedAt DateTime @default(now())
+
+  userId  String
+  user    User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  movieId String
+  movie   Movie @relation(fields: [movieId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, movieId])
+}
+
+// Films you've seen and want to see again. Independent of the watchlist:
+// being watched never blocks a film from going on here (that's the point),
+// and rating or marking a film watched leaves it alone. Only logging a
+// diary watch takes it off — see createDiaryEntry.
+model RewatchItem {
   id      String   @id @default(cuid())
   addedAt DateTime @default(now())
 

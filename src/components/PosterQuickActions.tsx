@@ -1,12 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { createPortal } from "react-dom";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { posterUrl, type TmdbImage } from "@/lib/tmdb";
-import { BookmarkIcon, EyeIcon, ImageIcon, ShoppingBagIcon } from "@/components/icons";
+import { BookmarkIcon, EyeIcon, RewatchIcon, ShoppingBagIcon } from "@/components/icons";
 import { useToast } from "@/components/Toast";
+import { useRewatchIds } from "@/components/RewatchIdsProvider";
 import { useCoalescedRefresh } from "@/lib/useCoalescedRefresh";
 
 function actionButtonClass(active: boolean) {
@@ -42,11 +40,9 @@ export function PosterQuickActions({
   const [watchlistSaving, setWatchlistSaving] = useState(false);
   const [watched, setWatched] = useState(initialWatched);
   const [watchedSaving, setWatchedSaving] = useState(false);
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [posters, setPosters] = useState<TmdbImage[] | null>(null);
-  const [loadingPosters, setLoadingPosters] = useState(false);
-  const [savingPoster, setSavingPoster] = useState(false);
-  const [posterError, setPosterError] = useState<string | null>(null);
+  const initialInRewatch = useRewatchIds().has(tmdbId);
+  const [inRewatch, setInRewatch] = useState(initialInRewatch);
+  const [rewatchSaving, setRewatchSaving] = useState(false);
 
   // initialOwned/initialInWatchlist can change out from under this component
   // after a router.refresh() triggered elsewhere on the page (e.g. the same
@@ -67,6 +63,11 @@ export function PosterQuickActions({
   if (initialWatched !== prevInitialWatched && !watchedSaving) {
     setPrevInitialWatched(initialWatched);
     setWatched(initialWatched);
+  }
+  const [prevInitialInRewatch, setPrevInitialInRewatch] = useState(initialInRewatch);
+  if (initialInRewatch !== prevInitialInRewatch && !rewatchSaving) {
+    setPrevInitialInRewatch(initialInRewatch);
+    setInRewatch(initialInRewatch);
   }
 
   // Owned/watchlist are real toggles (unlike logging a dated diary watch,
@@ -202,38 +203,37 @@ export function PosterQuickActions({
     }
   }
 
-  function openPosterPicker(e: React.MouseEvent) {
+  // Independent of watchlist/watched: no "already seen" refusal to reconcile,
+  // so this is the same plain flip-and-roll-back as toggleOwned.
+  async function toggleRewatch(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
-    setPickerOpen(true);
-    if (posters) return;
-    setLoadingPosters(true);
-    setPosterError(null);
-    fetch(`/api/movies/${tmdbId}/images`)
-      .then((res) => res.json())
-      .then((data) => setPosters(data.posters ?? []))
-      .catch(() => setPosterError("Couldn't load poster options."))
-      .finally(() => setLoadingPosters(false));
-  }
-
-  async function choosePoster(posterPath: string) {
-    setSavingPoster(true);
-    const res = await fetch(`/api/movies/${tmdbId}/poster`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ posterPath }),
-    });
-    setSavingPoster(false);
+    const previousInRewatch = inRewatch;
+    setInRewatch(!previousInRewatch);
+    setRewatchSaving(true);
+    let res: Response;
+    try {
+      res = await fetch(`/api/movies/${tmdbId}/rewatch`, {
+        method: previousInRewatch ? "DELETE" : "POST",
+      });
+    } catch {
+      setRewatchSaving(false);
+      setInRewatch(previousInRewatch);
+      showToast("Something went wrong — try again.", "error");
+      return;
+    }
+    setRewatchSaving(false);
     if (res.status === 401) {
+      setInRewatch(previousInRewatch);
       router.push("/login");
       return;
     }
-    setPickerOpen(false);
-    // Immediate, not coalesced like the toggles above: the poster itself is
-    // server-rendered, so this refresh *is* the visible result of the click.
-    // Delaying it would just leave the old poster sitting there. It's also a
-    // one-off from a modal, never a burst, so there's nothing to collapse.
-    router.refresh();
+    if (!res.ok) {
+      setInRewatch(previousInRewatch);
+      showToast("Something went wrong — try again.", "error");
+      return;
+    }
+    refresh();
   }
 
   return (
@@ -241,12 +241,14 @@ export function PosterQuickActions({
       <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between p-1.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
         <button
           type="button"
-          title="Change poster"
-          aria-label="Change poster"
-          onClick={openPosterPicker}
-          className={actionButtonClass(false)}
+          title={inRewatch ? "On rewatch list — click to remove" : "Add to rewatch list"}
+          aria-label="Add to rewatch list"
+          aria-pressed={inRewatch}
+          disabled={rewatchSaving}
+          onClick={toggleRewatch}
+          className={actionButtonClass(inRewatch)}
         >
-          <ImageIcon />
+          <RewatchIcon />
         </button>
         <button
           type="button"
@@ -285,65 +287,6 @@ export function PosterQuickActions({
           <BookmarkIcon />
         </button>
       </div>
-
-      {pickerOpen &&
-        createPortal(
-          // Portaled to <body> — MovieCard's poster wrapper has
-          // overflow-hidden (to clip/round the poster image), which would
-          // otherwise clip this modal down to the card's own tiny box even
-          // though it's position:fixed. The movie page's own poster picker
-          // has no such ancestor, which is why only this one needed it.
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-            onClick={() => setPickerOpen(false)}
-          >
-            <div
-              className="max-h-[80vh] w-full max-w-2xl overflow-y-auto rounded-lg border border-border bg-surface p-4"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="mb-3 flex items-center justify-between">
-                <h3 className="text-sm font-semibold">Choose a poster</h3>
-                <button
-                  type="button"
-                  onClick={() => setPickerOpen(false)}
-                  className="text-xs text-muted hover:text-foreground"
-                >
-                  Close
-                </button>
-              </div>
-
-              {loadingPosters && <p className="text-sm text-muted">Loading posters...</p>}
-              {posterError && <p className="text-sm text-red-400">{posterError}</p>}
-
-              {posters && posters.length === 0 && (
-                <p className="text-sm text-muted">No alternate posters found for this movie.</p>
-              )}
-
-              {posters && posters.length > 0 && (
-                <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
-                  {posters.map((img) => (
-                    <button
-                      key={img.file_path}
-                      type="button"
-                      disabled={savingPoster}
-                      onClick={() => choosePoster(img.file_path)}
-                      className="overflow-hidden rounded-md border border-border transition-colors hover:border-accent-green disabled:opacity-50"
-                    >
-                      <Image
-                        src={posterUrl(img.file_path, "w200")!}
-                        alt=""
-                        width={200}
-                        height={300}
-                        className="h-full w-full object-cover"
-                      />
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>,
-          document.body
-        )}
     </>
   );
 }

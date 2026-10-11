@@ -18,6 +18,7 @@ import { excludeShortFilms } from "@/lib/runtimeFilter";
 import { formatRuntime } from "@/lib/format";
 import { StarRating } from "@/components/StarRating";
 import { WatchlistButton } from "@/components/WatchlistButton";
+import { RewatchButton } from "@/components/RewatchButton";
 import { LikeButton } from "@/components/LikeButton";
 import { OwnedButton } from "@/components/OwnedButton";
 import { WatchedButton } from "@/components/WatchedButton";
@@ -98,6 +99,9 @@ export default async function MovieDetailPage({
           watchlist: session?.user?.id
             ? { where: { userId: session.user.id } }
             : false,
+          rewatchList: session?.user?.id
+            ? { where: { userId: session.user.id } }
+            : false,
           likes: session?.user?.id
             ? { where: { userId: session.user.id } }
             : false,
@@ -158,6 +162,7 @@ export default async function MovieDetailPage({
 
   const myRating = localMovie?.ratings?.[0]?.score ?? null;
   const inWatchlist = (localMovie?.watchlist?.length ?? 0) > 0;
+  const inRewatch = (localMovie?.rewatchList?.length ?? 0) > 0;
   const isLiked = (localMovie?.likes?.length ?? 0) > 0;
   const likeCount = localMovie?._count.likes ?? 0;
   const isOwned = (localMovie?.owned?.length ?? 0) > 0;
@@ -218,6 +223,11 @@ export default async function MovieDetailPage({
               studios={details.production_companies ?? []}
               crew={details.credits?.crew ?? []}
               cast={cast}
+            />
+            <RewatchButton
+              tmdbId={tmdbId}
+              initialInRewatch={inRewatch}
+              signedIn={!!session?.user}
             />
           </div>
           <div className="mt-2 flex justify-center md:justify-start">

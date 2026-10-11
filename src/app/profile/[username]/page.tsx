@@ -285,7 +285,7 @@ export default async function ProfilePage({
 
   return (
     <div>
-      <div className="mb-8 flex items-center gap-4">
+      <div className="mb-8 flex flex-wrap items-center gap-4">
         <div className="h-16 w-16 shrink-0 overflow-hidden rounded-full border border-border bg-surface">
           {user.image ? (
             <Image
@@ -337,22 +337,28 @@ export default async function ProfilePage({
         </div>
 
         {isOwnProfile && (
-          <div className="ml-auto flex gap-2">
+          <div className="flex w-full flex-wrap gap-2 sm:ml-auto sm:w-auto">
+            <Link
+              href="/rewatch"
+              className="whitespace-nowrap rounded-md border border-border px-3 py-1.5 text-sm text-muted hover:text-foreground hover:border-accent-green transition-colors"
+            >
+              Rewatch List
+            </Link>
             <Link
               href="/settings"
-              className="rounded-md border border-border px-3 py-1.5 text-sm text-muted hover:text-foreground hover:border-accent-green transition-colors"
+              className="whitespace-nowrap rounded-md border border-border px-3 py-1.5 text-sm text-muted hover:text-foreground hover:border-accent-green transition-colors"
             >
               Settings
             </Link>
             <Link
               href="/streaming"
-              className="rounded-md border border-border px-3 py-1.5 text-sm text-muted hover:text-foreground hover:border-accent-green transition-colors"
+              className="whitespace-nowrap rounded-md border border-border px-3 py-1.5 text-sm text-muted hover:text-foreground hover:border-accent-green transition-colors"
             >
               Streaming Services
             </Link>
             <Link
               href="/import"
-              className="rounded-md border border-border px-3 py-1.5 text-sm text-muted hover:text-foreground hover:border-accent-green transition-colors"
+              className="whitespace-nowrap rounded-md border border-border px-3 py-1.5 text-sm text-muted hover:text-foreground hover:border-accent-green transition-colors"
             >
               Import from Letterboxd
             </Link>

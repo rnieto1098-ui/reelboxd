@@ -3,6 +3,7 @@ import "./globals.css";
 import { NavBar } from "@/components/NavBar";
 import { Footer } from "@/components/Footer";
 import { ToastProvider } from "@/components/Toast";
+import { RewatchIdsProvider } from "@/components/RewatchIdsProvider";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { SITE_URL } from "@/lib/siteUrl";
@@ -33,9 +34,13 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   const user = session?.user?.id
     ? await prisma.user.findUnique({
         where: { id: session.user.id },
-        select: { backgroundImage: true },
+        select: {
+          backgroundImage: true,
+          rewatchList: { select: { movie: { select: { tmdbId: true } } } },
+        },
       })
     : null;
+  const rewatchTmdbIds = user?.rewatchList.map((r) => r.movie.tmdbId) ?? [];
 
   const bodyStyle: React.CSSProperties | undefined = user?.backgroundImage
     ? {
@@ -50,9 +55,11 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="en" className="h-full antialiased">
       <body className="min-h-full flex flex-col" style={bodyStyle}>
         <ToastProvider>
-          <NavBar />
-          <main className="flex-1 mx-auto w-full max-w-[1600px] px-4 py-8">{children}</main>
-          <Footer />
+          <RewatchIdsProvider ids={rewatchTmdbIds}>
+            <NavBar />
+            <main className="flex-1 mx-auto w-full max-w-[1600px] px-4 py-8">{children}</main>
+            <Footer />
+          </RewatchIdsProvider>
         </ToastProvider>
       </body>
     </html>

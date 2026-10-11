@@ -325,19 +325,20 @@ export type WatchlistImportSummary = {
   unmatched: { title: string; year: string }[];
 };
 
-// Accepts either a full Letterboxd export .zip (pulls just watchlist.csv out
-// of it) or a standalone .csv with Name/Year columns — which also covers
-// re-importing this app's own watchlist export, since exportData.ts
-// deliberately mirrors that column layout.
-async function parseWatchlistRows(file: File): Promise<CsvRow[]> {
+// Accepts either an export .zip (pulls just `zipEntry` out of it — a full
+// Letterboxd export for watchlist.csv, a Flixtally account export for either)
+// or a standalone .csv with Name/Year columns — which also covers
+// re-importing this app's own list exports, since exportData.ts deliberately
+// mirrors that column layout.
+async function parseTitleYearFile(file: File, zipEntry = "watchlist.csv"): Promise<CsvRow[]> {
   const name = file.name.toLowerCase();
 
   if (name.endsWith(".zip")) {
     const buffer = await file.arrayBuffer();
     const zip = await JSZip.loadAsync(buffer);
-    const rows = await readCsv(zip, "watchlist.csv");
+    const rows = await readCsv(zip, zipEntry);
     if (!rows) {
-      throw new Error("That .zip didn't contain a watchlist.csv.");
+      throw new Error(`That .zip didn't contain a ${zipEntry}.`);
     }
     return normalizeTitleYearRows(rows);
   }
@@ -354,7 +355,7 @@ export async function importWatchlistFile(
   userId: string,
   file: File
 ): Promise<WatchlistImportSummary> {
-  const rows = await parseWatchlistRows(file);
+  const rows = await parseTitleYearFile(file);
   const films = rows
     .filter((row) => row["Name"])
     .map((row) => ({ title: row["Name"], year: row["Year"] ?? "" }));
@@ -397,11 +398,11 @@ export type OwnedImportSummary = {
 
 // Not a Letterboxd concept — "owned" is Flixtally-only — so this is for a
 // plain CSV with Name/Year columns (a DVD-shelf spreadsheet, this app's own
-// export, etc.), not a Letterboxd export. Shares parseWatchlistRows since
+// export, etc.), not a Letterboxd export. Shares parseTitleYearFile since
 // the accepted shapes (.csv, or a .zip containing a watchlist.csv-named
 // file) are otherwise identical.
 export async function importOwnedFile(userId: string, file: File): Promise<OwnedImportSummary> {
-  const rows = await parseWatchlistRows(file);
+  const rows = await parseTitleYearFile(file);
   const films = rows
     .filter((row) => row["Name"])
     .map((row) => ({ title: row["Name"], year: row["Year"] ?? "" }));
@@ -437,4 +438,67 @@ export async function importOwnedFile(userId: string, file: File): Promise<Owned
   }
 
   return { imported, unmatched };
+}
+
+export type RewatchImportSummary = {
+  imported: number;
+  alreadyOnList: number;
+  unmatched: { title: string; year: string }[];
+};
+
+// Letterboxd has no rewatch list, so this takes a plain Name/Year CSV (this
+// app's own rewatch export included) or a Flixtally account-export .zip,
+// reading its rewatch.csv. Unlike the watchlist import, already-watched films
+// aren't skipped — they're what a rewatch list is for.
+export async function importRewatchFile(userId: string, file: File): Promise<RewatchImportSummary> {
+  const rows = await parseTitleYearFile(file, "rewatch.csv");
+  // Deduped up front so a film listed twice can't be counted as imported
+  // twice by two rows racing through the same batch.
+  const byKey = new Map<string, { title: string; year: string }>();
+  for (const row of rows) {
+    if (!row["Name"]) continue;
+    const film = { title: row["Name"], year: row["Year"] ?? "" };
+    byKey.set(filmKey(film.title, film.year), film);
+  }
+  const films = [...byKey.values()];
+
+  if (films.length === 0) {
+    throw new Error(
+      "No movies found in that file — make sure it has a Name (or Title) column, ideally with Year too."
+    );
+  }
+
+  const unmatched: { title: string; year: string }[] = [];
+  let imported = 0;
+  let alreadyOnList = 0;
+
+  for (let i = 0; i < films.length; i += MATCH_CONCURRENCY) {
+    const batch = films.slice(i, i + MATCH_CONCURRENCY);
+    await Promise.all(
+      batch.map(async (film) => {
+        const tmdbId = await matchTmdbId(film.title, film.year);
+        if (!tmdbId) {
+          unmatched.push(film);
+          return;
+        }
+
+        const movie = await ensureMovieCached(tmdbId);
+        const where = { userId_movieId: { userId, movieId: movie.id } };
+        if (await prisma.rewatchItem.findUnique({ where, select: { id: true } })) {
+          alreadyOnList++;
+          return;
+        }
+        // Upsert rather than create: two rows in one file can match the same
+        // film, and both can pass the check above in the same batch.
+        await prisma.rewatchItem.upsert({
+          where,
+          update: {},
+          create: { userId, movieId: movie.id },
+        });
+        imported++;
+      })
+    );
+  }
+
+  return { imported, alreadyOnList, unmatched };
 }

@@ -1,21 +1,32 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 
-type WatchlistImportSummary = {
+type ListImportSummary = {
   imported: number;
-  skippedWatched: number;
+  // Watchlist only: films already seen don't go on a watchlist.
+  skippedWatched?: number;
+  // Rewatch list only: films that were on it before this import.
+  alreadyOnList?: number;
   unmatched: { title: string; year: string }[];
 };
 
-export function WatchlistImportForm() {
+export function ListImportForm({
+  endpoint,
+  listName,
+  description,
+}: {
+  endpoint: string;
+  listName: string;
+  description: ReactNode;
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [summary, setSummary] = useState<WatchlistImportSummary | null>(null);
+  const [summary, setSummary] = useState<ListImportSummary | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -30,7 +41,7 @@ export function WatchlistImportForm() {
 
     let res: Response;
     try {
-      res = await fetch("/api/watchlist/import", { method: "POST", body: formData });
+      res = await fetch(endpoint, { method: "POST", body: formData });
     } catch {
       setLoading(false);
       setError("Something went wrong — try again.");
@@ -57,13 +68,13 @@ export function WatchlistImportForm() {
         onClick={() => setOpen((v) => !v)}
         className="text-sm text-muted hover:text-accent-green hover:underline"
       >
-        Import to watchlist
+        Import to {listName}
       </button>
 
       {open && (
         <div className="absolute left-0 top-full z-20 sm:left-auto sm:right-0 mt-2 w-96 max-w-[90vw] rounded-lg border border-border bg-surface p-4 shadow-lg">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold">Import to watchlist</h2>
+            <h2 className="text-sm font-semibold">Import to {listName}</h2>
             <button
               type="button"
               onClick={() => setOpen(false)}
@@ -72,23 +83,7 @@ export function WatchlistImportForm() {
               Close
             </button>
           </div>
-          <p className="mb-3 text-xs text-muted">
-            Upload a Letterboxd watchlist.csv (or the full export .zip from{" "}
-            <a
-              href="https://letterboxd.com/user/exportdata/"
-              target="_blank"
-              rel="noreferrer"
-              className="text-accent-green hover:underline"
-            >
-              letterboxd.com/user/exportdata
-            </a>
-            ), or a watchlist.csv you exported from Flixtally — everything in it gets added straight
-            to your watchlist. Ratings and other data are ignored; use{" "}
-            <a href="/import" className="text-accent-green hover:underline">
-              full import
-            </a>{" "}
-            for those.
-          </p>
+          <p className="mb-3 text-xs text-muted">{description}</p>
 
           <form onSubmit={handleSubmit} className="flex flex-wrap items-center gap-3">
             <input
@@ -112,12 +107,18 @@ export function WatchlistImportForm() {
             <div className="mt-4 space-y-2">
               <p className="text-sm">
                 Added <span className="text-accent-green">{summary.imported}</span> movie
-                {summary.imported === 1 ? "" : "s"} to your watchlist.
+                {summary.imported === 1 ? "" : "s"} to your {listName}.
               </p>
-              {summary.skippedWatched > 0 && (
+              {(summary.skippedWatched ?? 0) > 0 && (
                 <p className="text-sm text-muted">
                   Skipped {summary.skippedWatched} you&apos;ve already watched — a watched movie
                   doesn&apos;t go back on your watchlist.
+                </p>
+              )}
+              {(summary.alreadyOnList ?? 0) > 0 && (
+                <p className="text-sm text-muted">
+                  {summary.alreadyOnList} {summary.alreadyOnList === 1 ? "was" : "were"} already on
+                  your {listName}.
                 </p>
               )}
               {summary.unmatched.length > 0 && (

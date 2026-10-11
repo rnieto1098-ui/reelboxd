@@ -14,18 +14,30 @@ function toCsv(headers: string[], rows: string[][]): string {
   return [headers, ...rows].map((row) => row.map(csvEscape).join(",")).join("\n");
 }
 
+export async function exportWatchlistCsv(userId: string): Promise<string> {
+  const watchlist = await prisma.watchlistItem.findMany({
+    where: { userId },
+    include: { movie: true },
+    orderBy: { addedAt: "asc" },
+  });
+  return toCsv(
+    ["Date", "Name", "Year"],
+    watchlist.map((w) => [
+      w.addedAt.toISOString().slice(0, 10),
+      w.movie.title,
+      w.movie.releaseDate?.slice(0, 4) ?? "",
+    ])
+  );
+}
+
 export async function exportUserDataZip(userId: string): Promise<Buffer> {
-  const [ratings, watchlist, diaryEntries] = await Promise.all([
+  const [ratings, watchlistCsv, diaryEntries] = await Promise.all([
     prisma.rating.findMany({
       where: { userId },
       include: { movie: true },
       orderBy: { createdAt: "asc" },
     }),
-    prisma.watchlistItem.findMany({
-      where: { userId },
-      include: { movie: true },
-      orderBy: { addedAt: "asc" },
-    }),
+    exportWatchlistCsv(userId),
     prisma.diaryEntry.findMany({
       where: { userId },
       include: { movie: true },
@@ -48,17 +60,7 @@ export async function exportUserDataZip(userId: string): Promise<Buffer> {
     )
   );
 
-  zip.file(
-    "watchlist.csv",
-    toCsv(
-      ["Date", "Name", "Year"],
-      watchlist.map((w) => [
-        w.addedAt.toISOString().slice(0, 10),
-        w.movie.title,
-        w.movie.releaseDate?.slice(0, 4) ?? "",
-      ])
-    )
-  );
+  zip.file("watchlist.csv", watchlistCsv);
 
   zip.file(
     "diary.csv",

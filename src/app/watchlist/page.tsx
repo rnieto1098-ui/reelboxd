@@ -276,10 +276,21 @@ export default async function WatchlistPage({ searchParams }: PageProps<"/watchl
 
   return (
     <div>
-      <div className="mb-1 flex items-center justify-between gap-4">
+      <div className="mb-1 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         <h1 className="text-2xl font-bold">Your Watchlist</h1>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
           <WatchlistImportForm />
+          {items.length > 0 && (
+            // A plain <a>, not <Link>: this is a file download from an API
+            // route, not a page navigation.
+            <a
+              href="/api/watchlist/export"
+              download
+              className="text-sm text-muted hover:text-accent-green hover:underline"
+            >
+              Export as CSV
+            </a>
+          )}
           <Link
             href="/streaming"
             className="text-sm text-muted hover:text-accent-green hover:underline"

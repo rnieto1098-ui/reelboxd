@@ -61,7 +61,7 @@ export function WatchlistImportForm() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full z-20 mt-2 w-96 max-w-[90vw] rounded-lg border border-border bg-surface p-4 shadow-lg">
+        <div className="absolute left-0 top-full z-20 sm:left-auto sm:right-0 mt-2 w-96 max-w-[90vw] rounded-lg border border-border bg-surface p-4 shadow-lg">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-semibold">Import to watchlist</h2>
             <button

@@ -19,6 +19,7 @@ import { CreditGrid, type CreditDisplay } from "@/components/CreditGrid";
 import { FadeWatchedControl } from "@/components/FadeWatchedControl";
 import { MovieRow } from "@/components/MovieRow";
 import { AvailabilityFilterLinks } from "@/components/AvailabilityFilterLinks";
+import { AddAllToWatchlistButton } from "@/components/AddAllToWatchlistButton";
 
 function buildHref(id: string, streamingOnly: boolean) {
   return streamingOnly ? `/challenges/${id}?streaming=1` : `/challenges/${id}`;
@@ -164,6 +165,10 @@ export default async function ChallengeDetailPage({
     credits = await filterMoviesByStreaming(credits, userProviderIds, ownedIds);
   }
 
+  // GENRE/TIMEFRAME grids are all already-watched films, so for those the
+  // films worth adding are the "What to watch next" suggestions.
+  const hasAddableFilms = filterableType ? credits.length > 0 : suggestions.length > 0;
+
   return (
     <div>
       <Link
@@ -185,6 +190,14 @@ export default async function ChallengeDetailPage({
         >
           From the list &ldquo;{challenge.list.title}&rdquo;
         </Link>
+      )}
+      {viewerId && hasAddableFilms && (
+        <div className="mt-3">
+          <AddAllToWatchlistButton
+            endpoint={`/api/challenges/${id}/add-to-watchlist`}
+            body={applyStreamingFilter ? { streaming: true } : undefined}
+          />
+        </div>
       )}
       <div className="mb-8" />
 

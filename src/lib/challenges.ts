@@ -495,3 +495,26 @@ export async function getChallengeSuggestions(
 
   return results.filter((m) => !loggedTmdbIds.has(m.id)).slice(0, SUGGESTION_COUNT);
 }
+
+// The films a viewer could still go watch for this challenge, for the "add
+// all to watchlist" action. CREW and LIST have a fixed set to work through;
+// GENRE and TIMEFRAME grids only ever show films already logged, so the
+// candidates there are the "What to watch next" suggestions instead.
+export async function getChallengeWatchlistCandidates(
+  viewerId: string,
+  challenge: {
+    type: string;
+    personId: number | null;
+    department: string | null;
+    listId: string | null;
+    genreName: string | null;
+  }
+): Promise<{ id: number }[]> {
+  if (challenge.type === "CREW" && challenge.personId != null) {
+    return getCrewFilmography(challenge.personId, challenge.department);
+  }
+  if (challenge.type === "LIST" && challenge.listId) {
+    return (await getListChallengeTmdbIds(challenge.listId)).map((id) => ({ id }));
+  }
+  return getChallengeSuggestions(viewerId, challenge);
+}

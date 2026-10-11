@@ -17,7 +17,7 @@ import { getWatchedTmdbIds } from "@/lib/recommendations";
 import { compareNullableNumbers, type SortDir } from "@/lib/sortComparator";
 import { ListMovieGrid } from "@/components/ListMovieGrid";
 import { DeleteListButton } from "@/components/DeleteListButton";
-import { AddListToWatchlistButton } from "@/components/AddListToWatchlistButton";
+import { AddAllToWatchlistButton } from "@/components/AddAllToWatchlistButton";
 import { MakeListChallengeButton } from "@/components/MakeListChallengeButton";
 import { FadeWatchedControl } from "@/components/FadeWatchedControl";
 import { ListCoverUpload } from "@/components/ListCoverUpload";
@@ -278,7 +278,12 @@ export default async function ListDetailPage({
           </div>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-2">
-          {userId && list.items.length > 0 && <AddListToWatchlistButton listId={list.id} />}
+          {userId && list.items.length > 0 && (
+            <AddAllToWatchlistButton
+              endpoint={`/api/lists/${list.id}/add-to-watchlist`}
+              emptyMessage="This list is empty."
+            />
+          )}
           {userId && list.items.length > 0 && <MakeListChallengeButton listId={list.id} />}
           {isOwner && <DeleteListButton listId={list.id} />}
         </div>

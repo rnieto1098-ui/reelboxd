@@ -1,8 +1,13 @@
 import { prisma } from "@/lib/prisma";
+import { ensureMovieCached } from "@/lib/movies";
 
 // Chunked rather than one transaction: a curated list can run to hundreds of
 // films, and this is the same shape the add-to-watchlist route already used.
 const WRITE_CONCURRENCY = 12;
+
+// Cache-first (ensureMovieCached hits the local DB before ever touching
+// TMDB), so this can run at higher concurrency than a per-item TMDB call.
+const CACHE_CONCURRENCY = 12;
 
 /**
  * Which of these films the user has already seen, keyed by local Movie id.
@@ -84,4 +89,34 @@ export async function addToWatchlist(
     added: addable.length - racedIntoWatched.size,
     skippedWatched: unique.length - addable.length + racedIntoWatched.size,
   };
+}
+
+/**
+ * Bulk-add by TMDB id — for sets of films that may not be in the local Movie
+ * cache yet (a list, a challenge's filmography). Films already on the
+ * watchlist are skipped before caching so re-running a big add stays cheap.
+ */
+export async function addTmdbIdsToWatchlist(
+  userId: string,
+  tmdbIds: number[]
+): Promise<{ added: number; skippedWatched: number; total: number }> {
+  const unique = [...new Set(tmdbIds)];
+  if (unique.length === 0) return { added: 0, skippedWatched: 0, total: 0 };
+
+  const existing = await prisma.watchlistItem.findMany({
+    where: { userId, movie: { tmdbId: { in: unique } } },
+    select: { movie: { select: { tmdbId: true } } },
+  });
+  const alreadyWatchlisted = new Set(existing.map((e) => e.movie.tmdbId));
+  const toAdd = unique.filter((id) => !alreadyWatchlisted.has(id));
+
+  const movieIds: string[] = [];
+  for (let i = 0; i < toAdd.length; i += CACHE_CONCURRENCY) {
+    const chunk = toAdd.slice(i, i + CACHE_CONCURRENCY);
+    const movies = await Promise.all(chunk.map((id) => ensureMovieCached(id).catch(() => null)));
+    for (const movie of movies) if (movie) movieIds.push(movie.id);
+  }
+
+  const { added, skippedWatched } = await addToWatchlist(userId, movieIds);
+  return { added, skippedWatched, total: unique.length };
 }

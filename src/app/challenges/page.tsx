@@ -31,6 +31,7 @@ function ChallengeCard({ challenge }: { challenge: ChallengeSummary }) {
             title={challenge.title}
             href={`/challenges/${challenge.id}`}
             canEdit
+            twoLines
           />
         </div>
         <DeleteChallengeButton challengeId={challenge.id} />

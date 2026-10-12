@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Image from "next/image";
+import { PosterImage } from "@/components/PosterImage";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { auth } from "@/auth";
@@ -200,19 +201,22 @@ export default async function MovieDetailPage({
         </div>
       )}
 
-      <div className="grid gap-8 md:grid-cols-[240px_1fr] md:-mt-40 relative">
+      {/* The negative margin tucks the poster up into the backdrop. Without a
+          backdrop it pulled the whole block up over the site header. */}
+      <div
+        className={`relative grid gap-8 md:grid-cols-[240px_1fr] ${backdrop ? "md:-mt-40" : ""}`}
+      >
         <div className="w-40 sm:w-60 mx-auto md:mx-0">
-          {poster ? (
-            <Image
+          {/* PosterImage covers both a missing poster_path and one that 404s
+              when fetched, with the same title-card placeholder as the rows. */}
+          <div className="aspect-[2/3] overflow-hidden rounded-lg border border-border bg-surface shadow-lg">
+            <PosterImage
               src={poster}
               alt={details.title}
-              width={500}
-              height={750}
-              className="rounded-lg border border-border shadow-lg"
+              year={details.release_date?.slice(0, 4)}
+              quality={90}
             />
-          ) : (
-            <div className="aspect-[2/3] rounded-lg bg-surface border border-border" />
-          )}
+          </div>
           <div className="mt-2 flex items-center justify-center gap-3 md:justify-start">
             {session?.user && (
               <PosterPicker tmdbId={tmdbId} hasCustomPoster={!!customPosterPath} />

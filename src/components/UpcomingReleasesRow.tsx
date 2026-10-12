@@ -6,10 +6,14 @@ export function UpcomingReleasesRow({
   movies,
   title = "Upcoming Releases",
   ownedIds,
+  watchlistIds,
 }: {
   movies: TmdbMovieSummary[];
   title?: string;
   ownedIds?: Set<number>;
+  // The row mixes watchlist films with TMDB's general upcoming list, so the
+  // watchlist state is per movie rather than assumed true for all of them.
+  watchlistIds?: Set<number>;
 }) {
   return (
     <HorizontalScroller title={title} isEmpty={movies.length === 0}>
@@ -29,7 +33,7 @@ export function UpcomingReleasesRow({
               timeZone: "UTC",
             })}
             owned={ownedIds?.has(movie.id)}
-            inWatchlist
+            inWatchlist={watchlistIds?.has(movie.id)}
           />
         </div>
       ))}

@@ -29,7 +29,7 @@ export function StatTile({
     <div className="rounded-lg border border-border bg-surface p-4 transition-colors hover:border-surface-hover">
       <p className={`text-2xl font-bold tabular-nums sm:text-3xl ${toneClass}`}>{value}</p>
       <p className="mt-1 text-[11px] font-medium uppercase tracking-wide text-muted">{label}</p>
-      {hint && <p className="mt-0.5 text-[11px] text-muted/70">{hint}</p>}
+      {hint && <p className="mt-0.5 text-[11px] text-muted">{hint}</p>}
     </div>
   );
 }

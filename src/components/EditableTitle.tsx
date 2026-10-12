@@ -15,6 +15,7 @@ export function EditableTitle({
   href,
   canEdit,
   className = "text-sm font-semibold",
+  twoLines = false,
 }: {
   /** PATCH target; receives `{ title }`. */
   endpoint: string;
@@ -22,6 +23,8 @@ export function EditableTitle({
   href?: string;
   canEdit: boolean;
   className?: string;
+  /** Wrap onto a second line before clipping, instead of one-line truncation. */
+  twoLines?: boolean;
 }) {
   const router = useRouter();
   const showToast = useToast();
@@ -75,12 +78,21 @@ export function EditableTitle({
     router.refresh();
   }
 
+  // title= gives the full text as a tooltip whenever it gets clipped.
+  // line-clamp sets its own display, so it must not be paired with `block`.
+  const clip = twoLines ? "line-clamp-2 break-words" : "block truncate";
   const text = href ? (
-    <Link href={href} className={`block truncate hover:text-accent-green hover:underline ${className}`}>
+    <Link
+      href={href}
+      title={title}
+      className={`${clip} hover:text-accent-green hover:underline ${className}`}
+    >
       {title}
     </Link>
   ) : (
-    <span className={`block truncate ${className}`}>{title}</span>
+    <span title={title} className={`${clip} ${className}`}>
+      {title}
+    </span>
   );
 
   if (!canEdit) return text;

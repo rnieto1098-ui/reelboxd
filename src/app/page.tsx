@@ -49,15 +49,29 @@ const WELCOME_PHRASES = [
 // several tags without being about superheroes at all. TMDB's own keyword
 // tagging (id 9715, "superhero") is a real curated signal for this instead.
 const SUPERHERO_KEYWORD_ID = 9715;
+// The keyword alone still lets in kids' films with a superhero gag (PAW
+// Patrol: The Mighty Movie, Despicable Me 4), so the row also excludes
+// Animation and Family. TMDB genre ids are fixed.
+const ANIMATION_GENRE_ID = 16;
+const FAMILY_GENRE_ID = 10751;
 
 // The three genre-based rows below filter on *primary* genre (see
 // isPrimaryGenre) rather than "has this genre anywhere in its tags" — a
 // with_genres match alone let Despicable Me (Animation, Comedy, Crime, ...)
 // into Crime and Cars 3 / Inside Out (Animation, Drama, ...) into Drama,
 // genre only as a distant, secondary label.
-type GenreRow = { title: string; genreName?: string; keywordId?: number };
+type GenreRow = {
+  title: string;
+  genreName?: string;
+  keywordId?: number;
+  excludeGenreIds?: number[];
+};
 const GENRE_ROWS: GenreRow[] = [
-  { title: "Superhero", keywordId: SUPERHERO_KEYWORD_ID },
+  {
+    title: "Superhero",
+    keywordId: SUPERHERO_KEYWORD_ID,
+    excludeGenreIds: [ANIMATION_GENRE_ID, FAMILY_GENRE_ID],
+  },
   { title: "Comedy", genreName: "Comedy" },
   { title: "Drama", genreName: "Drama" },
   { title: "Crime", genreName: "Crime" },
@@ -291,7 +305,11 @@ async function HomeMovieRows({
     ...GENRE_ROWS.map((row) => {
       if (row.keywordId != null) {
         return discoverMoviesMultiPage(
-          { keywordIds: [row.keywordId], revalidateSeconds: SLOW_ROW_CACHE_SECONDS },
+          {
+            keywordIds: [row.keywordId],
+            excludeGenreIds: row.excludeGenreIds,
+            revalidateSeconds: SLOW_ROW_CACHE_SECONDS,
+          },
           rowPages
         ).then(excludeShortFilms);
       }
@@ -371,11 +389,16 @@ async function HomeMovieRows({
   const discoverWithPosters = cleanMovieList(applyPosterOverrides(discover, posterOverrides));
   const rentBuyWithPosters = cleanMovieList(applyPosterOverrides(rentBuy, posterOverrides));
   const recentlyAddedWithPosters = cleanMovieList(applyPosterOverrides(recentlyAdded, posterOverrides));
-  const upcomingReleasesWithPosters = cleanMovieList(
-    applyPosterOverrides(upcomingReleases, posterOverrides)
-  );
+  // One "Coming Soon" row: the user's own unreleased watchlist films merged
+  // into TMDB's upcoming list, in release order. A separate "Upcoming
+  // Releases" row usually held only one or two films next to this one.
   const comingSoonWithPosters = cleanMovieList(
-    applyPosterOverrides(comingSoonRaw.results, posterOverrides)
+    applyPosterOverrides(
+      [...upcomingReleases, ...comingSoonRaw.results].sort((a, b) =>
+        a.release_date.localeCompare(b.release_date)
+      ),
+      posterOverrides
+    )
   );
   const genreRowsWithPosters = genreRows.map((row) => ({
     ...row,
@@ -425,7 +448,12 @@ async function HomeMovieRows({
         />
       )}
       {comingSoonWithPosters.length > 0 && (
-        <UpcomingReleasesRow title="Coming Soon" movies={comingSoonWithPosters} ownedIds={ownedTmdbIds} />
+        <UpcomingReleasesRow
+          title="Coming Soon"
+          movies={comingSoonWithPosters}
+          ownedIds={ownedTmdbIds}
+          watchlistIds={watchlistTmdbIds}
+        />
       )}
       {isSignedIn && listsProgress.length > 0 && <CuratedListsProgress lists={listsProgress} />}
       {isSignedIn && (
@@ -453,9 +481,6 @@ async function HomeMovieRows({
           ownedIds={ownedIdsArray}
           watchlistIds={watchlistIdsArray}
         />
-      )}
-      {isSignedIn && upcomingReleasesWithPosters.length > 0 && (
-        <UpcomingReleasesRow movies={upcomingReleasesWithPosters} ownedIds={ownedTmdbIds} />
       )}
       <MovieRow
         title="Highest Rated"

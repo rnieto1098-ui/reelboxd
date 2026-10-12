@@ -24,8 +24,9 @@ export function StudioRow({ title, studios }: { title: string; studios: TmdbComp
                   className="h-full w-full object-contain"
                 />
               ) : (
-                <div className="flex h-full w-full items-center justify-center text-xs font-bold text-black">
-                  {studio.name[0]}
+                // No logo: the full name as a wordmark, never a lone initial.
+                <div className="flex h-full w-full items-center justify-center text-center text-xs font-bold leading-tight text-black">
+                  {studio.name}
                 </div>
               )}
             </div>

@@ -1,7 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { auth } from "@/auth";
-import { SignOutButton } from "@/components/SignOutButton";
+import { UserMenu } from "@/components/UserMenu";
+import { prisma } from "@/lib/prisma";
 import { SearchBox } from "@/components/SearchBox";
 import { MobileNav, type MobileNavItem } from "@/components/MobileNav";
 
@@ -19,8 +20,8 @@ export async function NavBar() {
         ]
       : [{ href: "/lists", label: "Lists" }]),
     { href: "/crew", label: "Crew" },
-    // The header hides the username link below sm to make room for the
-    // search box — this is mobile's only other way back to your profile.
+    // Also reachable from the avatar menu; kept here so the hamburger menu
+    // is a complete map of the site on its own.
     ...(session?.user
       ? [{ href: `/profile/${session.user.name}`, label: `${session.user.name} (Profile)` }]
       : [
@@ -29,9 +30,30 @@ export async function NavBar() {
         ]),
   ];
 
+  const navItems = [
+    { href: "/", label: "Home" },
+    ...(session?.user ? [{ href: "/recommend", label: "Recommend Me" }] : []),
+    { href: "/lists", label: "Lists" },
+    ...(session?.user
+      ? [
+          { href: "/watchlist", label: "Watchlist" },
+          { href: "/challenges", label: "Challenges" },
+        ]
+      : []),
+    { href: "/crew", label: "Crew" },
+  ];
+
+  const avatar = session?.user?.id
+    ? (await prisma.user.findUnique({ where: { id: session.user.id }, select: { image: true } }))
+        ?.image ?? null
+    : null;
+
+  // Below lg the tab links live in the hamburger menu — at laptop widths
+  // (~630–1000px) the full set used to overlap the account links and wrap
+  // "Recommend Me" onto two lines.
   return (
     <header className="border-b border-border bg-surface">
-      <div className="relative mx-auto max-w-[1600px] px-4 py-3 flex items-center justify-between gap-6">
+      <div className="mx-auto flex max-w-[1600px] items-center gap-4 px-4 py-3 lg:gap-6">
         <div className="flex shrink-0 items-center gap-2">
           <MobileNav items={mobileNavItems} />
           <Link
@@ -44,58 +66,27 @@ export async function NavBar() {
           </Link>
         </div>
 
-        <div className="flex items-center gap-6 sm:absolute sm:left-1/2 sm:-translate-x-1/2">
-          <nav className="hidden sm:flex items-center gap-6 text-sm font-semibold text-foreground/90">
-            <Link href="/" className="hover:text-accent-green transition-colors">
-              Home
+        <nav className="hidden items-center gap-5 whitespace-nowrap text-sm font-semibold text-foreground/90 lg:flex">
+          {navItems.map((item) => (
+            <Link key={item.href} href={item.href} className="hover:text-accent-green transition-colors">
+              {item.label}
             </Link>
-            {session?.user && (
-              <Link href="/recommend" className="hover:text-accent-green transition-colors">
-                Recommend Me
-              </Link>
-            )}
-            <Link href="/lists" className="hover:text-accent-green transition-colors">
-              Lists
-            </Link>
-          </nav>
+          ))}
+        </nav>
 
+        <div className="flex min-w-0 flex-1 justify-end">
           <SearchBox />
-
-          <nav className="hidden sm:flex items-center gap-6 text-sm font-semibold text-foreground/90">
-            {session?.user && (
-              <>
-                <Link href="/watchlist" className="hover:text-accent-green transition-colors">
-                  Watchlist
-                </Link>
-                <Link href="/challenges" className="hover:text-accent-green transition-colors">
-                  Challenges
-                </Link>
-              </>
-            )}
-            <Link href="/crew" className="hover:text-accent-green transition-colors">
-              Crew
-            </Link>
-          </nav>
         </div>
 
         <div className="flex shrink-0 items-center gap-4">
-          {session?.user && (
-            <Link
-              href={`/profile/${session.user.name}`}
-              className="hidden text-sm font-medium hover:text-accent-green transition-colors sm:inline-flex"
-            >
-              {session.user.name}
-            </Link>
-          )}
-
-          {session?.user ? (
-            <SignOutButton />
+          {session?.user?.name ? (
+            <UserMenu username={session.user.name} image={avatar} />
           ) : (
             // Hidden below sm — same links are in the mobile hamburger menu
             // (mobileNavItems above) instead, since at narrow widths this
             // pair used to sit alongside the search box with nowhere to
             // shrink to and pushed the page wider than the screen.
-            <div className="hidden items-center gap-4 sm:flex">
+            <div className="hidden items-center gap-4 whitespace-nowrap sm:flex">
               <Link
                 href="/login"
                 className="text-sm text-muted hover:text-foreground transition-colors"

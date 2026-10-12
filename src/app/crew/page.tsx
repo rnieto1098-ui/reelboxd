@@ -153,8 +153,8 @@ export default async function CrewPage({ searchParams }: PageProps<"/crew">) {
                             className="h-full w-full object-contain"
                           />
                         ) : (
-                          <div className="flex h-full w-full items-center justify-center text-xs font-bold text-black">
-                            {company.name[0]}
+                          <div className="flex h-full w-full items-center justify-center text-center text-[10px] font-bold leading-tight text-black">
+                            {company.name}
                           </div>
                         )}
                       </div>

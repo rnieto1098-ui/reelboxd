@@ -7,8 +7,8 @@ import { MenuIcon, CloseIcon } from "@/components/icons";
 
 export type MobileNavItem = { href: string; label: string };
 
-// Mobile-only replacement for the desktop top-tab nav (which is `hidden`
-// below the `sm` breakpoint) — a slide-in sidebar instead of trying to
+// Below-lg replacement for the desktop top-tab nav (which is `hidden`
+// below the `lg` breakpoint) — a slide-in sidebar instead of trying to
 // cram the same links into the narrow header row.
 export function MobileNav({ items }: { items: MobileNavItem[] }) {
   const [open, setOpen] = useState(false);
@@ -33,13 +33,13 @@ export function MobileNav({ items }: { items: MobileNavItem[] }) {
         type="button"
         onClick={() => setOpen(true)}
         aria-label="Open menu"
-        className="-ml-1.5 rounded-md p-1.5 text-muted hover:text-foreground transition-colors sm:hidden"
+        className="-ml-1.5 rounded-md p-1.5 text-muted hover:text-foreground transition-colors lg:hidden"
       >
         <MenuIcon />
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-50 sm:hidden">
+        <div className="fixed inset-0 z-50 lg:hidden">
           <button
             type="button"
             aria-label="Close menu"

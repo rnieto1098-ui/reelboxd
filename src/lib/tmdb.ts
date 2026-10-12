@@ -305,6 +305,8 @@ export function discoverMovies(params: {
   // signal for those, versus with_genres matching on the much broader
   // Action/Adventure genre a superhero movie also happens to carry.
   keywordIds?: number[];
+  // Genres a result must NOT carry (TMDB without_genres).
+  excludeGenreIds?: number[];
   minVoteAverage?: number;
   minVoteCount?: number;
   minRuntime?: number;
@@ -334,6 +336,10 @@ export function discoverMovies(params: {
         params.genreIds && params.genreIds.length > 0 ? params.genreIds.join(",") : undefined,
       with_keywords:
         params.keywordIds && params.keywordIds.length > 0 ? params.keywordIds.join(",") : undefined,
+      without_genres:
+        params.excludeGenreIds && params.excludeGenreIds.length > 0
+          ? params.excludeGenreIds.join(",")
+          : undefined,
       "vote_average.gte": params.minVoteAverage,
       "vote_count.gte": params.minVoteCount ?? 100,
       "with_runtime.gte": params.minRuntime,

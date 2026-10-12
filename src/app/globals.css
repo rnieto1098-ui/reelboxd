@@ -5,7 +5,10 @@
   --surface: #1c2228;
   --surface-hover: #253039;
   --foreground: #e7e9eb;
-  --muted: #9ab;
+  /* Slightly brighter than the original #9ab so small secondary text
+     clears WCAG AA (4.5:1) even over the lighter parts of the photo
+     backgrounds, not just the flat #14181c. */
+  --muted: #aab7c4;
   --border: #2c3440;
   --accent-green: #00e054;
   --accent-blue: #40bcf4;

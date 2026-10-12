@@ -461,7 +461,7 @@ function MiniStat({ label, value, hint }: { label: string; value: string; hint?:
     <div>
       <p className="text-lg font-semibold tabular-nums">{value}</p>
       <p className="mt-0.5 text-[11px] uppercase tracking-wide text-muted">{label}</p>
-      {hint && <p className="text-[11px] text-muted/70">{hint}</p>}
+      {hint && <p className="text-[11px] text-muted">{hint}</p>}
     </div>
   );
 }

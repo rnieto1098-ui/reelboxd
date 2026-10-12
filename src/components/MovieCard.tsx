@@ -24,6 +24,9 @@ export function MovieCard({
   watched?: boolean;
 }) {
   const src = posterUrl(posterPath);
+  // `year` is sometimes a full release date (Coming Soon rows); the
+  // placeholder only needs the year itself.
+  const placeholderYear = year?.match(/\d{4}/)?.[0];
 
   const href = `/movie/${tmdbId}`;
 
@@ -35,7 +38,7 @@ export function MovieCard({
             inside it — nesting them worked in some browsers but not
             reliably, since it's invalid HTML with undefined click behavior. */}
         <Link href={href} className="absolute inset-0">
-          <PosterImage src={src} alt={title} />
+          <PosterImage src={src} alt={title} year={placeholderYear} />
         </Link>
         <PosterQuickActions
           tmdbId={tmdbId}
@@ -50,13 +53,20 @@ export function MovieCard({
           title, and this row's flex container stretches every card to the
           tallest one anyway. title= is a plain native tooltip backstop for
           anything long enough to still clip at two lines. */}
-      <Link
-        href={href}
-        title={title}
-        className="mt-1.5 block line-clamp-2 min-h-[2.5rem] text-sm font-medium group-hover:text-accent-green transition-colors"
-      >
-        {title}
-      </Link>
+      {src ? (
+        <Link
+          href={href}
+          title={title}
+          className="mt-1.5 block line-clamp-2 min-h-[2.5rem] text-sm font-medium group-hover:text-accent-green transition-colors"
+        >
+          {title}
+        </Link>
+      ) : (
+        // No poster: the placeholder above already shows the title, so the
+        // caption doesn't repeat it — just the empty two-line slot, keeping
+        // this card's date in line with its neighbors'.
+        <div aria-hidden className="mt-1.5 min-h-[2.5rem]" />
+      )}
       {year && <p className="text-xs text-muted">{year}</p>}
     </div>
   );

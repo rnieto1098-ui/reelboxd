@@ -5,6 +5,7 @@ import {
   type TmdbCompany,
   type TmdbPerson,
 } from "@/lib/tmdb";
+import { pickCompany } from "@/lib/companyMatch";
 
 const POPULAR_PEOPLE_PAGES = 4;
 const ROW_SIZE = 15;
@@ -67,13 +68,19 @@ const FEATURED_STUDIOS = [
 
 async function resolveByName<T>(
   names: string[],
-  search: (name: string) => Promise<{ results: T[] }>
+  search: (name: string) => Promise<{ results: T[] }>,
+  pick: (name: string, results: T[]) => T | undefined = (_, results) => results[0]
 ): Promise<T[]> {
   const found: (T | undefined)[] = await Promise.all(
-    names.map((name) => search(name).then((r) => r.results[0]).catch(() => undefined))
+    names.map((name) =>
+      search(name)
+        .then((r) => pick(name, r.results))
+        .catch(() => undefined)
+    )
   );
   return found.filter((x): x is T => x != null);
 }
+
 
 export async function getBrowseRows() {
   const [peoplePages, directors, cinematographers, studios] = await Promise.all([
@@ -82,7 +89,7 @@ export async function getBrowseRows() {
     ),
     resolveByName(FEATURED_DIRECTORS, searchPeople),
     resolveByName(FEATURED_CINEMATOGRAPHERS, searchPeople),
-    resolveByName(FEATURED_STUDIOS, searchCompanies),
+    resolveByName(FEATURED_STUDIOS, searchCompanies, pickCompany),
   ]);
 
   const allPeople = dedupeById(peoplePages.flatMap((p) => p.results));
@@ -95,7 +102,7 @@ export async function getBrowseRows() {
     directors: directors.slice(0, ROW_SIZE),
     actors,
     cinematographers: cinematographers.slice(0, ROW_SIZE),
-    studios: studios.slice(0, ROW_SIZE),
+    studios: dedupeById(studios).slice(0, ROW_SIZE),
   };
 }
 

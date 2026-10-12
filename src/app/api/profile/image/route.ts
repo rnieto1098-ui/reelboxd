@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { del, put } from "@vercel/blob";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { isUploadedBackground } from "@/lib/backgrounds";
 
 const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
 
@@ -71,8 +72,11 @@ export async function POST(request: Request) {
   });
 
   // Delete the old blob only after the new one is safely stored and saved —
-  // never risk losing a working image because a later step failed.
-  if (oldUrl) await del(oldUrl).catch(() => null);
+  // never risk losing a working image because a later step failed. A
+  // background may be a preset or "none", which aren't blobs.
+  if (oldUrl && (type === "avatar" || isUploadedBackground(oldUrl))) {
+    await del(oldUrl).catch(() => null);
+  }
 
   return NextResponse.json({ path: blob.url });
 }
@@ -99,7 +103,9 @@ export async function DELETE(request: Request) {
     data: type === "avatar" ? { image: null } : { backgroundImage: null },
   });
 
-  if (url) await del(url).catch(() => null);
+  if (url && (type === "avatar" || isUploadedBackground(url))) {
+    await del(url).catch(() => null);
+  }
 
   return NextResponse.json({ ok: true });
 }

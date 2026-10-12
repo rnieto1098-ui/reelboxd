@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { ChangeUsernameForm } from "@/components/ChangeUsernameForm";
 import { ChangePasswordForm } from "@/components/ChangePasswordForm";
 import { ProfileImageUpload } from "@/components/ProfileImageUpload";
+import { BackgroundPicker } from "@/components/BackgroundPicker";
+import { NO_BACKGROUND, resolveBackground } from "@/lib/backgrounds";
 
 export default async function SettingsPage() {
   const session = await auth();
@@ -14,6 +16,7 @@ export default async function SettingsPage() {
     where: { id: session.user.id },
     select: { image: true, backgroundImage: true },
   });
+  const background = resolveBackground(user?.backgroundImage);
 
   return (
     <div className="max-w-xl">
@@ -43,22 +46,31 @@ export default async function SettingsPage() {
 
       <section className="mb-8 rounded-lg border border-border bg-surface p-4">
         <h2 className="mb-3 text-lg font-semibold">Site background</h2>
-        <div className="flex items-center gap-4">
-          <div className="h-14 w-24 shrink-0 overflow-hidden rounded-md border border-border bg-background">
-            {user?.backgroundImage && (
+        <BackgroundPicker
+          selected={
+            background.kind === "preset"
+              ? background.preset.id
+              : background.kind === "none"
+                ? NO_BACKGROUND
+                : "upload"
+          }
+        />
+        <div className="mt-4 flex items-center gap-4">
+          {background.kind === "upload" && (
+            <div className="h-14 w-24 shrink-0 overflow-hidden rounded-md border-2 border-accent-green bg-background">
               <Image
-                src={user.backgroundImage}
+                src={background.url}
                 alt=""
                 width={96}
                 height={56}
                 className="h-full w-full object-cover"
               />
-            )}
-          </div>
+            </div>
+          )}
           <ProfileImageUpload
             type="background"
-            label="Upload background"
-            hasImage={!!user?.backgroundImage}
+            label={background.kind === "upload" ? "Replace your image" : "Upload your own"}
+            hasImage={background.kind === "upload"}
           />
         </div>
       </section>

@@ -7,6 +7,7 @@ import { RewatchIdsProvider } from "@/components/RewatchIdsProvider";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { SITE_URL } from "@/lib/siteUrl";
+import { backgroundStyle } from "@/lib/backgrounds";
 
 const TITLE = "Flixtally";
 const DESCRIPTION = "Track films you've watched. Discover what to watch next.";
@@ -42,14 +43,8 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
     : null;
   const rewatchTmdbIds = user?.rewatchList.map((r) => r.movie.tmdbId) ?? [];
 
-  const bodyStyle: React.CSSProperties | undefined = user?.backgroundImage
-    ? {
-        backgroundImage: `linear-gradient(rgba(20, 24, 28, 0.88), rgba(20, 24, 28, 0.88)), url(${user.backgroundImage})`,
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-        backgroundAttachment: "fixed",
-      }
-    : undefined;
+  // Signed-out visitors (user === null) get the default preset too.
+  const bodyStyle = backgroundStyle(user?.backgroundImage);
 
   return (
     <html lang="en" className="h-full antialiased">

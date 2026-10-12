@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { auth } from "@/auth";
 import { SignOutButton } from "@/components/SignOutButton";
@@ -33,7 +34,12 @@ export async function NavBar() {
       <div className="relative mx-auto max-w-[1600px] px-4 py-3 flex items-center justify-between gap-6">
         <div className="flex shrink-0 items-center gap-2">
           <MobileNav items={mobileNavItems} />
-          <Link href="/" className="text-xl font-bold tracking-tight text-accent-green">
+          <Link
+            href="/"
+            className="flex items-center gap-2 text-xl font-bold tracking-tight text-accent-green"
+          >
+            {/* Same artwork as app/icon.png, pre-sized in public/ for 3x screens. */}
+            <Image src="/logo.png" alt="" width={32} height={32} priority className="h-8 w-8" />
             Flixtally
           </Link>
         </div>

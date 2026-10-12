@@ -20,7 +20,7 @@ export function SearchBox() {
         type="text"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="Search movies..."
+        placeholder="Search movies, people..."
         className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm placeholder:text-muted focus:outline-none focus:border-accent-green"
       />
     </form>

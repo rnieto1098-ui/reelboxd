@@ -1,11 +1,22 @@
 import Image from "next/image";
 import Link from "next/link";
 import { HorizontalScroller } from "@/components/HorizontalScroller";
+import type { ReactNode } from "react";
 import { profileUrl, type TmdbPerson } from "@/lib/tmdb";
 
-export function PersonRow({ title, people }: { title: string; people: TmdbPerson[] }) {
+export function PersonRow({
+  title,
+  people,
+  headerAction,
+  showDepartment = false,
+}: {
+  title: string;
+  people: TmdbPerson[];
+  headerAction?: ReactNode;
+  showDepartment?: boolean;
+}) {
   return (
-    <HorizontalScroller title={title} isEmpty={people.length === 0}>
+    <HorizontalScroller title={title} headerAction={headerAction} isEmpty={people.length === 0}>
       {people.map((person) => {
         const photo = profileUrl(person.profile_path, "w185");
         return (
@@ -35,6 +46,9 @@ export function PersonRow({ title, people }: { title: string; people: TmdbPerson
             >
               {person.name}
             </p>
+            {showDepartment && person.known_for_department && (
+              <p className="text-xs text-muted">{person.known_for_department}</p>
+            )}
           </Link>
         );
       })}

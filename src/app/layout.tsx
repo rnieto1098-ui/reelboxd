@@ -7,7 +7,7 @@ import { RewatchIdsProvider } from "@/components/RewatchIdsProvider";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { SITE_URL } from "@/lib/siteUrl";
-import { backgroundStyle } from "@/lib/backgrounds";
+import { PageBackground } from "@/components/PageBackground";
 
 const TITLE = "Flixtally";
 const DESCRIPTION = "Track films you've watched. Discover what to watch next.";
@@ -43,12 +43,11 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
     : null;
   const rewatchTmdbIds = user?.rewatchList.map((r) => r.movie.tmdbId) ?? [];
 
-  // Signed-out visitors (user === null) get the default preset too.
-  const bodyStyle = backgroundStyle(user?.backgroundImage);
-
   return (
     <html lang="en" className="h-full antialiased">
-      <body className="min-h-full flex flex-col" style={bodyStyle}>
+      <body className="min-h-full flex flex-col">
+        {/* Signed-out visitors (no user) get the per-tab backgrounds too. */}
+        <PageBackground stored={user?.backgroundImage ?? null} />
         <ToastProvider>
           <RewatchIdsProvider ids={rewatchTmdbIds}>
             <NavBar />

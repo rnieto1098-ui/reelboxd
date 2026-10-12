@@ -6,7 +6,7 @@ import { ChangeUsernameForm } from "@/components/ChangeUsernameForm";
 import { ChangePasswordForm } from "@/components/ChangePasswordForm";
 import { ProfileImageUpload } from "@/components/ProfileImageUpload";
 import { BackgroundPicker } from "@/components/BackgroundPicker";
-import { NO_BACKGROUND, resolveBackground } from "@/lib/backgrounds";
+import { pickerSelection, resolveBackground } from "@/lib/backgrounds";
 
 export default async function SettingsPage() {
   const session = await auth();
@@ -46,15 +46,10 @@ export default async function SettingsPage() {
 
       <section className="mb-8 rounded-lg border border-border bg-surface p-4">
         <h2 className="mb-3 text-lg font-semibold">Site background</h2>
-        <BackgroundPicker
-          selected={
-            background.kind === "preset"
-              ? background.preset.id
-              : background.kind === "none"
-                ? NO_BACKGROUND
-                : "upload"
-          }
-        />
+        <p className="mb-3 text-sm text-muted">
+          By default each tab has its own backdrop. Pick one to use it everywhere instead.
+        </p>
+        <BackgroundPicker selected={pickerSelection(user?.backgroundImage)} />
         <div className="mt-4 flex items-center gap-4">
           {background.kind === "upload" && (
             <div className="h-14 w-24 shrink-0 overflow-hidden rounded-md border-2 border-accent-green bg-background">

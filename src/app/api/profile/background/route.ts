@@ -4,13 +4,14 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import {
   BACKGROUND_PRESETS,
-  DEFAULT_BACKGROUND_ID,
+  MATCH_TAB,
   NO_BACKGROUND,
   isUploadedBackground,
   presetValue,
 } from "@/lib/backgrounds";
 
-// Picks a preset site background, or "none" for a plain one. Uploading your
+// Picks a preset site background, MATCH_TAB for a different preset on each
+// tab, or "none" for a plain one. Uploading your
 // own image goes through /api/profile/image instead.
 export async function PUT(request: Request) {
   const session = await auth();
@@ -22,7 +23,9 @@ export async function PUT(request: Request) {
   const choice = body?.choice;
   if (
     typeof choice !== "string" ||
-    (choice !== NO_BACKGROUND && !BACKGROUND_PRESETS.some((p) => p.id === choice))
+    (choice !== NO_BACKGROUND &&
+      choice !== MATCH_TAB &&
+      !BACKGROUND_PRESETS.some((p) => p.id === choice))
   ) {
     return NextResponse.json({ error: "Unknown background" }, { status: 400 });
   }
@@ -32,10 +35,10 @@ export async function PUT(request: Request) {
     select: { backgroundImage: true },
   });
 
-  // The default preset is stored as null so a future change of default
-  // reaches everyone who never picked one explicitly.
+  // Match-each-tab is stored as null: it's the default, so a future change to
+  // the tab backgrounds reaches everyone who never picked one explicitly.
   const value =
-    choice === NO_BACKGROUND ? NO_BACKGROUND : choice === DEFAULT_BACKGROUND_ID ? null : presetValue(choice);
+    choice === NO_BACKGROUND ? NO_BACKGROUND : choice === MATCH_TAB ? null : presetValue(choice);
 
   await prisma.user.update({
     where: { id: session.user.id },

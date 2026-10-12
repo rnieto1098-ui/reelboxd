@@ -8,6 +8,8 @@ import { getPersonalListCoverMap } from "@/lib/listCovers";
 import { CreateListForm } from "@/components/CreateListForm";
 import { ListRow } from "@/components/ListRow";
 import { parseStoredTags } from "@/lib/listTags";
+import { applySavedOrder, parseListOrder } from "@/lib/listOrder";
+import { ReorderableListsSection, type ReorderItem } from "@/components/ReorderableListsSection";
 
 export default async function ListsPage({ searchParams }: PageProps<"/lists">) {
   const { tag } = await searchParams;
@@ -16,7 +18,7 @@ export default async function ListsPage({ searchParams }: PageProps<"/lists">) {
   const session = await auth();
   await ensureSystemLists();
 
-  const [systemLists, userLists] = await Promise.all([
+  const [systemListsRaw, userListsRaw, savedOrders] = await Promise.all([
     prisma.list.findMany({
       where: { isSystem: true },
       include: {
@@ -34,7 +36,23 @@ export default async function ListsPage({ searchParams }: PageProps<"/lists">) {
           },
         })
       : Promise.resolve([]),
+    session?.user?.id
+      ? prisma.user.findUnique({
+          where: { id: session.user.id },
+          select: { listOrder: true, curatedListOrder: true },
+        })
+      : Promise.resolve(null),
   ]);
+
+  // Curated lists share their saved order with the homepage's "Your List
+  // Progress" cards; lists added since go last. Your own lists default to
+  // newest first, and one created since the last reorder goes at the top.
+  const systemLists = applySavedOrder(
+    systemListsRaw,
+    parseListOrder(savedOrders?.curatedListOrder),
+    "end"
+  );
+  const userLists = applySavedOrder(userListsRaw, parseListOrder(savedOrders?.listOrder), "start");
 
   const personalCovers = await getPersonalListCoverMap(session?.user?.id, [
     ...systemLists.map((l) => l.id),
@@ -72,15 +90,32 @@ export default async function ListsPage({ searchParams }: PageProps<"/lists">) {
       </p>
 
       <div className="mb-10">
-        <ListRow title="Curated Lists" lists={systemListCards} />
+        <ReorderableListsSection
+          title="Curated Lists"
+          endpoint="/api/account/curated-list-order"
+          items={systemListCards.map(toReorderItem)}
+          canReorder={!!session?.user}
+        >
+          <ListRow lists={systemListCards} />
+        </ReorderableListsSection>
       </div>
 
       {session?.user && (
-        <section>
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Your Lists</h2>
-            <CreateListForm />
-          </div>
+        <ReorderableListsSection
+          title="Your Lists"
+          actions={<CreateListForm />}
+          endpoint="/api/account/list-order"
+          items={userLists.map((list) =>
+            toReorderItem({
+              id: list.id,
+              title: list.title,
+              coverImage: personalCovers.get(list.id) ?? list.coverImage,
+              coverPosterPath: list.items[0]?.posterPath ?? null,
+            })
+          )}
+          // Reordering a tag-filtered subset would be ambiguous; reorder from "All".
+          canReorder={!activeTag}
+        >
 
           {allTags.length > 0 && (
             <div className="mb-4 flex flex-wrap items-center gap-1.5 text-xs">
@@ -115,7 +150,7 @@ export default async function ListsPage({ searchParams }: PageProps<"/lists">) {
           ) : (
             <ListGrid lists={visibleLists} personalCovers={personalCovers} />
           )}
-        </section>
+        </ReorderableListsSection>
       )}
     </div>
   );
@@ -174,4 +209,17 @@ function ListGrid({
       })}
     </div>
   );
+}
+
+function toReorderItem(list: {
+  id: string;
+  title: string;
+  coverImage: string | null;
+  coverPosterPath: string | null;
+}): ReorderItem {
+  return {
+    id: list.id,
+    title: list.title,
+    cover: list.coverImage ?? posterUrl(list.coverPosterPath, "w200"),
+  };
 }

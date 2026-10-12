@@ -4,7 +4,7 @@ import { PosterImage } from "@/components/PosterImage";
 import { posterUrl } from "@/lib/tmdb";
 import type { ListCard } from "@/lib/systemLists";
 
-export function ListRow({ title, lists }: { title: string; lists: ListCard[] }) {
+export function ListRow({ title, lists }: { title?: string; lists: ListCard[] }) {
   return (
     <HorizontalScroller title={title} isEmpty={lists.length === 0}>
       {lists.map((list) => {

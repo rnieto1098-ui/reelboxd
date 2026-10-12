@@ -5189,6 +5189,109 @@ const GREATEST_800_LIST: { title: string; year: number }[] = [
   { title: "Little Miss Sunshine", year: 2006 },
 ];
 
+const COMEDY_100_LIST: { title: string; year: number }[] = [
+  { title: "Some Like It Hot", year: 1959 },
+  { title: "Dr. Strangelove", year: 1964 },
+  { title: "Monty Python and the Holy Grail", year: 1975 },
+  { title: "Airplane!", year: 1980 },
+  { title: "The Big Lebowski", year: 1998 },
+  { title: "Duck Soup", year: 1933 },
+  { title: "The Apartment", year: 1960 },
+  { title: "This Is Spinal Tap", year: 1984 },
+  { title: "Groundhog Day", year: 1993 },
+  { title: "Annie Hall", year: 1977 },
+  { title: "Blazing Saddles", year: 1974 },
+  { title: "Young Frankenstein", year: 1974 },
+  { title: "Singin' in the Rain", year: 1952 },
+  { title: "City Lights", year: 1931 },
+  { title: "The General", year: 1926 },
+  { title: "Bringing Up Baby", year: 1938 },
+  { title: "His Girl Friday", year: 1940 },
+  { title: "The Philadelphia Story", year: 1940 },
+  { title: "It Happened One Night", year: 1934 },
+  { title: "The Producers", year: 1967 },
+  { title: "A Night at the Opera", year: 1935 },
+  { title: "Modern Times", year: 1936 },
+  { title: "The Great Dictator", year: 1940 },
+  { title: "The Gold Rush", year: 1925 },
+  { title: "Safety Last!", year: 1923 },
+  { title: "Sherlock Jr.", year: 1924 },
+  { title: "The Lady Eve", year: 1941 },
+  { title: "Sullivan's Travels", year: 1941 },
+  { title: "To Be or Not to Be", year: 1942 },
+  { title: "Kind Hearts and Coronets", year: 1949 },
+  { title: "The Lavender Hill Mob", year: 1951 },
+  { title: "Monsieur Hulot's Holiday", year: 1953 },
+  { title: "Roman Holiday", year: 1953 },
+  { title: "The Ladykillers", year: 1955 },
+  { title: "The Pink Panther", year: 1963 },
+  { title: "A Shot in the Dark", year: 1964 },
+  { title: "The Graduate", year: 1967 },
+  { title: "PlayTime", year: 1967 },
+  { title: "The Odd Couple", year: 1968 },
+  { title: "The Party", year: 1968 },
+  { title: "M*A*S*H", year: 1970 },
+  { title: "Harold and Maude", year: 1971 },
+  { title: "What's Up, Doc?", year: 1972 },
+  { title: "American Graffiti", year: 1973 },
+  { title: "The Sting", year: 1973 },
+  { title: "Monty Python's Life of Brian", year: 1979 },
+  { title: "Being There", year: 1979 },
+  { title: "The Jerk", year: 1979 },
+  { title: "The Blues Brothers", year: 1980 },
+  { title: "Caddyshack", year: 1980 },
+  { title: "Tootsie", year: 1982 },
+  { title: "Trading Places", year: 1983 },
+  { title: "National Lampoon's Vacation", year: 1983 },
+  { title: "Ghostbusters", year: 1984 },
+  { title: "Beverly Hills Cop", year: 1984 },
+  { title: "Back to the Future", year: 1985 },
+  { title: "Ferris Bueller's Day Off", year: 1986 },
+  { title: "Raising Arizona", year: 1987 },
+  { title: "Planes, Trains and Automobiles", year: 1987 },
+  { title: "The Princess Bride", year: 1987 },
+  { title: "A Fish Called Wanda", year: 1988 },
+  { title: "The Naked Gun: From the Files of Police Squad!", year: 1988 },
+  { title: "When Harry Met Sally...", year: 1989 },
+  { title: "Home Alone", year: 1990 },
+  { title: "My Cousin Vinny", year: 1992 },
+  { title: "Wayne's World", year: 1992 },
+  { title: "Dazed and Confused", year: 1993 },
+  { title: "Mrs. Doubtfire", year: 1993 },
+  { title: "Dumb and Dumber", year: 1994 },
+  { title: "Clerks", year: 1994 },
+  { title: "Ace Ventura: Pet Detective", year: 1994 },
+  { title: "Friday", year: 1995 },
+  { title: "Clueless", year: 1995 },
+  { title: "Fargo", year: 1996 },
+  { title: "The Birdcage", year: 1996 },
+  { title: "Waiting for Guffman", year: 1996 },
+  { title: "Austin Powers: International Man of Mystery", year: 1997 },
+  { title: "There's Something About Mary", year: 1998 },
+  { title: "Office Space", year: 1999 },
+  { title: "Galaxy Quest", year: 1999 },
+  { title: "American Pie", year: 1999 },
+  { title: "Best in Show", year: 2000 },
+  { title: "Meet the Parents", year: 2000 },
+  { title: "Zoolander", year: 2001 },
+  { title: "Shaun of the Dead", year: 2004 },
+  { title: "Mean Girls", year: 2004 },
+  { title: "Anchorman: The Legend of Ron Burgundy", year: 2004 },
+  { title: "Borat", year: 2006 },
+  { title: "Little Miss Sunshine", year: 2006 },
+  { title: "Hot Fuzz", year: 2007 },
+  { title: "Superbad", year: 2007 },
+  { title: "Tropic Thunder", year: 2008 },
+  { title: "Step Brothers", year: 2008 },
+  { title: "In Bruges", year: 2008 },
+  { title: "The Hangover", year: 2009 },
+  { title: "Bridesmaids", year: 2011 },
+  { title: "21 Jump Street", year: 2012 },
+  { title: "The Grand Budapest Hotel", year: 2014 },
+  { title: "What We Do in the Shadows", year: 2014 },
+  { title: "The Nice Guys", year: 2016 },
+];
+
 const DIACRITIC_MARKS = /[̀-ͯ]/g;
 
 function normalizeTitle(s: string) {
@@ -5357,6 +5460,10 @@ const WAR_250_LIST_DESCRIPTION = "Official Letterboxd list of the top 250 war fi
 const GREATEST_800_LIST_KEY = "800-greatest-movies";
 const GREATEST_800_LIST_TITLE = "800 Greatest Movies";
 const GREATEST_800_LIST_DESCRIPTION = "A curated ranking of the 800 greatest movies.";
+
+const COMEDY_100_LIST_KEY = "top-100-comedy-films";
+const COMEDY_100_LIST_TITLE = "Top 100 Comedy Films";
+const COMEDY_100_LIST_DESCRIPTION = "A curated ranking of the 100 greatest comedy films.";
 
 // Claims a system list's row via its unique `key` *before* doing any TMDB
 // resolution work. Two requests racing to seed the same list for the first
@@ -5647,6 +5754,30 @@ async function seedGreatest800List() {
   });
 }
 
+async function seedComedy100List() {
+  const list = await claimSystemList(
+    COMEDY_100_LIST_KEY,
+    COMEDY_100_LIST_TITLE,
+    COMEDY_100_LIST_DESCRIPTION
+  );
+  if (!list) return;
+
+  const resolved = await resolveTitleYearList(COMEDY_100_LIST);
+
+  // Rank order, matches the source list's own displayed order.
+  await prisma.listItem.createMany({
+    data: resolved.map(({ movie }, i) => ({
+      listId: list.id,
+      tmdbId: movie.id,
+      title: movie.title,
+      posterPath: movie.poster_path,
+      releaseDate: movie.release_date,
+      popularity: movie.popularity ?? null,
+      position: i,
+    })),
+  });
+}
+
 const SYSTEM_LIST_KEYS = [
   OSCAR_LIST_KEY,
   LETTERBOXD_LIST_KEY,
@@ -5661,6 +5792,7 @@ const SYSTEM_LIST_KEYS = [
   HORROR_250_LIST_KEY,
   WAR_250_LIST_KEY,
   GREATEST_800_LIST_KEY,
+  COMEDY_100_LIST_KEY,
 ];
 
 // Once this process has confirmed every system list exists, it never stops
@@ -5690,6 +5822,7 @@ export async function ensureSystemLists() {
   if (!existingKeys.has(HORROR_250_LIST_KEY)) await seedHorrorList();
   if (!existingKeys.has(WAR_250_LIST_KEY)) await seedWarList();
   if (!existingKeys.has(GREATEST_800_LIST_KEY)) await seedGreatest800List();
+  if (!existingKeys.has(COMEDY_100_LIST_KEY)) await seedComedy100List();
 
   allSystemListsConfirmed = true;
 }

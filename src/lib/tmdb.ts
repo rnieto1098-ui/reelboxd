@@ -92,7 +92,10 @@ export type TmdbListResponse = {
 // TMDB's rate limit. This gates ALL tmdbFetch calls through one queue
 // (per server instance) so at most MAX_CONCURRENT are ever in flight,
 // regardless of how many callers fire at once.
-const MAX_CONCURRENT_REQUESTS = 6;
+// 10 in flight at ~100–250ms each stays well under TMDB's ~40-50 req/s
+// per-IP limit (and 429s are retried with backoff below); 6 left a cold
+// home page waiting several seconds in this queue.
+const MAX_CONCURRENT_REQUESTS = 10;
 let activeRequests = 0;
 const requestQueue: (() => void)[] = [];
 
@@ -379,9 +382,17 @@ export function getSimilarMovies(tmdbId: number, page = 1) {
   return tmdbFetch<TmdbListResponse>(`/movie/${tmdbId}/recommendations`, { page });
 }
 
+// Streaming availability shifts on the scale of days, not hours (the daily
+// provider-snapshot cron runs on the same assumption), and the home page's
+// Discover / Rent or Buy rows look this up for dozens of films per load, so
+// a day-long cache keeps those lookups from going cold every hour.
+const WATCH_PROVIDERS_CACHE_SECONDS = 24 * 60 * 60;
+
 export function getWatchProviders(tmdbId: number) {
   return tmdbFetch<{ results: Record<string, TmdbWatchProviderResults> }>(
-    `/movie/${tmdbId}/watch/providers`
+    `/movie/${tmdbId}/watch/providers`,
+    {},
+    WATCH_PROVIDERS_CACHE_SECONDS
   );
 }
 

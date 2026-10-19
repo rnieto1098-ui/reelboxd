@@ -135,24 +135,44 @@ export async function getRecommendationsForUser(
     }
   }
 
+  // Every source is fetched up front in parallel, then merged in the same
+  // priority order as before — these used to be awaited one at a time,
+  // several seconds of round trips on a cold cache. A source that turns out
+  // not to be needed costs one cached TMDB call; a failed one is skipped.
+  const settle = <T>(p: Promise<T>) => p.catch(() => null);
+  const [directorPages, castPages, genrePages] = await Promise.all([
+    Promise.all(
+      topDirectorIds.map((crewId) =>
+        settle(discoverMovies({ crewId }).then((page) => excludeShortFilms(page.results)))
+      )
+    ),
+    Promise.all(
+      topCastIds.map((castId) =>
+        settle(discoverMovies({ castId }).then((page) => excludeShortFilms(page.results)))
+      )
+    ),
+    Promise.all(
+      genreIds.map((genreId) =>
+        settle(
+          discoverMoviesMultiPage({ genreIds: [genreId] }, GENRE_PAGES_PER_QUERY).then(
+            excludeShortFilms
+          )
+        )
+      )
+    ),
+  ]);
+
   // Director/cast overlap first, capped well below resultCount so genre
   // still gets a fair share of the row even for someone with strong,
   // consistent people-signal.
-  for (const directorId of topDirectorIds) {
+  for (const movies of [...directorPages, ...castPages]) {
     if (results.length >= peopleResultCap) break;
-    const page = await discoverMovies({ crewId: directorId });
-    addFromPage(await excludeShortFilms(page.results), peopleResultCap);
-  }
-  for (const castId of topCastIds) {
-    if (results.length >= peopleResultCap) break;
-    const page = await discoverMovies({ castId });
-    addFromPage(await excludeShortFilms(page.results), peopleResultCap);
+    if (movies) addFromPage(movies, peopleResultCap);
   }
 
-  for (const genreId of genreIds) {
+  for (const movies of genrePages) {
     if (results.length >= resultCount) break;
-    const movies = await discoverMoviesMultiPage({ genreIds: [genreId] }, GENRE_PAGES_PER_QUERY);
-    addFromPage(await excludeShortFilms(movies), resultCount);
+    if (movies) addFromPage(movies, resultCount);
   }
 
   return results;

@@ -2,10 +2,10 @@
 // resolving, so the page shell above it doesn't sit on a blank screen in
 // the meantime. Shape mirrors MovieRow: a title-sized bar over a row of
 // poster-sized placeholders.
-export function HomeRowsSkeleton() {
+export function HomeRowsSkeleton({ rows = 3 }: { rows?: number }) {
   return (
     <div className="space-y-10">
-      {Array.from({ length: 3 }).map((_, row) => (
+      {Array.from({ length: rows }).map((_, row) => (
         <div key={row}>
           <div className="mb-3 h-6 w-40 animate-pulse rounded bg-surface" />
           <div className="flex gap-4 overflow-hidden">

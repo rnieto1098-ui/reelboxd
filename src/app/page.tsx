@@ -1,4 +1,4 @@
-import { Suspense } from "react";
+import { Suspense, type ReactNode } from "react";
 import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -123,6 +123,15 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
 
   const canFilterByAvailability = hasStreamingAvailability(userProviderIds, ownedTmdbIds);
 
+  // Started here (not awaited) because more than one streamed section needs
+  // them: recommendations feed For You, Popular's exclusions and Discover;
+  // the watchlist feeds Coming Soon and Rent or Buy.
+  const recommendCount = canFilterByAvailability ? STREAMING_RECOMMEND_COUNT : BASE_RECOMMEND_COUNT;
+  const recommendedPromise = getGenres().then((catalog) =>
+    getRecommendationsForUser(userId, watchedIds, catalog.genres, recommendCount)
+  );
+  const watchlistMoviesPromise = loadWatchlistMovies(userId);
+
   // Reuses data already fetched above — no extra queries just to know
   // whether these are done.
   const onboardingItems: ChecklistItem[] = [
@@ -187,6 +196,38 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
           ownedTmdbIds={ownedTmdbIds}
           watchlistTmdbIds={watchlistTmdbIds}
           canFilterByAvailability={canFilterByAvailability}
+          recommendedPromise={recommendedPromise}
+          watchlistMoviesPromise={watchlistMoviesPromise}
+          // Discover and Rent or Buy each need a live streaming-availability
+          // lookup per film (easily several seconds on a cold cache), so
+          // they stream in on their own instead of holding back every other
+          // row on the page.
+          discoverRow={
+            session?.user ? (
+              <Suspense fallback={<HomeRowsSkeleton rows={1} />}>
+                <DiscoverRow
+                  userId={userId}
+                  recommendedPromise={recommendedPromise}
+                  userProviderIds={userProviderIds}
+                  ownedTmdbIds={ownedTmdbIds}
+                  watchlistTmdbIds={watchlistTmdbIds}
+                  canFilterByAvailability={canFilterByAvailability}
+                />
+              </Suspense>
+            ) : null
+          }
+          rentBuyRow={
+            session?.user ? (
+              <Suspense fallback={<HomeRowsSkeleton rows={1} />}>
+                <RentBuyRow
+                  userId={userId}
+                  watchlistMoviesPromise={watchlistMoviesPromise}
+                  ownedTmdbIds={ownedTmdbIds}
+                  watchlistTmdbIds={watchlistTmdbIds}
+                />
+              </Suspense>
+            ) : null
+          }
         />
       </Suspense>
     </div>
@@ -195,10 +236,9 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
 
 // Split out from HomePage so the shell above (header, goal widget,
 // onboarding) can paint before this — the much heavier part — resolves.
-// Everything in here still runs as one unit: the rows have real
-// cross-dependencies (Popular excludes what's already in For You, poster
-// overrides are looked up once for everything together) that aren't worth
-// untangling just to stream each row independently.
+// Most rows still run as one unit (Popular excludes what's already in For
+// You); the two slowest, Discover and Rent or Buy, arrive as their own
+// streamed slots (discoverRow / rentBuyRow) rendered in their usual places.
 async function HomeMovieRows({
   userId,
   isSignedIn,
@@ -208,6 +248,10 @@ async function HomeMovieRows({
   ownedTmdbIds,
   watchlistTmdbIds,
   canFilterByAvailability,
+  recommendedPromise,
+  watchlistMoviesPromise,
+  discoverRow,
+  rentBuyRow,
 }: {
   userId: string | undefined;
   isSignedIn: boolean;
@@ -217,52 +261,26 @@ async function HomeMovieRows({
   ownedTmdbIds: Set<number>;
   watchlistTmdbIds: Set<number>;
   canFilterByAvailability: boolean;
+  recommendedPromise: Promise<TmdbMovieSummary[]>;
+  watchlistMoviesPromise: Promise<TmdbMovieSummary[]>;
+  discoverRow: ReactNode;
+  rentBuyRow: ReactNode;
 }) {
-  const [comingSoonRaw, genreCatalog, listCards, watchlistRows, recentlyAddedRaw] = await Promise.all([
+  const [comingSoonRaw, genreCatalog, listCards, watchlistMoviesRaw, recentlyAddedRaw] = await Promise.all([
     getUpcomingMovies(),
     getGenres(),
     getHomepageListCards(userId),
-    userId
-      ? prisma.watchlistItem.findMany({
-          where: { userId },
-          select: {
-            movie: {
-              select: {
-                tmdbId: true,
-                title: true,
-                overview: true,
-                posterPath: true,
-                backdropPath: true,
-                releaseDate: true,
-                voteAverage: true,
-              },
-            },
-          },
-        })
-      : Promise.resolve([]),
+    watchlistMoviesPromise,
     userId ? getRecentlyAddedForUser(userId, userProviderIds) : Promise.resolve([]),
   ]);
 
   const applyStreamingFilter = streamingOnly && canFilterByAvailability;
   const rowPages = applyStreamingFilter ? STREAMING_ROW_PAGES : BASE_ROW_PAGES;
-  const recommendCount = canFilterByAvailability ? STREAMING_RECOMMEND_COUNT : BASE_RECOMMEND_COUNT;
 
   const [popularRaw, trendingRaw] = await Promise.all([
     getPopularMoviesMultiPage(rowPages).then(excludeShortFilms),
     getTrendingMoviesMultiPage("week", rowPages).then(excludeShortFilms),
   ]);
-
-  // Stubbed into TmdbMovieSummary shape from the local cache snapshot —
-  // MovieCard/MovieRow only ever read id/title/poster_path/release_date.
-  const watchlistMoviesRaw: TmdbMovieSummary[] = watchlistRows.map((w) => ({
-    id: w.movie.tmdbId,
-    title: w.movie.title,
-    overview: w.movie.overview ?? "",
-    poster_path: w.movie.posterPath,
-    backdrop_path: w.movie.backdropPath,
-    release_date: w.movie.releaseDate ?? "",
-    vote_average: w.movie.voteAverage ?? 0,
-  }));
 
   const recentlyAdded: TmdbMovieSummary[] = recentlyAddedRaw.map((m) => ({
     id: m.tmdbId,
@@ -293,7 +311,7 @@ async function HomeMovieRows({
   // depends on it (only the `excludeFromPopular` filter does, after) — so it
   // runs alongside the rest instead of serializing in front of them.
   const [recommendedRaw, highestRatedRaw, ...genreRowsRaw] = await Promise.all([
-    getRecommendationsForUser(userId, watchedIds, genreCatalog.genres, recommendCount),
+    recommendedPromise,
     // A high vote-count floor is what actually gets you "universally agreed
     // masterpiece" territory (Shawshank, The Godfather, ...) — the default
     // floor of 100 lets small-but-devoted-fanbase obscurities with a handful
@@ -343,8 +361,6 @@ async function HomeMovieRows({
     popular,
     trending,
     highestRated,
-    discover,
-    rentBuy,
     listsProgress,
     ...genreMoviesNarrowed
   ] = await Promise.all([
@@ -352,14 +368,6 @@ async function HomeMovieRows({
     narrow(popularFilteredRaw),
     narrow(trendingFiltered),
     narrow(highestRatedFiltered),
-    // Unlike the other rows, this one always filters to the user's
-    // services regardless of the "Showing" toggle above — that's the
-    // whole point of "Discover": personalized picks you can watch right
-    // now, not just when the global filter happens to be on.
-    canFilterByAvailability
-      ? filterMoviesByStreaming(recommendedRaw, userProviderIds, ownedTmdbIds)
-      : Promise.resolve([] as TmdbMovieSummary[]),
-    filterRentBuyOnly(watchlistMoviesRaw),
     getCuratedListsProgress(userId, watchedIds),
     ...genreRowsFiltered.map((row) => narrow(row.movies)),
   ]);
@@ -370,8 +378,6 @@ async function HomeMovieRows({
     ...popular.map((m) => m.id),
     ...trending.map((m) => m.id),
     ...highestRated.map((m) => m.id),
-    ...discover.map((m) => m.id),
-    ...rentBuy.map((m) => m.id),
     ...recentlyAdded.map((m) => m.id),
     ...upcomingReleases.map((m) => m.id),
     ...comingSoonRaw.results.map((m) => m.id),
@@ -386,8 +392,6 @@ async function HomeMovieRows({
   const popularWithPosters = cleanMovieList(applyPosterOverrides(popular, posterOverrides));
   const trendingWithPosters = cleanMovieList(applyPosterOverrides(trending, posterOverrides));
   const highestRatedWithPosters = cleanMovieList(applyPosterOverrides(highestRated, posterOverrides));
-  const discoverWithPosters = cleanMovieList(applyPosterOverrides(discover, posterOverrides));
-  const rentBuyWithPosters = cleanMovieList(applyPosterOverrides(rentBuy, posterOverrides));
   const recentlyAddedWithPosters = cleanMovieList(applyPosterOverrides(recentlyAdded, posterOverrides));
   // One "Coming Soon" row: the user's own unreleased watchlist films merged
   // into TMDB's upcoming list, in release order. A separate "Upcoming
@@ -404,19 +408,6 @@ async function HomeMovieRows({
     ...row,
     movies: cleanMovieList(applyPosterOverrides(row.movies, posterOverrides)),
   }));
-
-  const discoverEmptyMessage = !canFilterByAvailability ? (
-    <>
-      <Link href="/streaming" className="text-accent-green hover:underline">
-        Add your streaming services
-      </Link>{" "}
-      to see personalized picks you can actually watch right now.
-    </>
-  ) : recommendedRaw.length === 0 ? (
-    "Rate a few movies you liked and we'll start recommending things you haven't seen."
-  ) : (
-    "Nothing you own or have streaming matches your taste yet — check back soon."
-  );
 
   // MovieRow is a Client Component (shuffle needs local state) — Set isn't
   // serializable across that boundary, so these cross it as plain arrays.
@@ -456,15 +447,7 @@ async function HomeMovieRows({
         />
       )}
       {isSignedIn && listsProgress.length > 0 && <CuratedListsProgress lists={listsProgress} />}
-      {isSignedIn && (
-        <MovieRow
-          title="Discover"
-          movies={discoverWithPosters}
-          emptyMessage={discoverEmptyMessage}
-          ownedIds={ownedIdsArray}
-          watchlistIds={watchlistIdsArray}
-        />
-      )}
+      {discoverRow}
       {isSignedIn && recentlyAddedWithPosters.length > 0 && (
         <MovieRow
           title="Recently Added to Your Services"
@@ -473,15 +456,7 @@ async function HomeMovieRows({
           watchlistIds={watchlistIdsArray}
         />
       )}
-      {isSignedIn && watchlistMoviesRaw.length > 0 && (
-        <MovieRow
-          title="Rent or Buy"
-          movies={rentBuyWithPosters}
-          emptyMessage="Nothing on your watchlist currently needs to be rented or bought."
-          ownedIds={ownedIdsArray}
-          watchlistIds={watchlistIdsArray}
-        />
-      )}
+      {rentBuyRow}
       <MovieRow
         title="Highest Rated"
         movies={highestRatedWithPosters}
@@ -498,5 +473,118 @@ async function HomeMovieRows({
         />
       ))}
     </div>
+  );
+}
+
+// The user's watchlist from the local movie cache, in TmdbMovieSummary shape
+// (MovieCard/MovieRow only ever read id/title/poster_path/release_date).
+async function loadWatchlistMovies(userId: string | undefined): Promise<TmdbMovieSummary[]> {
+  if (!userId) return [];
+  const rows = await prisma.watchlistItem.findMany({
+    where: { userId },
+    select: {
+      movie: {
+        select: {
+          tmdbId: true,
+          title: true,
+          overview: true,
+          posterPath: true,
+          backdropPath: true,
+          releaseDate: true,
+          voteAverage: true,
+        },
+      },
+    },
+  });
+  return rows.map((w) => ({
+    id: w.movie.tmdbId,
+    title: w.movie.title,
+    overview: w.movie.overview ?? "",
+    poster_path: w.movie.posterPath,
+    backdrop_path: w.movie.backdropPath,
+    release_date: w.movie.releaseDate ?? "",
+    vote_average: w.movie.voteAverage ?? 0,
+  }));
+}
+
+// Personalized picks the user can watch right now. Unlike the other rows,
+// this always filters to the user's services regardless of the "Showing"
+// toggle; that's the whole point of "Discover".
+async function DiscoverRow({
+  userId,
+  recommendedPromise,
+  userProviderIds,
+  ownedTmdbIds,
+  watchlistTmdbIds,
+  canFilterByAvailability,
+}: {
+  userId: string | undefined;
+  recommendedPromise: Promise<TmdbMovieSummary[]>;
+  userProviderIds: Set<number>;
+  ownedTmdbIds: Set<number>;
+  watchlistTmdbIds: Set<number>;
+  canFilterByAvailability: boolean;
+}) {
+  const recommendedRaw = await recommendedPromise;
+  const discover = canFilterByAvailability
+    ? await filterMoviesByStreaming(recommendedRaw, userProviderIds, ownedTmdbIds)
+    : [];
+  const posterOverrides = await getCustomPosterMap(
+    userId,
+    discover.map((m) => m.id)
+  );
+
+  const discoverEmptyMessage = !canFilterByAvailability ? (
+    <>
+      <Link href="/streaming" className="text-accent-green hover:underline">
+        Add your streaming services
+      </Link>{" "}
+      to see personalized picks you can actually watch right now.
+    </>
+  ) : recommendedRaw.length === 0 ? (
+    "Rate a few movies you liked and we'll start recommending things you haven't seen."
+  ) : (
+    "Nothing you own or have streaming matches your taste yet — check back soon."
+  );
+
+  return (
+    <MovieRow
+      title="Discover"
+      movies={cleanMovieList(applyPosterOverrides(discover, posterOverrides))}
+      emptyMessage={discoverEmptyMessage}
+      ownedIds={[...ownedTmdbIds]}
+      watchlistIds={[...watchlistTmdbIds]}
+    />
+  );
+}
+
+// Watchlist films only available to rent or buy right now. Hidden for an
+// empty watchlist, as before it streamed separately.
+async function RentBuyRow({
+  userId,
+  watchlistMoviesPromise,
+  ownedTmdbIds,
+  watchlistTmdbIds,
+}: {
+  userId: string | undefined;
+  watchlistMoviesPromise: Promise<TmdbMovieSummary[]>;
+  ownedTmdbIds: Set<number>;
+  watchlistTmdbIds: Set<number>;
+}) {
+  const watchlistMovies = await watchlistMoviesPromise;
+  if (watchlistMovies.length === 0) return null;
+  const rentBuy = await filterRentBuyOnly(watchlistMovies);
+  const posterOverrides = await getCustomPosterMap(
+    userId,
+    rentBuy.map((m) => m.id)
+  );
+  return (
+    <MovieRow
+      title="Rent or Buy"
+      movies={cleanMovieList(applyPosterOverrides(rentBuy, posterOverrides))}
+      emptyMessage="Nothing on your watchlist currently needs to be rented or bought."
+      ownedIds={[...ownedTmdbIds]}
+      watchlistIds={[...watchlistTmdbIds]}
+    />
   );
 }

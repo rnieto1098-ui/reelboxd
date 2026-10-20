@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { prisma } from "@/lib/prisma";
 import {
   getWatchProviderCatalog,
@@ -90,8 +91,6 @@ export function parseProviderIds(stored: string): Set<number> {
   );
 }
 
-const SNAPSHOT_SEED_CONCURRENCY = 6;
-
 /**
  * Flatrate provider ids for a batch of movies, keyed by tmdbId.
  *
@@ -127,25 +126,37 @@ export async function getFlatrateProviderIdsByTmdbId(
     else byTmdbId.set(movie.tmdbId, parseProviderIds(stored));
   }
 
-  for (let i = 0; i < unseeded.length; i += SNAPSHOT_SEED_CONCURRENCY) {
-    const batch = unseeded.slice(i, i + SNAPSHOT_SEED_CONCURRENCY);
-    await Promise.all(
-      batch.map(async (movie) => {
-        const providers = await getFlatrateProviders(movie.tmdbId);
-        const ids = providers.map((p) => p.provider_id);
-        byTmdbId.set(movie.tmdbId, new Set(ids));
-        // Best-effort: a failed seed just means the next load fetches live
-        // again, so it must never take the page down with it.
-        await prisma.movieProviderSnapshot
-          .upsert({
-            where: { movieId: movie.id },
-            update: { providerIds: ids.join(",") },
-            create: { movieId: movie.id, providerIds: ids.join(",") },
+  if (unseeded.length === 0) return byTmdbId;
+
+  // All at once rather than in fixed-size waves: the TMDB client's global
+  // limiter already caps concurrency, and waves meant every batch waited on
+  // its slowest request before the next one began.
+  const seeded = await Promise.all(
+    unseeded.map(async (movie) => {
+      const providers = await getFlatrateProviders(movie.tmdbId);
+      const ids = providers.map((p) => p.provider_id);
+      byTmdbId.set(movie.tmdbId, new Set(ids));
+      return { movieId: movie.id, providerIds: ids.join(",") };
+    })
+  );
+
+  // Written back after the response has been sent, in one transaction — a
+  // write per movie inside the render used to hold the page for seconds.
+  // Best-effort: a failed seed just means the next load fetches live again,
+  // so it must never take the page down with it.
+  after(() =>
+    prisma
+      .$transaction(
+        seeded.map((s) =>
+          prisma.movieProviderSnapshot.upsert({
+            where: { movieId: s.movieId },
+            update: { providerIds: s.providerIds },
+            create: s,
           })
-          .catch(() => null);
-      })
-    );
-  }
+        )
+      )
+      .catch(() => null)
+  );
 
   return byTmdbId;
 }

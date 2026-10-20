@@ -1,5 +1,6 @@
 "use client";
 
+import { startTransition, useEffect, useState } from "react";
 import { MovieCard } from "@/components/MovieCard";
 import { ShuffleButton } from "@/components/ShuffleButton";
 import { useShuffle } from "@/lib/useShuffle";
@@ -20,8 +21,19 @@ export type WatchlistGridEntry = {
   inWatchlist?: boolean;
 };
 
+// Enough cards to fill a large screen. A watchlist can run to hundreds of
+// films, and rendering every card before the page appears made opening the
+// tab feel stuck — so the first screenful renders straight away and the
+// rest follows in a background transition a moment later.
+const INITIAL_CARDS = 48;
+
 export function WatchlistGrid({ entries }: { entries: WatchlistGridEntry[] }) {
   const { order, shuffle } = useShuffle(entries, (e) => e.item.id);
+  const [showAll, setShowAll] = useState(false);
+  useEffect(() => {
+    startTransition(() => setShowAll(true));
+  }, []);
+  const visible = showAll ? order : order.slice(0, INITIAL_CARDS);
 
   return (
     <div>
@@ -29,7 +41,7 @@ export function WatchlistGrid({ entries }: { entries: WatchlistGridEntry[] }) {
         <ShuffleButton onClick={shuffle} disabled={entries.length < 2} />
       </div>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-6">
-        {order.map(({ item, owned, watched, inWatchlist }) => (
+        {visible.map(({ item, owned, watched, inWatchlist }) => (
           <div key={item.id}>
             <MovieCard
               tmdbId={item.movie.tmdbId}

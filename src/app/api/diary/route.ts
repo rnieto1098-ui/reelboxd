@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/auth";
-import { ensureMovieCached } from "@/lib/movies";
+import { movieForRoute } from "@/lib/movieRoute";
 import { createDiaryEntry } from "@/lib/diary";
 import { checkNewlyCompletedChallenges } from "@/lib/challenges";
 import { checkGoalJustCompleted } from "@/lib/goals";
+import { parseCalendarDate } from "@/lib/dates";
 
 const diarySchema = z.object({
   tmdbId: z.number().int().positive(),
@@ -18,7 +19,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
 
-  const body = await request.json();
+  const body = await request.json().catch(() => null);
   const parsed = diarySchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
@@ -27,8 +28,20 @@ export async function POST(request: Request) {
     );
   }
 
-  const movie = await ensureMovieCached(parsed.data.tmdbId);
-  const watchedDate = parsed.data.watchedDate ? new Date(parsed.data.watchedDate) : new Date();
+  const cached = await movieForRoute(parsed.data.tmdbId);
+  if (cached.response) return cached.response;
+  const movie = cached.movie;
+  // A date, when given, must be a real "YYYY-MM-DD" calendar date. It used to
+  // go straight into `new Date()`, so a malformed value became an Invalid
+  // Date and a 500, and "2999-01-01" was happily stored.
+  let watchedDate = new Date();
+  if (parsed.data.watchedDate != null) {
+    const parsedDate = parseCalendarDate(parsed.data.watchedDate);
+    if (!parsedDate) {
+      return NextResponse.json({ error: "That isn't a valid watch date." }, { status: 400 });
+    }
+    watchedDate = parsedDate;
+  }
 
   const { entry, created } = await createDiaryEntry({
     userId: session.user.id,

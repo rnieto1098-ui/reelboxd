@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { loginHref } from "@/lib/loginHref";
 import { useToast } from "@/components/Toast";
 import { useCoalescedRefresh } from "@/lib/useCoalescedRefresh";
 
@@ -65,7 +66,7 @@ export function useToggleAction(
 
   async function toggle() {
     if (!signedIn) {
-      router.push("/login");
+      router.push(loginHref());
       return;
     }
 
@@ -86,7 +87,7 @@ export function useToggleAction(
     if (res.status === 401) {
       setSaving(false);
       setActive(previousActive);
-      router.push("/login");
+      router.push(loginHref());
       return;
     }
     if (!res.ok) {

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { ensureMovieCached } from "@/lib/movies";
+import { movieForRoute } from "@/lib/movieRoute";
 
 const posterSchema = z.object({
   posterPath: z.string().min(1),
@@ -18,7 +18,7 @@ export async function POST(
   }
 
   const { tmdbId } = await context.params;
-  const body = await request.json();
+  const body = await request.json().catch(() => null);
   const parsed = posterSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
@@ -27,7 +27,9 @@ export async function POST(
     );
   }
 
-  const movie = await ensureMovieCached(Number(tmdbId));
+  const cached = await movieForRoute(tmdbId);
+  if (cached.response) return cached.response;
+  const movie = cached.movie;
 
   const customPoster = await prisma.customPoster.upsert({
     where: { userId_movieId: { userId: session.user.id, movieId: movie.id } },

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { loginHref } from "@/lib/loginHref";
 import { BookmarkIcon, EyeIcon, RewatchIcon, ShoppingBagIcon } from "@/components/icons";
 import { Ellipsis, X } from "lucide-react";
 import { useToast } from "@/components/Toast";
@@ -105,7 +106,7 @@ export function PosterQuickActions({
     setOwnedSaving(false);
     if (res.status === 401) {
       setOwned(previousOwned);
-      router.push("/login");
+      router.push(loginHref());
       return;
     }
     if (!res.ok) {
@@ -136,7 +137,7 @@ export function PosterQuickActions({
     if (res.status === 401) {
       setWatchlistSaving(false);
       setInWatchlist(previousInWatchlist);
-      router.push("/login");
+      router.push(loginHref());
       return;
     }
     if (!res.ok) {
@@ -188,7 +189,7 @@ export function PosterQuickActions({
     if (res.status === 401) {
       setWatchedSaving(false);
       setWatched(wasWatched);
-      router.push("/login");
+      router.push(loginHref());
       return;
     }
     if (!res.ok) {
@@ -236,7 +237,7 @@ export function PosterQuickActions({
     setRewatchSaving(false);
     if (res.status === 401) {
       setInRewatch(previousInRewatch);
-      router.push("/login");
+      router.push(loginHref());
       return;
     }
     if (!res.ok) {

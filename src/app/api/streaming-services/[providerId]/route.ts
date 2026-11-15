@@ -18,7 +18,7 @@ export async function POST(
   }
 
   const { providerId } = await context.params;
-  const body = await request.json();
+  const body = await request.json().catch(() => null);
   const parsed = bodySchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(

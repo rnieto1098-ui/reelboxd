@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { ensureMovieCached } from "@/lib/movies";
+import { movieForRoute } from "@/lib/movieRoute";
 
 export async function POST(
   _request: Request,
@@ -13,7 +13,9 @@ export async function POST(
   }
 
   const { tmdbId } = await context.params;
-  const movie = await ensureMovieCached(Number(tmdbId));
+  const cached = await movieForRoute(tmdbId);
+  if (cached.response) return cached.response;
+  const movie = cached.movie;
 
   await prisma.like.upsert({
     where: { userId_movieId: { userId: session.user.id, movieId: movie.id } },

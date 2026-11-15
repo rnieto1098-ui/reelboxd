@@ -67,3 +67,28 @@ test("yearBounds on a parsed year always produces valid dates", () => {
     assert.ok(!Number.isNaN(end.getTime()), `end valid for ${input}`);
   }
 });
+
+test("localDateString uses the device's own calendar day, zero-padded", async () => {
+  const { localDateString } = await import("./dates.ts");
+  // Built from local-time parts, so this holds whatever zone the test runs in.
+  assert.equal(localDateString(new Date(2026, 0, 5, 23, 59)), "2026-01-05");
+  assert.equal(localDateString(new Date(2026, 10, 14, 0, 1)), "2026-11-14");
+});
+
+test("parseCalendarDate accepts a real date and stores it at UTC midnight", async () => {
+  const { parseCalendarDate } = await import("./dates.ts");
+  const parsed = parseCalendarDate("2026-06-14", now);
+  assert.equal(parsed?.toISOString(), "2026-06-14T00:00:00.000Z");
+});
+
+test("parseCalendarDate rejects junk, impossible dates and the far future", async () => {
+  const { parseCalendarDate } = await import("./dates.ts");
+  for (const bad of ["x", "", "1/5/2024", "2026-6-1", "2026-02-31", "2026-13-01", "1700-01-01", null, 5]) {
+    assert.equal(parseCalendarDate(bad, now), null, String(bad));
+  }
+  // One day ahead is allowed (a viewer whose local date is already tomorrow)...
+  assert.ok(parseCalendarDate("2026-06-16", now));
+  // ...two days ahead is not.
+  assert.equal(parseCalendarDate("2026-06-17", now), null);
+  assert.equal(parseCalendarDate("2999-01-01", now), null);
+});

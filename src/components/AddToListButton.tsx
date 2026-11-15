@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/Toast";
 import { ListPlusIcon } from "@/components/icons";
+import { Dialog } from "@/components/Dialog";
 
 type ListEntry = { id: string; title: string; hasMovie: boolean };
 
@@ -26,6 +27,14 @@ export function AddToListButton({
   const [entries, setEntries] = useState(lists);
   const [newListName, setNewListName] = useState("");
   const [saving, setSaving] = useState(false);
+
+  // `lists` is re-sent after every refresh; adopt it unless a save is in
+  // flight (adjusted during render so a stale tick never paints).
+  const [prevLists, setPrevLists] = useState(lists);
+  if (lists !== prevLists && !saving) {
+    setPrevLists(lists);
+    setEntries(lists);
+  }
 
   async function toggle(listId: string, currentlyIn: boolean) {
     setSaving(true);
@@ -114,65 +123,63 @@ export function AddToListButton({
   }
 
   return (
-    <div className="relative inline-block">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium border-border text-muted hover:text-foreground transition-colors"
-      >
+    <>
+      <button type="button" onClick={() => setOpen(true)} className="btn btn-secondary">
         <ListPlusIcon />
         Add to list
       </button>
 
       {open && (
-        <div
-          className="fixed inset-0 z-40"
-          onClick={() => setOpen(false)}
-        />
-      )}
-
-      {open && (
-        <div className="absolute left-0 top-full z-50 mt-2 w-64 rounded-lg border border-border bg-surface p-3 shadow-lg">
+        <Dialog title="Add to a list" onClose={() => setOpen(false)} size="sm">
           {entries.length === 0 ? (
-            <p className="mb-2 text-xs text-muted">You don&apos;t have any lists yet.</p>
+            <p className="mb-3 text-sm text-muted">
+              You don&apos;t have any lists yet. Name one below to start it with this film.
+            </p>
           ) : (
-            <div className="mb-2 max-h-48 space-y-1 overflow-y-auto">
+            <ul className="-mx-2 mb-3 max-h-64 overflow-y-auto">
               {entries.map((list) => (
-                <label
-                  key={list.id}
-                  className="flex items-center gap-2 rounded px-1 py-1 text-sm hover:bg-surface-hover cursor-pointer"
-                >
-                  <input
-                    type="checkbox"
-                    checked={list.hasMovie}
-                    disabled={saving}
-                    onChange={() => toggle(list.id, list.hasMovie)}
-                    className="accent-accent-green"
-                  />
-                  <span className="truncate">{list.title}</span>
-                </label>
+                <li key={list.id}>
+                  <label className="flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2 text-sm hover:bg-white/[0.06]">
+                    <input
+                      type="checkbox"
+                      checked={list.hasMovie}
+                      disabled={saving}
+                      onChange={() => toggle(list.id, list.hasMovie)}
+                      className="h-4 w-4 accent-accent-green"
+                    />
+                    <span className="truncate">{list.title}</span>
+                  </label>
+                </li>
               ))}
-            </div>
+            </ul>
           )}
-          <div className="flex gap-1.5 border-t border-border pt-2">
+          {/* A real form, so Enter in the field creates the list. */}
+          <form
+            className="flex gap-2 border-t border-border pt-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              createAndAdd();
+            }}
+          >
             <input
               type="text"
               value={newListName}
               onChange={(e) => setNewListName(e.target.value)}
               placeholder="New list name"
-              className="min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-1 text-xs placeholder:text-muted focus:outline-none focus:border-accent-green"
+              aria-label="New list name"
+              maxLength={100}
+              className="input min-w-0 flex-1"
             />
             <button
-              type="button"
-              onClick={createAndAdd}
+              type="submit"
               disabled={saving || !newListName.trim()}
-              className="shrink-0 rounded-md bg-accent-green px-2 py-1 text-xs font-medium text-black hover:opacity-90 disabled:opacity-50"
+              className="btn btn-primary shrink-0"
             >
-              Add
+              Create
             </button>
-          </div>
-        </div>
+          </form>
+        </Dialog>
       )}
-    </div>
+    </>
   );
 }

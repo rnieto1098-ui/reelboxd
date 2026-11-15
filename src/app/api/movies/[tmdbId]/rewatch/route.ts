@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { ensureMovieCached } from "@/lib/movies";
+import { movieForRoute } from "@/lib/movieRoute";
 
 // Unlike the watchlist route, there's no "already watched" check here — a
 // film you've seen is exactly what belongs on a rewatch list.
@@ -16,7 +16,9 @@ export async function POST(
   const userId = session.user.id;
 
   const { tmdbId } = await context.params;
-  const movie = await ensureMovieCached(Number(tmdbId));
+  const cached = await movieForRoute(tmdbId);
+  if (cached.response) return cached.response;
+  const movie = cached.movie;
 
   await prisma.rewatchItem.upsert({
     where: { userId_movieId: { userId, movieId: movie.id } },

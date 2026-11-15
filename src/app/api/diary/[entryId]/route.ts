@@ -3,6 +3,7 @@ import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { parseCalendarDate } from "@/lib/dates";
 
 const patchSchema = z.object({
   watchedDate: z.string().optional(),
@@ -19,7 +20,7 @@ export async function PATCH(
   }
 
   const { entryId } = await context.params;
-  const body = await request.json();
+  const body = await request.json().catch(() => null);
   const parsed = patchSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
@@ -33,7 +34,14 @@ export async function PATCH(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const newWatchedDate = parsed.data.watchedDate ? new Date(parsed.data.watchedDate) : undefined;
+  let newWatchedDate: Date | undefined;
+  if (parsed.data.watchedDate != null) {
+    const parsedDate = parseCalendarDate(parsed.data.watchedDate);
+    if (!parsedDate) {
+      return NextResponse.json({ error: "That isn't a valid watch date." }, { status: 400 });
+    }
+    newWatchedDate = parsedDate;
+  }
   const newWatchedDay = newWatchedDate
     ? new Date(
         Date.UTC(newWatchedDate.getUTCFullYear(), newWatchedDate.getUTCMonth(), newWatchedDate.getUTCDate())

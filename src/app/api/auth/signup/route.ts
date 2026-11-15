@@ -30,7 +30,7 @@ export async function POST(request: Request) {
   }
   await recordHit(rateLimitKey);
 
-  const body = await request.json();
+  const body = await request.json().catch(() => null);
   const parsed = signupSchema.safeParse(body);
 
   if (!parsed.success) {

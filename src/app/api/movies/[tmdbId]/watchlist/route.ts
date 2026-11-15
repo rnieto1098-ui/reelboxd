@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { ensureMovieCached } from "@/lib/movies";
+import { movieForRoute } from "@/lib/movieRoute";
 import { addToWatchlist } from "@/lib/watchlist";
 
 export async function POST(
@@ -14,7 +14,9 @@ export async function POST(
   }
 
   const { tmdbId } = await context.params;
-  const movie = await ensureMovieCached(Number(tmdbId));
+  const cached = await movieForRoute(tmdbId);
+  if (cached.response) return cached.response;
+  const movie = cached.movie;
 
   const { added } = await addToWatchlist(session.user.id, [movie.id]);
 

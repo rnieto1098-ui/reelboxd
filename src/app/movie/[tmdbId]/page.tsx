@@ -1,5 +1,7 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import Image from "next/image";
+import { CalendarDays, Clock, Star } from "lucide-react";
 import { PosterImage } from "@/components/PosterImage";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -9,9 +11,11 @@ import {
   getMovieDetails,
   getSimilarMovies,
   getUsCertification,
+  pickTrailer,
   posterUrl,
   backdropUrl,
   logoUrl,
+  type TmdbWatchProvider,
 } from "@/lib/tmdb";
 import { applyPosterOverrides, getCustomPosterMap } from "@/lib/customPosters";
 import { getUserProviderIds, getWatchAvailability } from "@/lib/streaming";
@@ -31,6 +35,14 @@ import { AddToListButton } from "@/components/AddToListButton";
 import { MovieListsButton } from "@/components/MovieListsButton";
 import { ContentAdvisoryModal } from "@/components/ContentAdvisoryModal";
 import { MovieRow } from "@/components/MovieRow";
+import { TrailerButton } from "@/components/TrailerButton";
+import { HomeRowsSkeleton } from "@/components/HomeRowsSkeleton";
+
+// How many of the billed cast get a portrait card. The full cast is in the
+// credits dialog.
+const CAST_CARD_COUNT = 20;
+// Below this many votes a TMDB average says little, so none is shown.
+const MIN_VOTES_FOR_SCORE = 20;
 
 // Next dedupes this against the identical getMovieDetails(tmdbId) call the
 // page component below makes — both run within the same request, so this
@@ -86,7 +98,6 @@ export default async function MovieDetailPage({
     localMovie,
     watchAvailability,
     userProviderIds,
-    similar,
     myLists,
     listsContainingMovie,
     avgRating,
@@ -120,7 +131,6 @@ export default async function MovieDetailPage({
       }),
       getWatchAvailability(tmdbId),
       getUserProviderIds(session?.user?.id),
-      getSimilarMovies(tmdbId).catch(() => ({ results: [] })),
       session?.user?.id
         ? prisma.list.findMany({
             where: { ownerId: session.user.id },
@@ -148,18 +158,8 @@ export default async function MovieDetailPage({
       }),
     ]);
 
-  // "More like this" is a recommendation like any other row — same
-  // app-wide minimum-runtime rule applies (see runtimeFilter.ts).
-  const similarFiltered = await excludeShortFilms(similar.results);
-
-  // One combined lookup for both the primary movie's poster override and the
-  // "More like this" row's, instead of two separate CustomPoster queries.
-  const posterOverrides = await getCustomPosterMap(session?.user?.id, [
-    tmdbId,
-    ...similarFiltered.map((m) => m.id),
-  ]);
+  const posterOverrides = await getCustomPosterMap(session?.user?.id, [tmdbId]);
   const customPosterPath = posterOverrides.get(tmdbId) ?? null;
-  const similarMovies = applyPosterOverrides(similarFiltered.slice(0, 12), posterOverrides);
 
   const myRating = localMovie?.ratings?.[0]?.score ?? null;
   const inWatchlist = (localMovie?.watchlist?.length ?? 0) > 0;
@@ -186,222 +186,358 @@ export default async function MovieDetailPage({
   const backdrop = backdropUrl(details.backdrop_path);
   const poster = posterUrl(customPosterPath ?? details.poster_path, "w500");
   const year = details.release_date?.slice(0, 4);
-  const director = details.credits?.crew.find((c) => c.job === "Director");
+  const directors = details.credits?.crew.filter((c) => c.job === "Director") ?? [];
   const cast = details.credits?.cast ?? [];
   const runtime = formatRuntime(details.runtime);
   const certification = getUsCertification(details);
   const keywordNames = details.keywords?.keywords.map((k) => k.name) ?? [];
+  const trailer = pickTrailer(details);
+  const signedIn = !!session?.user;
+  const tmdbScore =
+    (details.vote_count ?? 0) >= MIN_VOTES_FOR_SCORE && details.vote_average > 0
+      ? details.vote_average
+      : null;
+  const releaseDate = details.release_date
+    ? new Date(`${details.release_date}T00:00:00.000Z`).toLocaleDateString("en-US", {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+        timeZone: "UTC",
+      })
+    : null;
+  const lastLogged = diaryEntries[0]?.watchedDate.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  });
 
   return (
     <div>
-      {backdrop && (
-        <div className="relative -mx-4 mb-8 h-64 overflow-hidden sm:-mx-8 sm:h-80">
-          <Image src={backdrop} alt="" fill className="object-cover opacity-30" priority />
-          <div className="absolute inset-0 bg-gradient-to-t from-background to-transparent" />
-        </div>
-      )}
+      {/* Hero: the film's still across the full window, with the poster,
+          title and main actions over it. */}
+      <section className="bleed relative -mt-8 overflow-hidden bg-surface">
+        {backdrop && (
+          <Image
+            src={backdrop}
+            alt=""
+            fill
+            sizes="100vw"
+            priority
+            className="object-cover object-[center_20%] opacity-60"
+          />
+        )}
+        <div aria-hidden className="scrim-left absolute inset-0" />
+        <div aria-hidden className="scrim-bottom absolute inset-0" />
 
-      {/* The negative margin tucks the poster up into the backdrop. Without a
-          backdrop it pulled the whole block up over the site header. */}
-      <div
-        className={`relative grid gap-8 md:grid-cols-[240px_1fr] ${backdrop ? "md:-mt-40" : ""}`}
-      >
-        <div className="w-40 sm:w-60 mx-auto md:mx-0">
-          {/* PosterImage covers both a missing poster_path and one that 404s
-              when fetched, with the same title-card placeholder as the rows. */}
-          <div className="aspect-[2/3] overflow-hidden rounded-lg border border-border bg-surface shadow-lg">
-            <PosterImage
-              src={poster}
-              alt={details.title}
-              year={details.release_date?.slice(0, 4)}
-              quality={90}
-            />
+        <div className="container-page relative grid items-end gap-6 pb-10 pt-16 sm:gap-10 sm:pt-28 md:grid-cols-[240px_1fr] lg:grid-cols-[280px_1fr] lg:pt-36">
+          <div className="mx-auto w-44 sm:w-56 md:mx-0 md:w-full">
+            {/* PosterImage covers both a missing poster_path and one that 404s
+                when fetched, with the same title-card placeholder as the rows. */}
+            <div className="aspect-[2/3] overflow-hidden rounded-xl bg-surface shadow-pop ring-1 ring-white/15">
+              <PosterImage
+                src={poster}
+                alt={`${details.title} poster`}
+                year={year}
+                quality={90}
+                sizes="(min-width: 1024px) 280px, (min-width: 768px) 240px, 224px"
+                priority
+              />
+            </div>
           </div>
-          <div className="mt-2 flex items-center justify-center gap-3 md:justify-start">
-            {session?.user && (
-              <PosterPicker tmdbId={tmdbId} hasCustomPoster={!!customPosterPath} />
-            )}
-            <AboutMovieModal
-              title={details.title}
-              genres={details.genres}
-              studios={details.production_companies ?? []}
-              crew={details.credits?.crew ?? []}
-              cast={cast}
-            />
-            <RewatchButton
-              tmdbId={tmdbId}
-              initialInRewatch={inRewatch}
-              signedIn={!!session?.user}
-            />
-          </div>
-          <div className="mt-2 flex justify-center md:justify-start">
-            <MovieListsButton
-              lists={listsContainingMovie.map((l) => ({
-                id: l.id,
-                title: l.title,
-                isSystem: l.isSystem,
-              }))}
-            />
-          </div>
-        </div>
 
-        <div>
-          <h1 className="text-3xl font-bold">
-            {details.title} {year && <span className="font-normal text-muted">({year})</span>}
-          </h1>
-          {director && <p className="mt-1 text-muted">Directed by {director.name}</p>}
-          {(runtime || certification) && (
-            <p className="mt-1 flex items-center gap-2 text-sm text-muted">
-              {runtime && <span>{runtime}</span>}
+          <div className="min-w-0 text-center md:text-left">
+            <div className="mb-3 flex flex-wrap items-center justify-center gap-2 text-xs font-medium text-foreground/85 md:justify-start">
               {certification && (
-                <span className="rounded border border-border px-1.5 py-0.5 text-xs font-medium">
+                <span className="rounded border border-white/40 px-1.5 py-0.5 font-semibold">
                   {certification}
                 </span>
               )}
-            </p>
-          )}
+              {year && (
+                <span className="flex items-center gap-1">
+                  <CalendarDays aria-hidden className="h-3.5 w-3.5" />
+                  {year}
+                </span>
+              )}
+              {runtime && (
+                <span className="flex items-center gap-1">
+                  <Clock aria-hidden className="h-3.5 w-3.5" />
+                  {runtime}
+                </span>
+              )}
+              {tmdbScore != null && (
+                <span
+                  className="flex items-center gap-1 text-accent-gold"
+                  title={`${details.vote_count?.toLocaleString("en-US")} ratings on TMDB`}
+                >
+                  <Star aria-hidden className="h-3.5 w-3.5 fill-current" />
+                  {tmdbScore.toFixed(1)}
+                  <span className="text-foreground/60">TMDB</span>
+                </span>
+              )}
+            </div>
 
-          <div className="mt-4 flex flex-wrap items-center gap-4">
-            <StarRating tmdbId={tmdbId} initialScore={myRating} signedIn={!!session?.user} />
-            <LikeButton
-              tmdbId={tmdbId}
-              initialLiked={isLiked}
-              likeCount={likeCount}
-              signedIn={!!session?.user}
-            />
-            <WatchlistButton
-              tmdbId={tmdbId}
-              initialInWatchlist={inWatchlist}
-              signedIn={!!session?.user}
-            />
-            <OwnedButton tmdbId={tmdbId} initialOwned={isOwned} signedIn={!!session?.user} />
-            <LogWatchButton tmdbId={tmdbId} signedIn={!!session?.user} />
-            <WatchedButton
-              tmdbId={tmdbId}
-              initialWatched={isWatched}
-              signedIn={!!session?.user}
-            />
-            {session?.user && (
-              <AddToListButton
-                tmdbId={tmdbId}
-                title={details.title}
-                posterPath={details.poster_path}
-                releaseDate={details.release_date}
-                lists={myLists.map((l) => ({
-                  id: l.id,
-                  title: l.title,
-                  hasMovie: l.items.length > 0,
-                }))}
-              />
+            <h1 className="text-balance text-4xl font-extrabold leading-[1.05] tracking-tight drop-shadow-lg sm:text-5xl lg:text-6xl">
+              {details.title}
+            </h1>
+            {details.tagline && (
+              <p className="mt-3 text-lg italic text-foreground/75">{details.tagline}</p>
             )}
-          </div>
-
-          {avgRating._avg.score != null && (
-            <p className="mt-2 text-sm text-muted">
-              Average rating: {avgRating._avg.score.toFixed(1)} / 5 (
-              {avgRating._count.score} rating{avgRating._count.score === 1 ? "" : "s"})
-            </p>
-          )}
-
-          {diaryEntries.length > 0 && (
-            <p className="mt-1 text-sm text-muted">
-              📅 Logged {diaryEntries.length} time{diaryEntries.length === 1 ? "" : "s"} · last on{" "}
-              {diaryEntries[0].watchedDate.toLocaleDateString("en-US", {
-                month: "short",
-                day: "numeric",
-                year: "numeric",
-                timeZone: "UTC",
-              })}
-            </p>
-          )}
-
-          {details.tagline && (
-            <p className="mt-4 italic text-muted">{details.tagline}</p>
-          )}
-          <p className="mt-2 max-w-2xl text-sm leading-relaxed">{details.overview}</p>
-
-          <div className="mt-4 flex flex-wrap gap-2 text-xs text-muted">
-            {details.genres.map((g) => (
-              <span key={g.id} className="rounded-full border border-border px-2 py-1">
-                {g.name}
-              </span>
-            ))}
-          </div>
-
-          {flatrateProviders.length > 0 && (
-            <div className="mt-6">
-              <h3 className="mb-2 text-sm font-semibold text-muted">Where to watch</h3>
-              <div className="flex flex-wrap gap-3">
-                {flatrateProviders.map((p) => {
-                  const logo = logoUrl(p.logo_path, "w92");
-                  const owned = userProviderIds.has(p.provider_id);
-                  return (
-                    <div
-                      key={p.provider_id}
-                      title={p.provider_name}
-                      className={`h-11 w-11 overflow-hidden rounded-lg border ${
-                        owned ? "border-accent-green ring-1 ring-accent-green" : "border-border"
-                      }`}
+            {directors.length > 0 && (
+              <p className="mt-3 text-sm text-foreground/75">
+                Directed by{" "}
+                {directors.map((d, i) => (
+                  <span key={d.id}>
+                    {i > 0 && ", "}
+                    <Link
+                      href={`/crew/person/${d.id}`}
+                      className="font-semibold text-foreground hover:text-accent-green hover:underline"
                     >
-                      {logo && (
-                        <Image src={logo} alt={p.provider_name} width={44} height={44} />
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-              <Link
-                href="/streaming"
-                className="mt-2 inline-block text-xs text-muted hover:text-accent-green hover:underline"
-              >
-                {userProviderIds.size > 0 ? "Edit your services" : "Add your streaming services"}
-              </Link>
-            </div>
-          )}
-
-          {flatrateProviders.length === 0 && rentBuyProviders.length > 0 && (
-            <div className="mt-6">
-              <h3 className="mb-2 text-sm font-semibold text-muted">Where to watch</h3>
-              <p className="mb-2 text-xs text-muted">
-                Not on any streaming service right now — available to rent or buy:
+                      {d.name}
+                    </Link>
+                  </span>
+                ))}
               </p>
-              <div className="flex flex-wrap gap-3">
-                {rentBuyProviders.map((p) => {
-                  const logo = logoUrl(p.logo_path, "w92");
-                  return (
-                    <div
-                      key={p.provider_id}
-                      title={p.provider_name}
-                      className="h-11 w-11 overflow-hidden rounded-lg border border-border"
-                    >
-                      {logo && (
-                        <Image src={logo} alt={p.provider_name} width={44} height={44} />
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+            )}
+
+            <div className="mt-6 flex flex-wrap justify-center gap-3 md:justify-start">
+              {trailer && <TrailerButton videoKey={trailer.key} title={details.title} />}
+              <WatchlistButton
+                tmdbId={tmdbId}
+                initialInWatchlist={inWatchlist}
+                signedIn={signedIn}
+              />
+              <LogWatchButton tmdbId={tmdbId} signedIn={signedIn} />
             </div>
+          </div>
+        </div>
+      </section>
+
+      <div className="mt-8 grid gap-10 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="min-w-0 space-y-10">
+          {/* Everything the viewer has said about this film, in one place. */}
+          <section className="card p-5" aria-label="Your activity">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <StarRating tmdbId={tmdbId} initialScore={myRating} signedIn={signedIn} />
+              {avgRating._avg.score != null && (
+                <p className="text-sm text-muted">
+                  Flixtally members:{" "}
+                  <span className="font-semibold text-foreground">
+                    {avgRating._avg.score.toFixed(1)}
+                  </span>{" "}
+                  / 5 from {avgRating._count.score} rating{avgRating._count.score === 1 ? "" : "s"}
+                </p>
+              )}
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2 border-t border-border pt-4">
+              <WatchedButton tmdbId={tmdbId} initialWatched={isWatched} signedIn={signedIn} />
+              <LikeButton
+                tmdbId={tmdbId}
+                initialLiked={isLiked}
+                likeCount={likeCount}
+                signedIn={signedIn}
+              />
+              <OwnedButton tmdbId={tmdbId} initialOwned={isOwned} signedIn={signedIn} />
+              <RewatchButton tmdbId={tmdbId} initialInRewatch={inRewatch} signedIn={signedIn} />
+              {session?.user && (
+                <AddToListButton
+                  tmdbId={tmdbId}
+                  title={details.title}
+                  posterPath={details.poster_path}
+                  releaseDate={details.release_date}
+                  lists={myLists.map((l) => ({
+                    id: l.id,
+                    title: l.title,
+                    hasMovie: l.items.length > 0,
+                  }))}
+                />
+              )}
+            </div>
+            {diaryEntries.length > 0 && (
+              <p className="mt-4 text-sm text-muted">
+                In your diary {diaryEntries.length} time{diaryEntries.length === 1 ? "" : "s"}, most
+                recently {lastLogged}.
+              </p>
+            )}
+          </section>
+
+          {details.overview && (
+            <section>
+              <h2 className="section-title mb-3">Overview</h2>
+              <p className="max-w-3xl text-[15px] leading-relaxed text-foreground/85">
+                {details.overview}
+              </p>
+            </section>
           )}
 
           {cast.length > 0 && (
-            <div className="mt-6">
-              <h3 className="mb-2 text-sm font-semibold text-muted">Cast</h3>
-              <CastList cast={cast} />
-            </div>
+            <CastList
+              cast={cast.slice(0, CAST_CARD_COUNT).map((c) => ({
+                id: c.id,
+                name: c.name,
+                character: c.character,
+                profile_path: c.profile_path,
+              }))}
+            />
           )}
-
-          <div className="mt-4">
-            <ContentAdvisoryModal certification={certification} keywords={keywordNames} />
-          </div>
         </div>
+
+        <aside className="space-y-5">
+          <WhereToWatch
+            flatrate={flatrateProviders}
+            rentBuy={rentBuyProviders}
+            userProviderIds={userProviderIds}
+          />
+
+          <section className="card p-5">
+            <h2 className="mb-3 font-sans text-sm font-semibold tracking-normal">Details</h2>
+            <dl className="space-y-3 text-sm">
+              {releaseDate && (
+                <div>
+                  <dt className="text-xs text-subtle">Release date</dt>
+                  <dd>{releaseDate}</dd>
+                </div>
+              )}
+              {runtime && (
+                <div>
+                  <dt className="text-xs text-subtle">Runtime</dt>
+                  <dd>{runtime}</dd>
+                </div>
+              )}
+              {details.genres.length > 0 && (
+                <div>
+                  <dt className="mb-1.5 text-xs text-subtle">Genres</dt>
+                  <dd className="flex flex-wrap gap-1.5">
+                    {details.genres.map((g) => (
+                      <span key={g.id} className="chip">
+                        {g.name}
+                      </span>
+                    ))}
+                  </dd>
+                </div>
+              )}
+            </dl>
+            <div className="-mx-2 mt-4 flex flex-col items-start border-t border-border pt-3">
+              <AboutMovieModal
+                title={details.title}
+                genres={details.genres}
+                studios={(details.production_companies ?? []).map((c) => ({
+                  id: c.id,
+                  name: c.name,
+                  logo_path: c.logo_path,
+                }))}
+                crew={(details.credits?.crew ?? []).map((c) => ({
+                  id: c.id,
+                  name: c.name,
+                  job: c.job,
+                  department: c.department,
+                }))}
+                cast={cast.map((c) => ({
+                  id: c.id,
+                  name: c.name,
+                  character: c.character,
+                  profile_path: c.profile_path,
+                }))}
+              />
+              <MovieListsButton
+                lists={listsContainingMovie.map((l) => ({
+                  id: l.id,
+                  title: l.title,
+                  isSystem: l.isSystem,
+                }))}
+              />
+              {session?.user && (
+                <PosterPicker tmdbId={tmdbId} hasCustomPoster={!!customPosterPath} />
+              )}
+              <ContentAdvisoryModal certification={certification} keywords={keywordNames} />
+            </div>
+          </section>
+        </aside>
       </div>
 
-      {similarMovies.length > 0 && (
-        <div className="mt-10">
-          <MovieRow title="More like this" movies={similarMovies} />
-        </div>
-      )}
+      {/* Streams in after the rest: it needs a TMDB call plus a runtime
+          lookup per film, and nothing above depends on it. */}
+      <div className="mt-12">
+        <Suspense fallback={<HomeRowsSkeleton rows={1} />}>
+          <SimilarRow tmdbId={tmdbId} userId={session?.user?.id} />
+        </Suspense>
+      </div>
     </div>
   );
+}
+
+function WhereToWatch({
+  flatrate,
+  rentBuy,
+  userProviderIds,
+}: {
+  flatrate: TmdbWatchProvider[];
+  rentBuy: TmdbWatchProvider[];
+  userProviderIds: Set<number>;
+}) {
+  const providers = flatrate.length > 0 ? flatrate : rentBuy;
+  const onYours = flatrate.filter((p) => userProviderIds.has(p.provider_id));
+
+  return (
+    <section className="card p-5">
+      <h2 className="mb-1 font-sans text-sm font-semibold tracking-normal">Where to watch</h2>
+      {providers.length === 0 ? (
+        <p className="text-sm text-muted">
+          Not available to stream, rent or buy in the US right now.
+        </p>
+      ) : (
+        <>
+          <p className="mb-3 text-xs text-muted">
+            {flatrate.length === 0
+              ? "Not on any subscription service right now. Rent or buy from:"
+              : onYours.length > 0
+                ? `Included with ${onYours.map((p) => p.provider_name).join(", ")}.`
+                : "Streaming with a subscription on:"}
+          </p>
+          <ul className="flex flex-wrap gap-2.5">
+            {providers.map((p) => {
+              const logo = logoUrl(p.logo_path, "w92");
+              const yours = flatrate.length > 0 && userProviderIds.has(p.provider_id);
+              return (
+                <li
+                  key={p.provider_id}
+                  title={yours ? `${p.provider_name} (one of your services)` : p.provider_name}
+                  className={`relative h-12 w-12 overflow-hidden rounded-xl bg-surface-hover ${
+                    yours ? "ring-2 ring-accent-green" : "ring-1 ring-white/10"
+                  }`}
+                >
+                  {logo ? (
+                    <Image src={logo} alt={p.provider_name} width={48} height={48} />
+                  ) : (
+                    <span className="flex h-full w-full items-center justify-center text-xs font-semibold">
+                      {p.provider_name[0]}
+                    </span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      )}
+      <Link
+        href="/streaming"
+        className="mt-3 inline-block text-xs text-muted hover:text-accent-green hover:underline"
+      >
+        {userProviderIds.size > 0 ? "Edit your services" : "Add your streaming services"}
+      </Link>
+    </section>
+  );
+}
+
+// "More like this" is a recommendation like any other row — same app-wide
+// minimum-runtime rule applies (see runtimeFilter.ts).
+async function SimilarRow({ tmdbId, userId }: { tmdbId: number; userId: string | undefined }) {
+  const similar = await getSimilarMovies(tmdbId).catch(() => ({ results: [] }));
+  const filtered = (await excludeShortFilms(similar.results)).slice(0, 18);
+  if (filtered.length === 0) return null;
+  const posterOverrides = await getCustomPosterMap(
+    userId,
+    filtered.map((m) => m.id)
+  );
+  return <MovieRow title="More like this" movies={applyPosterOverrides(filtered, posterOverrides)} />;
 }

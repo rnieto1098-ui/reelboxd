@@ -16,7 +16,7 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
 
-  const body = await request.json();
+  const body = await request.json().catch(() => null);
   const parsed = orderSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(

@@ -316,6 +316,17 @@ select:focus-visible {
   }
 }
 
+/* A toggle that is currently on (on your watchlist, owned, watched). */
+@utility btn-active {
+  border-color: var(--accent-green);
+  background: var(--accent-green-soft);
+  color: var(--accent-green);
+
+  &:hover:not(:disabled) {
+    background: rgba(0, 224, 84, 0.2);
+  }
+}
+
 @utility btn-outline {
   border-color: var(--border-strong);
   color: var(--foreground);

@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getMovieDetails, getUsCertification } from "@/lib/tmdb";
 
@@ -36,6 +37,36 @@ export function isMovieCacheStale(cachedAt: Date): boolean {
   return cachedAt < MOVIE_CACHE_SCHEMA_EPOCH;
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+// How long a cached row is trusted while its film's details are still
+// likely to change, and how long after release that stays true.
+const UNSETTLED_REFRESH_AFTER_MS = 7 * DAY_MS;
+const UNSETTLED_WINDOW_AFTER_RELEASE_MS = 90 * DAY_MS;
+
+/**
+ * Whether a cached row should be refetched before use.
+ *
+ * Beyond the schema-epoch rule above, a row is refreshed when it was cached
+ * over a week ago *and* the film's details were not yet settled: no runtime
+ * recorded, or a release date in the future or the last 90 days. A film
+ * first seen in the "Coming Soon" row used to keep its pre-release data (no
+ * runtime, no certification, a provisional date) for good, which then hid
+ * it from the recommendation rows that require a runtime. Settled films,
+ * the vast majority, are still fetched exactly once.
+ */
+export function movieNeedsRefresh(
+  movie: { cachedAt: Date; runtime: number | null; releaseDate: string | null },
+  now: Date = new Date()
+): boolean {
+  if (isMovieCacheStale(movie.cachedAt)) return true;
+  if (now.getTime() - movie.cachedAt.getTime() < UNSETTLED_REFRESH_AFTER_MS) return false;
+  if (!movie.runtime) return true;
+  if (!movie.releaseDate) return false;
+  const released = Date.parse(`${movie.releaseDate}T00:00:00.000Z`);
+  if (Number.isNaN(released)) return false;
+  return released > now.getTime() - UNSETTLED_WINDOW_AFTER_RELEASE_MS;
+}
+
 function movieFieldsFromDetails(details: Awaited<ReturnType<typeof getMovieDetails>>) {
   return {
     tmdbId: details.id,
@@ -58,7 +89,7 @@ function movieFieldsFromDetails(details: Awaited<ReturnType<typeof getMovieDetai
 // and cached locally the first time anyone interacts with it.
 export async function ensureMovieCached(tmdbId: number) {
   const existing = await prisma.movie.findUnique({ where: { tmdbId } });
-  if (existing && !isMovieCacheStale(existing.cachedAt)) return existing;
+  if (existing && !movieNeedsRefresh(existing)) return existing;
 
   if (existing) {
     // A refresh failing is not a reason to behave as though the movie were
@@ -73,7 +104,19 @@ export async function ensureMovieCached(tmdbId: number) {
   }
 
   const details = await getMovieDetails(tmdbId);
-  return prisma.movie.create({ data: movieFieldsFromDetails(details) });
+  try {
+    return await prisma.movie.create({ data: movieFieldsFromDetails(details) });
+  } catch (error) {
+    // Two requests for a never-cached film (say, clicking Watchlist and Like
+    // in quick succession) both miss the lookup above and both try to
+    // create it; the second hits the unique constraint on tmdbId. The row
+    // it wanted now exists, so read it instead of failing the request.
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      const winner = await prisma.movie.findUnique({ where: { tmdbId } });
+      if (winner) return winner;
+    }
+    throw error;
+  }
 }
 
 const CACHE_REFRESH_CONCURRENCY = 8;

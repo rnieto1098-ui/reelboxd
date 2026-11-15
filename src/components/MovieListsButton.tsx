@@ -2,49 +2,43 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { ListChecks } from "lucide-react";
+import { Dialog } from "@/components/Dialog";
 
 type ListEntry = { id: string; title: string; isSystem: boolean };
 
+// Which lists this film appears on: Flixtally's curated ones plus the
+// viewer's own.
 export function MovieListsButton({ lists }: { lists: ListEntry[] }) {
   const [open, setOpen] = useState(false);
 
+  if (lists.length === 0) return null;
+
   return (
-    <div className="relative inline-block">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-muted transition-colors hover:text-foreground"
-      >
-        Lists ({lists.length})
+    <>
+      <button type="button" onClick={() => setOpen(true)} className="btn btn-ghost btn-sm">
+        <ListChecks aria-hidden className="h-4 w-4" />
+        On {lists.length} list{lists.length === 1 ? "" : "s"}
       </button>
 
-      {open && <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />}
-
       {open && (
-        <div className="absolute left-0 top-full z-50 mt-2 w-64 rounded-lg border border-border bg-surface p-3 shadow-lg">
-          {lists.length === 0 ? (
-            <p className="text-xs text-muted">Not on any lists yet.</p>
-          ) : (
-            <div className="max-h-48 space-y-1 overflow-y-auto">
-              {lists.map((list) => (
+        <Dialog title="Lists featuring this film" onClose={() => setOpen(false)} size="sm">
+          <ul className="-mx-2">
+            {lists.map((list) => (
+              <li key={list.id}>
                 <Link
-                  key={list.id}
                   href={`/lists/${list.id}`}
                   onClick={() => setOpen(false)}
-                  className="flex items-center justify-between gap-2 rounded px-1 py-1 text-sm hover:bg-surface-hover hover:text-accent-green"
+                  className="flex items-center justify-between gap-3 rounded-lg px-2 py-2 text-sm hover:bg-white/[0.06] hover:text-accent-green"
                 >
                   <span className="truncate">{list.title}</span>
-                  {list.isSystem && (
-                    <span className="shrink-0 rounded-full border border-border px-1.5 py-0.5 text-[10px] text-muted">
-                      Flixtally
-                    </span>
-                  )}
+                  {list.isSystem && <span className="chip shrink-0 py-0.5 text-[10px]">Curated</span>}
                 </Link>
-              ))}
-            </div>
-          )}
-        </div>
+              </li>
+            ))}
+          </ul>
+        </Dialog>
       )}
-    </div>
+    </>
   );
 }

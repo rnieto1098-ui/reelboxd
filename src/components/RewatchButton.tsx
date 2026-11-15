@@ -25,12 +25,10 @@ export function RewatchButton({
       onClick={toggle}
       disabled={saving}
       aria-pressed={inRewatch}
-      className={`flex items-center gap-1 text-xs transition-colors hover:underline disabled:opacity-50 ${
-        inRewatch ? "text-accent-green" : "text-muted hover:text-accent-green"
-      }`}
+      className={`btn ${inRewatch ? "btn-active" : "btn-secondary"}`}
     >
-      <RewatchIcon className="h-3.5 w-3.5" />
-      {inRewatch ? "On rewatch list" : "Rewatch list"}
+      <RewatchIcon />
+      {inRewatch ? "On rewatch list" : "Rewatch"}
     </button>
   );
 }

@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ImagePlus } from "lucide-react";
+import { Dialog } from "@/components/Dialog";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/Toast";
@@ -93,44 +95,41 @@ export function PosterPicker({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="text-xs text-muted hover:text-accent-green hover:underline"
+        className="btn btn-ghost btn-sm"
       >
+        <ImagePlus aria-hidden className="h-4 w-4" />
         Change poster
       </button>
 
       {open && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-          onClick={() => setOpen(false)}
+        <Dialog
+          title="Choose a poster"
+          onClose={() => setOpen(false)}
+          size="lg"
+          footer={
+            hasCustomPoster ? (
+              <button
+                type="button"
+                onClick={resetPoster}
+                disabled={saving}
+                className="btn btn-outline btn-sm"
+              >
+                Use the original poster
+              </button>
+            ) : undefined
+          }
         >
-          <div
-            className="max-h-[80vh] w-full max-w-2xl overflow-y-auto rounded-lg border border-border bg-surface p-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-sm font-semibold">Choose a poster</h3>
-              <div className="flex items-center gap-3">
-                {hasCustomPoster && (
-                  <button
-                    type="button"
-                    onClick={resetPoster}
-                    disabled={saving}
-                    className="text-xs text-muted hover:text-foreground disabled:opacity-50"
-                  >
-                    Use original
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setOpen(false)}
-                  className="text-xs text-muted hover:text-foreground"
-                >
-                  Close
-                </button>
+            <p className="mb-3 text-sm text-muted">
+              Only you see the poster you pick. It replaces the default everywhere this film
+              appears.
+            </p>
+            {loading && (
+              <div className="grid grid-cols-3 gap-3 sm:grid-cols-4" aria-busy="true">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <div key={i} className="skeleton aspect-[2/3]" />
+                ))}
               </div>
-            </div>
-
-            {loading && <p className="text-sm text-muted">Loading posters...</p>}
+            )}
             {error && <p className="text-sm text-red-400">{error}</p>}
 
             {posters && posters.length === 0 && (
@@ -139,13 +138,14 @@ export function PosterPicker({
 
             {posters && posters.length > 0 && (
               <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
-                {posters.map((img) => (
+                {posters.map((img, index) => (
                   <button
                     key={img.file_path}
                     type="button"
                     disabled={saving}
                     onClick={() => choosePoster(img.file_path)}
-                    className="overflow-hidden rounded-md border border-border transition-colors hover:border-accent-green disabled:opacity-50"
+                    aria-label={`Use poster option ${index + 1}`}
+                    className="overflow-hidden rounded-lg ring-1 ring-white/10 transition-[box-shadow,transform] hover:scale-[1.02] hover:ring-2 hover:ring-accent-green disabled:opacity-50"
                   >
                     <Image
                       src={posterUrl(img.file_path, "w200")!}
@@ -158,8 +158,7 @@ export function PosterPicker({
                 ))}
               </div>
             )}
-          </div>
-        </div>
+        </Dialog>
       )}
     </>
   );

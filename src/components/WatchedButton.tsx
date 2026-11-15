@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { loginHref } from "@/lib/loginHref";
 import { useToast } from "@/components/Toast";
 import { EyeIcon } from "@/components/icons";
 import { useCoalescedRefresh } from "@/lib/useCoalescedRefresh";
@@ -50,7 +51,7 @@ export function WatchedButton({
 
   async function toggle() {
     if (!signedIn) {
-      router.push("/login");
+      router.push(loginHref());
       return;
     }
 
@@ -72,7 +73,7 @@ export function WatchedButton({
     if (res.status === 401) {
       setSaving(false);
       setWatched(previousWatched);
-      router.push("/login");
+      router.push(loginHref());
       return;
     }
     if (!res.ok) {
@@ -114,11 +115,9 @@ export function WatchedButton({
           ? "Marked watched — click to undo"
           : "Mark as watched, without picking a date"
       }
-      className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors disabled:opacity-50 ${
-        watched
-          ? "border-accent-green bg-accent-green/10 text-accent-green"
-          : "border-border text-muted hover:text-foreground"
-      }`}
+      type="button"
+      aria-pressed={watched}
+      className={`btn ${watched ? "btn-active" : "btn-secondary"}`}
     >
       <EyeIcon />
       Watched

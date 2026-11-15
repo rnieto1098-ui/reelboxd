@@ -1,16 +1,23 @@
 "use client";
 
 import { useState } from "react";
+import { Info } from "lucide-react";
+import { Dialog } from "@/components/Dialog";
 import Image from "next/image";
 import Link from "next/link";
-import {
-  logoUrl,
-  profileUrl,
-  type TmdbCastMember,
-  type TmdbCrewMember,
-  type TmdbGenre,
-  type TmdbProductionCompany,
-} from "@/lib/tmdb";
+import { logoUrl, profileUrl, type TmdbGenre } from "@/lib/tmdb";
+
+// Only the fields this dialog draws. The page used to pass TMDB's full
+// credit records (a dozen fields each, for several hundred people) into the
+// browser on every movie view, for a dialog that starts closed.
+export type CreditsCrew = { id: number; name: string; job: string; department: string };
+export type CreditsCast = {
+  id: number;
+  name: string;
+  character: string;
+  profile_path: string | null;
+};
+export type CreditsStudio = { id: number; name: string; logo_path: string | null };
 
 const DEPARTMENT_ORDER = [
   "Directing",
@@ -34,13 +41,13 @@ export function AboutMovieModal({
 }: {
   title: string;
   genres: TmdbGenre[];
-  studios: TmdbProductionCompany[];
-  crew: TmdbCrewMember[];
-  cast: TmdbCastMember[];
+  studios: CreditsStudio[];
+  crew: CreditsCrew[];
+  cast: CreditsCast[];
 }) {
   const [open, setOpen] = useState(false);
 
-  const crewByDepartment = new Map<string, TmdbCrewMember[]>();
+  const crewByDepartment = new Map<string, CreditsCrew[]>();
   for (const member of crew) {
     const list = crewByDepartment.get(member.department) ?? [];
     list.push(member);
@@ -56,31 +63,14 @@ export function AboutMovieModal({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="text-xs text-muted hover:text-accent-green hover:underline"
+        className="btn btn-ghost btn-sm"
       >
-        About
+        <Info aria-hidden className="h-4 w-4" />
+        Full credits
       </button>
 
       {open && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-          onClick={() => setOpen(false)}
-        >
-          <div
-            className="max-h-[80vh] w-full max-w-2xl overflow-y-auto rounded-lg border border-border bg-surface p-5"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-4 flex items-center justify-between gap-4">
-              <h3 className="text-lg font-semibold">{title}</h3>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="shrink-0 text-xs text-muted hover:text-foreground"
-              >
-                Close
-              </button>
-            </div>
-
+        <Dialog title={title} onClose={() => setOpen(false)} size="lg">
             <div className="space-y-6">
               {genres.length > 0 && (
                 <section>
@@ -187,8 +177,7 @@ export function AboutMovieModal({
                 </section>
               )}
             </div>
-          </div>
-        </div>
+        </Dialog>
       )}
     </>
   );

@@ -9,11 +9,12 @@ import { getUserWatchlistedTmdbIds } from "@/lib/movies";
 import { getUserOwnedTmdbIds } from "@/lib/streaming";
 import { getWatchedTmdbIds } from "@/lib/recommendations";
 import { getGoalProgress } from "@/lib/goals";
-import { getChallengesWithProgress, type ChallengeSummary } from "@/lib/challenges";
+import { getChallengesWithProgress } from "@/lib/challenges";
 import { MovieRow } from "@/components/MovieRow";
 import { RecentlyLoggedRow } from "@/components/RecentlyLoggedRow";
 import { SortChips } from "@/components/SortChips";
 import { WatchGoalWidget } from "@/components/WatchGoalWidget";
+import { ChallengeCard } from "@/components/ChallengeCard";
 import { LetterboxdSyncCard } from "@/components/LetterboxdSyncCard";
 import { OwnedImportForm } from "@/components/OwnedImportForm";
 import { compareNullableNumbers, type SortDir } from "@/lib/sortComparator";
@@ -79,40 +80,6 @@ function sortEntries(entries: RecentEntry[], sortKey: SortKey, dir: SortDir): Re
     return e.movie.popularity;
   };
   return [...entries].sort((a, b) => compareNullableNumbers(valueOf(a), valueOf(b), dir));
-}
-
-const CHALLENGE_TYPE_LABEL: Record<ChallengeSummary["type"], string> = {
-  GENRE: "Genre",
-  TIMEFRAME: "Time frame",
-  CREW: "Crew",
-  LIST: "List",
-};
-
-function ChallengeCard({ challenge }: { challenge: ChallengeSummary }) {
-  return (
-    <Link
-      href={`/challenges/${challenge.id}`}
-      className="block rounded-lg border border-border bg-surface p-4 hover:border-accent-green"
-    >
-      <span className="mb-1 inline-block rounded-full border border-border px-2 py-0.5 text-[11px] text-muted">
-        {CHALLENGE_TYPE_LABEL[challenge.type]}
-      </span>
-      <p className="text-sm font-semibold">{challenge.title}</p>
-      <div className="mt-2 h-3 overflow-hidden rounded-full bg-background">
-        <div
-          className="h-full rounded-full bg-accent-green transition-all"
-          style={{ width: `${challenge.percent ?? 0}%` }}
-        />
-      </div>
-      <p className="mt-1.5 text-xs text-muted">
-        {challenge.target != null
-          ? challenge.percent != null && challenge.percent >= 100
-            ? `Complete — ${challenge.count}/${challenge.target} films! 🎉`
-            : `${challenge.count} / ${challenge.target} films`
-          : `${challenge.count} films logged`}
-      </p>
-    </Link>
-  );
 }
 
 function buildHref(username: string, key: SortKey, dir: SortDir) {
@@ -302,7 +269,7 @@ export default async function ProfilePage({
           )}
         </div>
         <div>
-          <h1 className="text-2xl font-bold">{user.username}</h1>
+          <h1 className="page-title">{user.username}</h1>
           <p className="text-sm text-muted">
             {user._count.ratings} rating{user._count.ratings === 1 ? "" : "s"} ·{" "}
             {user._count.watchlist} watchlisted ·{" "}
@@ -312,24 +279,24 @@ export default async function ProfilePage({
           <div className="mt-1 flex gap-3 text-xs">
             <Link
               href={`/profile/${username}/diary`}
-              className="text-accent-green hover:underline"
+              className="font-medium text-accent-green underline-offset-2 hover:underline"
             >
               Diary
             </Link>
             <Link
               href={`/profile/${username}/stats`}
-              className="text-accent-green hover:underline"
+              className="font-medium text-accent-green underline-offset-2 hover:underline"
             >
               Stats
             </Link>
             <Link
               href={`/profile/${username}/year`}
-              className="text-accent-green hover:underline"
+              className="font-medium text-accent-green underline-offset-2 hover:underline"
             >
               Year in Review
             </Link>
             {isOwnProfile && (
-              <Link href="/challenges" className="text-accent-green hover:underline">
+              <Link href="/challenges" className="font-medium text-accent-green underline-offset-2 hover:underline">
                 Challenges
               </Link>
             )}
@@ -340,25 +307,25 @@ export default async function ProfilePage({
           <div className="flex w-full flex-wrap gap-2 sm:ml-auto sm:w-auto">
             <Link
               href="/rewatch"
-              className="whitespace-nowrap rounded-md border border-border px-3 py-1.5 text-sm text-muted hover:text-foreground hover:border-accent-green transition-colors"
+              className="btn btn-outline btn-sm"
             >
               Rewatch List
             </Link>
             <Link
               href="/settings"
-              className="whitespace-nowrap rounded-md border border-border px-3 py-1.5 text-sm text-muted hover:text-foreground hover:border-accent-green transition-colors"
+              className="btn btn-outline btn-sm"
             >
               Settings
             </Link>
             <Link
               href="/streaming"
-              className="whitespace-nowrap rounded-md border border-border px-3 py-1.5 text-sm text-muted hover:text-foreground hover:border-accent-green transition-colors"
+              className="btn btn-outline btn-sm"
             >
               Streaming Services
             </Link>
             <Link
               href="/import"
-              className="whitespace-nowrap rounded-md border border-border px-3 py-1.5 text-sm text-muted hover:text-foreground hover:border-accent-green transition-colors"
+              className="btn btn-outline btn-sm"
             >
               Import from Letterboxd
             </Link>
@@ -367,7 +334,7 @@ export default async function ProfilePage({
       </div>
 
       {isOwnProfile && (
-        <div className="mb-8 rounded-lg border border-border bg-surface p-4">
+        <div className="card mb-8 p-5">
           <LetterboxdSyncCard
             initialUsername={user.letterboxdUsername}
             initialSyncedAt={user.letterboxdSyncedAt?.toISOString() ?? null}
@@ -383,14 +350,15 @@ export default async function ProfilePage({
               target={goal.target}
               count={goal.count}
               percent={goal.percent}
+              pace={goal.pace}
               isOwner={isOwnProfile}
               username={username}
             />
           )}
           {challenges.length > 0 && (
-            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {challenges.map((challenge) => (
-                <ChallengeCard key={challenge.id} challenge={challenge} />
+                <ChallengeCard key={challenge.id} challenge={challenge} canEdit={false} />
               ))}
             </div>
           )}
@@ -399,7 +367,7 @@ export default async function ProfilePage({
 
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-baseline gap-3">
-          <h2 className="text-lg font-semibold">Recently logged</h2>
+          <h2 className="section-title">Recently logged</h2>
           {recentEntries.length > 0 && (
             <Link
               href={`/profile/${username}/diary`}

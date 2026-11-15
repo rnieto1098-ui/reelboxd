@@ -222,7 +222,7 @@ export default async function ListDetailPage({
               endpoint={`/api/lists/${list.id}`}
               title={list.title}
               canEdit={isOwner && !list.isSystem}
-              className="text-2xl font-bold"
+              className="page-title"
             />
             <p className="text-sm text-muted">
               {list.isSystem ? "Curated by Flixtally" : `By ${list.owner?.username}`} ·{" "}

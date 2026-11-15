@@ -19,8 +19,8 @@ export default function ErrorBoundary({
   }, [error]);
 
   return (
-    <div className="mx-auto max-w-sm py-16 text-center">
-      <h1 className="text-2xl font-bold">Something went wrong</h1>
+    <div className="mx-auto max-w-md py-20 text-center">
+      <h1 className="page-title">Something went wrong</h1>
       <p className="mt-2 text-sm text-muted">
         That&apos;s on us, not you — try again, or head back home.
       </p>
@@ -28,13 +28,13 @@ export default function ErrorBoundary({
         <button
           type="button"
           onClick={reset}
-          className="rounded-md bg-accent-green px-4 py-2 text-sm font-medium text-black hover:opacity-90"
+          className="btn btn-primary"
         >
           Try again
         </button>
         <Link
           href="/"
-          className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:border-accent-green"
+          className="btn btn-secondary"
         >
           Go home
         </Link>

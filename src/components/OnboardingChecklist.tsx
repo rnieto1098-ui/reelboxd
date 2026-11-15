@@ -28,7 +28,7 @@ export function OnboardingChecklist({ items }: { items: ChecklistItem[] }) {
   }
 
   return (
-    <div className="rounded-lg border border-border bg-surface p-4">
+    <div className="card p-5">
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-sm font-semibold">Get more out of Flixtally</h2>
         <button type="button" onClick={dismiss} className="text-xs text-muted hover:text-foreground">

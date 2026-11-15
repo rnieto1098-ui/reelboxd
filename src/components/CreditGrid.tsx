@@ -35,7 +35,7 @@ export function CreditGrid({ title, credits }: { title: string; credits: CreditD
   return (
     <section>
       <div className="mb-3 flex items-center justify-between gap-4">
-        <h2 className="text-lg font-semibold">
+        <h2 className="section-title">
           {title} <span className="text-sm font-normal text-muted">({credits.length})</span>
         </h2>
         <ShuffleButton onClick={shuffle} disabled={credits.length < 2} />

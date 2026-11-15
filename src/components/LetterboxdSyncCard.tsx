@@ -73,10 +73,10 @@ export function LetterboxdSyncCard({
   function announce(body: SyncSummary) {
     showToast(summaryMessage(body));
     for (const challenge of body.completedChallenges ?? []) {
-      showToast(`🎉 Challenge complete: ${challenge.title}`);
+      showToast(`Challenge complete: ${challenge.title}`, "celebrate");
     }
     if (body.completedGoal) {
-      showToast(`🎉 ${body.completedGoal.year} watch goal complete!`);
+      showToast(`${body.completedGoal.year} watch goal complete!`, "celebrate");
     }
     if (body.watchlistError) {
       showToast(`Watchlist sync: ${body.watchlistError}`, "error");
@@ -148,7 +148,7 @@ export function LetterboxdSyncCard({
     return (
       <form onSubmit={connect} className="flex flex-wrap items-end gap-2">
         <div>
-          <label className="mb-1 block text-xs text-muted">Sync diary &amp; watchlist from Letterboxd</label>
+          <label className="field-label">Sync diary &amp; watchlist from Letterboxd</label>
           <input
             type="text"
             value={username}
@@ -160,7 +160,7 @@ export function LetterboxdSyncCard({
         <button
           type="submit"
           disabled={busy || !username.trim()}
-          className="rounded-md bg-accent-green px-3 py-1.5 text-sm font-medium text-black hover:opacity-90 disabled:opacity-50"
+          className="btn btn-primary btn-sm"
         >
           {busy ? "Connecting..." : "Connect"}
         </button>
@@ -176,7 +176,7 @@ export function LetterboxdSyncCard({
           href={`https://letterboxd.com/${initialUsername}/`}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-accent-green hover:underline"
+          className="font-medium text-accent-green underline-offset-2 hover:underline"
         >
           letterboxd.com/{initialUsername}
         </a>

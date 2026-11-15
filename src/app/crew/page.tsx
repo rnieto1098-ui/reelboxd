@@ -35,7 +35,7 @@ export default async function CrewPage({ searchParams }: PageProps<"/crew">) {
 
   return (
     <div>
-      <h1 className="mb-2 text-2xl font-bold">Crew</h1>
+      <h1 className="page-title mb-2">Crew</h1>
       <p className="mb-6 text-sm text-muted">
         Search for directors, actors, cinematographers, composers, producers, or studios, then
         browse everything they made.
@@ -54,7 +54,7 @@ export default async function CrewPage({ searchParams }: PageProps<"/crew">) {
       {query && people && companies && (
         <div className="space-y-10">
           <section>
-            <h2 className="mb-3 text-lg font-semibold">
+            <h2 className="section-title mb-3">
               People {people.results.length > 0 && `(${people.results.length})`}
             </h2>
             {fallbackQuery && (
@@ -72,7 +72,7 @@ export default async function CrewPage({ searchParams }: PageProps<"/crew">) {
                     href={`https://www.google.com/search?q=${encodeURIComponent(query)}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-accent-green hover:underline"
+                    className="font-medium text-accent-green underline-offset-2 hover:underline"
                   >
                     Google
                   </a>{" "}
@@ -81,7 +81,7 @@ export default async function CrewPage({ searchParams }: PageProps<"/crew">) {
                     href={`https://www.imdb.com/find/?q=${encodeURIComponent(query)}&s=nm`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-accent-green hover:underline"
+                    className="font-medium text-accent-green underline-offset-2 hover:underline"
                   >
                     IMDb
                   </a>{" "}
@@ -128,7 +128,7 @@ export default async function CrewPage({ searchParams }: PageProps<"/crew">) {
           </section>
 
           <section>
-            <h2 className="mb-3 text-lg font-semibold">
+            <h2 className="section-title mb-3">
               Studios {companies.results.length > 0 && `(${companies.results.length})`}
             </h2>
             {companies.results.length === 0 ? (

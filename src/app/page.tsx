@@ -196,6 +196,7 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
           target={goal.target}
           count={goal.count}
           percent={goal.percent}
+          pace={goal.pace}
           isOwner
           username={session.user.name ?? ""}
         />
@@ -623,7 +624,7 @@ async function DiscoverRow({
 
   const discoverEmptyMessage = !canFilterByAvailability ? (
     <>
-      <Link href="/streaming" className="text-accent-green hover:underline">
+      <Link href="/streaming" className="font-medium text-accent-green underline-offset-2 hover:underline">
         Add your streaming services
       </Link>{" "}
       to see personalized picks you can actually watch right now.

@@ -1,66 +1,23 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Flame, Gamepad2, Trophy } from "lucide-react";
 import { auth } from "@/auth";
 import { getGoalProgress } from "@/lib/goals";
-import { getChallengesWithProgress, type ChallengeSummary } from "@/lib/challenges";
+import { getChallengesWithProgress } from "@/lib/challenges";
+import { challengeStatus } from "@/lib/challengeStatus";
 import { getGenres } from "@/lib/tmdb";
-import { formatTimeLeft, currentYearUTC } from "@/lib/dates";
+import { currentYearUTC } from "@/lib/dates";
 import { WatchGoalWidget } from "@/components/WatchGoalWidget";
 import { NewChallengeForm } from "@/components/NewChallengeForm";
 import { RandomChallengeButton } from "@/components/RandomChallengeButton";
-import { DeleteChallengeButton } from "@/components/DeleteChallengeButton";
-import { EditableTitle } from "@/components/EditableTitle";
+import { ChallengeCard } from "@/components/ChallengeCard";
 
-const TYPE_LABEL: Record<ChallengeSummary["type"], string> = {
-  GENRE: "Genre",
-  TIMEFRAME: "Time frame",
-  CREW: "Crew",
-  LIST: "List",
-};
-
-function ChallengeCard({ challenge }: { challenge: ChallengeSummary }) {
-  return (
-    <div className="rounded-lg border border-border bg-surface p-4 transition-colors hover:border-accent-green">
-      <div className="mb-2 flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <span className="mb-1 inline-block rounded-full border border-border px-2 py-0.5 text-[11px] text-muted">
-            {TYPE_LABEL[challenge.type]}
-          </span>
-          <EditableTitle
-            endpoint={`/api/challenges/${challenge.id}`}
-            title={challenge.title}
-            href={`/challenges/${challenge.id}`}
-            canEdit
-            twoLines
-          />
-        </div>
-        <DeleteChallengeButton challengeId={challenge.id} />
-      </div>
-      <Link href={`/challenges/${challenge.id}`} className="block">
-        <div className="h-3 overflow-hidden rounded-full bg-background">
-          <div
-            className="h-full rounded-full bg-accent-green transition-all"
-            style={{ width: `${challenge.percent ?? 0}%` }}
-          />
-        </div>
-        <p className="mt-1.5 text-xs text-muted hover:text-foreground">
-          {challenge.target != null
-            ? challenge.percent != null && challenge.percent >= 100
-              ? `Complete — ${challenge.count}/${challenge.target} films! 🎉`
-              : `${challenge.count} / ${challenge.target} films`
-            : `${challenge.count} films logged`}
-        </p>
-        {challenge.type === "TIMEFRAME" && challenge.endDate && (
-          <p className="mt-0.5 text-xs text-muted">{formatTimeLeft(challenge.endDate)}</p>
-        )}
-      </Link>
-    </div>
-  );
-}
+export const metadata: Metadata = { title: "Challenges" };
 
 export default async function ChallengesPage() {
   const session = await auth();
-  if (!session?.user?.id) redirect("/login");
+  if (!session?.user?.id) redirect("/login?next=/challenges");
 
   const currentYear = currentYearUTC();
   const [goal, challenges, genresData] = await Promise.all([
@@ -70,45 +27,140 @@ export default async function ChallengesPage() {
   ]);
   const genreNames = genresData.genres.map((g) => g.name).sort((a, b) => a.localeCompare(b));
 
+  // Active first and nearest to done at the top, so the next one to finish
+  // is the first thing you see. Finished and expired ones each get their own
+  // shelf below instead of being mixed in among them.
+  const now = new Date();
+  const withStatus = challenges.map((c) => ({ challenge: c, status: challengeStatus(c, now) }));
+  const active = withStatus
+    .filter((c) => c.status === "active")
+    .sort((a, b) => (b.challenge.percent ?? 0) - (a.challenge.percent ?? 0));
+  const complete = withStatus.filter((c) => c.status === "complete");
+  const ended = withStatus.filter((c) => c.status === "ended");
+
+  const stats = [
+    { icon: Flame, label: "In progress", value: active.length },
+    { icon: Trophy, label: "Completed", value: complete.length },
+  ];
+
   return (
-    <div>
-      <h1 className="mb-1 text-2xl font-bold">Challenges</h1>
-      <p className="mb-8 text-sm text-muted">
-        Your yearly watch goal, plus any custom challenges you&apos;ve set for yourself.
-      </p>
+    <div className="space-y-12">
+      <header className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="eyebrow mb-2">Challenges</p>
+          <h1 className="page-title">Give your watching a goal</h1>
+          <p className="mt-2 max-w-xl text-muted">
+            Set a number for the year, take on a genre or a director&apos;s whole filmography,
+            and watch the rings fill in.
+          </p>
+        </div>
+        <dl className="flex gap-3">
+          {stats.map(({ icon: Icon, label, value }) => (
+            <div key={label} className="card flex items-center gap-3 px-4 py-3">
+              <Icon aria-hidden className="h-5 w-5 text-accent-green" />
+              <div>
+                <dd className="font-[family-name:var(--font-display)] text-xl font-bold leading-none tabular-nums">
+                  {value}
+                </dd>
+                <dt className="mt-1 text-xs text-muted">{label}</dt>
+              </div>
+            </div>
+          ))}
+        </dl>
+      </header>
 
-      <section className="mb-10">
-        <h2 className="mb-3 text-lg font-semibold">{currentYear} Challenge</h2>
-        <WatchGoalWidget
-          year={goal.year}
-          target={goal.target}
-          count={goal.count}
-          percent={goal.percent}
-          isOwner
-          username={session.user.name ?? ""}
-        />
-      </section>
+      <WatchGoalWidget
+        year={goal.year}
+        target={goal.target}
+        count={goal.count}
+        percent={goal.percent}
+        pace={goal.pace}
+        isOwner
+        username={session.user.name ?? ""}
+      />
 
-      <section>
-        <h2 className="mb-3 text-lg font-semibold">Custom challenges</h2>
-        <div className="mb-4 flex flex-wrap items-start gap-2">
-          <NewChallengeForm genres={genreNames} />
-          <RandomChallengeButton />
+      <section aria-labelledby="active-heading">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h2 id="active-heading" className="section-title">
+            In progress
+          </h2>
+          <div className="flex flex-wrap items-start gap-2">
+            <RandomChallengeButton />
+            <NewChallengeForm genres={genreNames} />
+          </div>
         </div>
 
-        {challenges.length === 0 ? (
-          <p className="text-sm text-muted">
-            No custom challenges yet — try a genre quota, a date-range quota, watching a
-            director&apos;s whole filmography, or working through one of your lists.
-          </p>
+        {active.length === 0 ? (
+          <div className="rounded-[0.875rem] border border-dashed border-border-strong px-6 py-10 text-center">
+            <Trophy aria-hidden className="mx-auto mb-3 h-8 w-8 text-subtle" />
+            <p className="font-semibold">
+              {challenges.length === 0 ? "No challenges yet" : "Nothing in progress"}
+            </p>
+            <p className="mx-auto mt-1 max-w-md text-sm text-muted">
+              Try a genre quota, a number of films inside a date range, or every film by a
+              director you like. To turn a list into a challenge, open the list and choose
+              &ldquo;Make this a challenge&rdquo;.
+            </p>
+            <Link href="/lists" className="btn btn-outline btn-sm mt-4">
+              Browse lists
+            </Link>
+          </div>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
-            {challenges.map((challenge) => (
-              <ChallengeCard key={challenge.id} challenge={challenge} />
+          <div className="stagger grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {active.map(({ challenge }, i) => (
+              <div key={challenge.id} style={{ "--i": i } as React.CSSProperties}>
+                <ChallengeCard challenge={challenge} canEdit />
+              </div>
             ))}
           </div>
         )}
       </section>
+
+      {complete.length > 0 && (
+        <section aria-labelledby="complete-heading">
+          <h2 id="complete-heading" className="section-title mb-4 flex items-center gap-2">
+            <Trophy aria-hidden className="h-5 w-5 text-accent-gold" />
+            Completed
+          </h2>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {complete.map(({ challenge }) => (
+              <ChallengeCard key={challenge.id} challenge={challenge} canEdit />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {ended.length > 0 && (
+        <section aria-labelledby="ended-heading">
+          <h2 id="ended-heading" className="section-title mb-1">
+            Ended
+          </h2>
+          <p className="mb-4 text-sm text-muted">
+            Date ranges that closed before the target was reached.
+          </p>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {ended.map(({ challenge }) => (
+              <ChallengeCard key={challenge.id} challenge={challenge} canEdit />
+            ))}
+          </div>
+        </section>
+      )}
+
+      <Link
+        href="/play"
+        className="card card-interactive flex items-center gap-4 p-5 sm:gap-5"
+      >
+        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-accent-green-soft text-accent-green">
+          <Gamepad2 aria-hidden className="h-6 w-6" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block font-semibold">Today&apos;s mystery film</span>
+          <span className="block text-sm text-muted">
+            A new film to guess every day, from six clues. Keep a streak going.
+          </span>
+        </span>
+        <span className="btn btn-primary btn-sm hidden shrink-0 sm:inline-flex">Play</span>
+      </Link>
     </div>
   );
 }

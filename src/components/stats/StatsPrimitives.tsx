@@ -49,7 +49,7 @@ export function StatSection({
     <section>
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <div>
-          <h2 className="text-lg font-semibold">{title}</h2>
+          <h2 className="section-title">{title}</h2>
           {description && <p className="mt-0.5 text-xs text-muted">{description}</p>}
         </div>
         {action}

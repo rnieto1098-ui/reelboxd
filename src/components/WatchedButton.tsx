@@ -97,7 +97,7 @@ export function WatchedButton({
     if (!previousWatched) {
       showToast("Marked as watched");
       for (const challenge of body?.completedChallenges ?? []) {
-        showToast(`🎉 Challenge complete: ${challenge.title}`);
+        showToast(`Challenge complete: ${challenge.title}`, "celebrate");
       }
     } else {
       showToast(

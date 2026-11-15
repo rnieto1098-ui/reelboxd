@@ -77,7 +77,7 @@ export function ReorderableListsSection({
   return (
     <section>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-lg font-semibold">{title}</h2>
+        <h2 className="section-title">{title}</h2>
         <div className="flex items-center gap-3">
           {editing ? (
             <>
@@ -93,7 +93,7 @@ export function ReorderableListsSection({
                 type="button"
                 onClick={save}
                 disabled={saving}
-                className="rounded-md bg-accent-green px-3 py-1.5 text-sm font-medium text-black hover:opacity-90 disabled:opacity-50"
+                className="btn btn-primary btn-sm"
               >
                 {saving ? "Saving..." : "Save order"}
               </button>

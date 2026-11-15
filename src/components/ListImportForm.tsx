@@ -95,7 +95,7 @@ export function ListImportForm({
             <button
               type="submit"
               disabled={!file || loading}
-              className="rounded-md bg-accent-green px-4 py-2 text-sm font-medium text-black hover:opacity-90 disabled:opacity-50"
+              className="btn btn-primary"
             >
               {loading ? "Importing..." : "Import"}
             </button>

@@ -36,13 +36,13 @@ export default async function WatchlistPage({ searchParams }: PageProps<"/watchl
                   href="https://letterboxd.com/user/exportdata/"
                   target="_blank"
                   rel="noreferrer"
-                  className="text-accent-green hover:underline"
+                  className="font-medium text-accent-green underline-offset-2 hover:underline"
                 >
                   letterboxd.com/user/exportdata
                 </a>
                 ), or a watchlist.csv you exported from Flixtally — everything in it gets added
                 straight to your watchlist. Ratings and other data are ignored; use{" "}
-                <a href="/import" className="text-accent-green hover:underline">
+                <a href="/import" className="font-medium text-accent-green underline-offset-2 hover:underline">
                   full import
                 </a>{" "}
                 for those.

@@ -1,8 +1,9 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useId, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { AuthShell, FormMessage } from "@/components/auth/AuthShell";
 
 export default function ResetPasswordPage() {
   // useSearchParams needs a Suspense boundary around it, or Next opts the
@@ -18,6 +19,7 @@ function ResetPasswordForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
+  const passwordId = useId();
 
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -26,16 +28,14 @@ function ResetPasswordForm() {
 
   if (!token) {
     return (
-      <div className="mx-auto max-w-sm">
-        <h1 className="mb-4 text-2xl font-bold">Invalid link</h1>
-        <p className="text-sm text-muted">
-          This password reset link is missing its token. Request a new one from the{" "}
-          <Link href="/forgot-password" className="text-accent-green hover:underline">
-            forgot password page
-          </Link>
-          .
+      <AuthShell title="This link won't work">
+        <p className="text-sm leading-relaxed text-muted">
+          The password reset link is incomplete. It may have been cut off when it was copied.
         </p>
-      </div>
+        <Link href="/forgot-password" className="btn btn-primary mt-5">
+          Request a new link
+        </Link>
+      </AuthShell>
     );
   }
 
@@ -44,17 +44,24 @@ function ResetPasswordForm() {
     setError(null);
     setLoading(true);
 
-    const res = await fetch("/api/auth/reset-password", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token, password }),
-    });
+    let res: Response;
+    try {
+      res = await fetch("/api/auth/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, password }),
+      });
+    } catch {
+      setLoading(false);
+      setError("Couldn't reach the server. Check your connection and try again.");
+      return;
+    }
 
     setLoading(false);
 
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      setError(data.error ?? "Something went wrong");
+      setError(data.error ?? "Something went wrong. Try again.");
       return;
     }
 
@@ -64,43 +71,48 @@ function ResetPasswordForm() {
 
   if (done) {
     return (
-      <div className="mx-auto max-w-sm">
-        <h1 className="mb-4 text-2xl font-bold">Password updated</h1>
-        <p className="text-sm text-muted">
-          Redirecting you to sign in...{" "}
-          <Link href="/login" className="text-accent-green hover:underline">
-            or click here
+      <AuthShell title="Password updated">
+        <FormMessage kind="success">Your new password is saved.</FormMessage>
+        <p className="mt-4 text-sm text-muted">
+          Taking you to sign in…{" "}
+          <Link
+            href="/login"
+            className="font-medium text-accent-green underline-offset-2 hover:underline"
+          >
+            or go now
           </Link>
           .
         </p>
-      </div>
+      </AuthShell>
     );
   }
 
   return (
-    <div className="mx-auto max-w-sm">
-      <h1 className="mb-6 text-2xl font-bold">Choose a new password</h1>
+    <AuthShell title="Choose a new password">
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="mb-1 block text-sm text-muted">New password</label>
+          <label htmlFor={passwordId} className="field-label">
+            New password
+          </label>
           <input
+            id={passwordId}
+            name="password"
             type="password"
+            autoComplete="new-password"
             required
+            autoFocus
             minLength={8}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm focus:outline-none focus:border-accent-green"
+            className="input"
           />
+          <p className="mt-1.5 text-xs text-subtle">At least 8 characters.</p>
         </div>
-        {error && <p className="text-sm text-red-400">{error}</p>}
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full rounded-md bg-accent-green px-3 py-2 text-sm font-medium text-black hover:opacity-90 transition-opacity disabled:opacity-50"
-        >
-          {loading ? "Saving..." : "Reset password"}
+        {error && <FormMessage>{error}</FormMessage>}
+        <button type="submit" disabled={loading} className="btn btn-primary btn-lg w-full">
+          {loading ? "Saving…" : "Save new password"}
         </button>
       </form>
-    </div>
+    </AuthShell>
   );
 }

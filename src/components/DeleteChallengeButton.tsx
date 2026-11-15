@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Trash2 } from "lucide-react";
 import { useToast } from "@/components/Toast";
 
 export function DeleteChallengeButton({ challengeId }: { challengeId: string }) {
@@ -41,29 +42,28 @@ export function DeleteChallengeButton({ challengeId }: { challengeId: string }) 
       <button
         type="button"
         onClick={() => setConfirming(true)}
-        className="text-xs text-muted hover:text-red-400"
+        aria-label="Remove challenge"
+        title="Remove challenge"
+        className="-mr-1.5 -mt-1.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-subtle transition-colors hover:bg-danger/10 hover:text-danger"
       >
-        Remove
+        <Trash2 aria-hidden className="h-4 w-4" />
       </button>
     );
   }
 
   return (
-    <div className="flex items-center gap-2 text-xs">
+    <div className="-mr-1.5 -mt-1.5 flex shrink-0 flex-col items-end gap-1">
       <button
         type="button"
         onClick={handleDelete}
         disabled={deleting}
-        className="text-red-400 hover:underline disabled:opacity-50"
+        autoFocus
+        className="btn btn-danger btn-sm"
       >
-        {deleting ? "Removing..." : "Confirm"}
+        {deleting ? "Removing…" : "Remove"}
       </button>
-      <button
-        type="button"
-        onClick={() => setConfirming(false)}
-        className="text-muted hover:text-foreground"
-      >
-        Cancel
+      <button type="button" onClick={() => setConfirming(false)} className="btn btn-ghost btn-sm">
+        Keep
       </button>
     </div>
   );

@@ -299,7 +299,7 @@ export async function SavedMoviesPage({
   return (
     <div>
       <div className="mb-1 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-        <h1 className="text-2xl font-bold">{title}</h1>
+        <h1 className="page-title">{title}</h1>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
           {headerActions?.(items.length)}
           <Link
@@ -332,7 +332,7 @@ export async function SavedMoviesPage({
           ) : (
             <span className="text-xs text-muted">
               You haven&apos;t added any services or marked anything as owned yet —{" "}
-              <Link href="/streaming" className="text-accent-green hover:underline">
+              <Link href="/streaming" className="font-medium text-accent-green underline-offset-2 hover:underline">
                 add your services here
               </Link>
               .
@@ -385,7 +385,7 @@ export async function SavedMoviesPage({
       ) : visibleEntries.length === 0 ? (
         <p className="text-sm text-muted">
           No movies match your filters.{" "}
-          <Link href={clearFiltersHref} className="text-accent-green hover:underline">
+          <Link href={clearFiltersHref} className="font-medium text-accent-green underline-offset-2 hover:underline">
             Clear filters
           </Link>
         </p>

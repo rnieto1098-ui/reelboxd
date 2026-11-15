@@ -29,7 +29,7 @@ export default function TermsPage() {
             href="https://www.themoviedb.org/"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-accent-green hover:underline"
+            className="font-medium text-accent-green underline-offset-2 hover:underline"
           >
             The Movie Database (TMDB)
           </a>
@@ -78,7 +78,7 @@ export default function TermsPage() {
           Flixtally is provided &ldquo;as is,&rdquo; run by one person as a side project. We
           don&apos;t guarantee it will always be available, bug-free, or that your data will
           never be lost — though we take reasonable care (see our{" "}
-          <a href="/privacy" className="text-accent-green hover:underline">
+          <a href="/privacy" className="font-medium text-accent-green underline-offset-2 hover:underline">
             Privacy Policy
           </a>{" "}
           for how your data is handled). To the extent allowed by law, we&apos;re not liable
@@ -99,7 +99,7 @@ export default function TermsPage() {
         <h2 className="mb-2 text-base font-semibold text-foreground">Contact</h2>
         <p>
           Questions about these terms? Reach out at{" "}
-          <a href="mailto:support@flixtally.com" className="text-accent-green hover:underline">
+          <a href="mailto:support@flixtally.com" className="font-medium text-accent-green underline-offset-2 hover:underline">
             support@flixtally.com
           </a>
           .

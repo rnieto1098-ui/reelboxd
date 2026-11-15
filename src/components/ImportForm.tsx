@@ -54,10 +54,10 @@ export function ImportForm() {
 
     setSummary(data);
     for (const challenge of data.completedChallenges ?? []) {
-      showToast(`🎉 Challenge complete: ${challenge.title}`);
+      showToast(`Challenge complete: ${challenge.title}`, "celebrate");
     }
     if (data.completedGoal) {
-      showToast(`🎉 ${data.completedGoal.year} watch goal complete!`);
+      showToast(`${data.completedGoal.year} watch goal complete!`, "celebrate");
     }
     router.refresh();
   }
@@ -74,7 +74,7 @@ export function ImportForm() {
         <button
           type="submit"
           disabled={!file || loading}
-          className="rounded-md bg-accent-green px-4 py-2 text-sm font-medium text-black hover:opacity-90 disabled:opacity-50"
+          className="btn btn-primary"
         >
           {loading ? "Importing... this can take a minute" : "Import"}
         </button>

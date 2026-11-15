@@ -88,7 +88,7 @@ export function ListCoverUpload({
           type="button"
           disabled={saving}
           onClick={() => inputRef.current?.click()}
-          className="rounded-md border border-border px-3 py-1.5 text-sm text-muted hover:text-foreground hover:border-accent-green transition-colors disabled:opacity-50"
+          className="btn btn-outline btn-sm"
         >
           {saving ? "Uploading..." : hasImage ? changeLabel : addLabel}
         </button>

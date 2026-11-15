@@ -181,7 +181,7 @@ export default async function ChallengeDetailPage({
         {TYPE_LABEL[challenge.type] ?? "Challenge"}
         {!isOwner && ` · ${challenge.user.username}`}
       </p>
-      <h1 className="text-2xl font-bold">{challenge.title}</h1>
+      <h1 className="page-title">{challenge.title}</h1>
       <p className="mt-1 text-sm text-muted">{subtitle}</p>
       {challenge.type === "LIST" && challenge.list && (
         <Link

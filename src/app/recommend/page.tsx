@@ -8,7 +8,7 @@ export default async function RecommendPage() {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <h1 className="mb-2 text-2xl font-bold">What should I watch?</h1>
+      <h1 className="page-title mb-2">What should I watch?</h1>
       <p className="mb-6 text-sm text-muted">
         Describe the vibe you&apos;re after — mood, genre, a movie it should feel like, how long
         you&apos;ve got, how well-reviewed it should be. We&apos;ll pick a handful of popular

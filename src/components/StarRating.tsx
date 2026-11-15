@@ -108,9 +108,9 @@ export function StarRating({
           : `Rated ${stars}`
     );
     for (const challenge of body?.completedChallenges ?? []) {
-      showToast(`Challenge complete: ${challenge.title}`);
+      showToast(`Challenge complete: ${challenge.title}`, "celebrate");
     }
-    if (body?.completedGoal) showToast(`${body.completedGoal.year} watch goal complete!`);
+    if (body?.completedGoal) showToast(`${body.completedGoal.year} watch goal complete!`, "celebrate");
     refresh();
   }
 

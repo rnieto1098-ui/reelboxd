@@ -58,7 +58,7 @@ export default async function StatsPage({ params }: PageProps<"/profile/[usernam
         ← {username}
       </Link>
       <div className="mt-1 mb-8 flex flex-wrap items-baseline justify-between gap-3">
-        <h1 className="text-3xl font-bold">{username}&apos;s Stats</h1>
+        <h1 className="page-title">{username}&apos;s Stats</h1>
         <Link
           href={`/profile/${username}/year`}
           className="text-sm text-muted hover:text-accent-green hover:underline"

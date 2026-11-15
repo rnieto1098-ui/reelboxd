@@ -84,7 +84,7 @@ export default async function ListsPage({ searchParams }: PageProps<"/lists">) {
 
   return (
     <div>
-      <h1 className="mb-2 text-2xl font-bold">Lists</h1>
+      <h1 className="page-title mb-2">Lists</h1>
       <p className="mb-8 text-sm text-muted">
         Browse curated lists, or build your own collection of movies.
       </p>

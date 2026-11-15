@@ -143,7 +143,7 @@ export default async function PersonPage({
           )}
         </div>
         <div>
-          <h1 className="text-2xl font-bold">{details.name}</h1>
+          <h1 className="page-title">{details.name}</h1>
           {details.known_for_department && (
             <p className="text-sm text-muted">{details.known_for_department}</p>
           )}

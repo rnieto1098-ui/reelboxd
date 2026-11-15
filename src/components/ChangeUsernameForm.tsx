@@ -53,12 +53,12 @@ export function ChangeUsernameForm({ currentUsername }: { currentUsername: strin
   return (
     <form onSubmit={handleSubmit} className="flex flex-wrap items-end gap-3">
       <div>
-        <label className="mb-1 block text-xs text-muted">Username</label>
+        <label className="field-label">Username</label>
         <input
           type="text"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
-          className="rounded-md border border-border bg-background px-3 py-1.5 text-sm"
+          className="input w-auto"
         />
       </div>
       <button

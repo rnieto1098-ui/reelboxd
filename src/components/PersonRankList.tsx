@@ -37,9 +37,9 @@ export function PersonRankList({
 
   return (
     <section>
-      <h2 className="mb-3 text-lg font-semibold">{title}</h2>
+      <h2 className="section-title mb-3">{title}</h2>
       <div className="grid gap-6 sm:grid-cols-2">
-        <div className="rounded-lg border border-border bg-surface p-4">
+        <div className="card p-5">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
             Most watched
           </p>
@@ -59,7 +59,7 @@ export function PersonRankList({
             </div>
           )}
         </div>
-        <div className="rounded-lg border border-border bg-surface p-4">
+        <div className="card p-5">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
             Highest rated
           </p>

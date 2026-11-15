@@ -103,7 +103,7 @@ export default function PrivacyPage() {
         <h2 className="mb-2 text-base font-semibold text-foreground">Contact</h2>
         <p>
           Questions, or want your data deleted? Reach out at{" "}
-          <a href="mailto:support@flixtally.com" className="text-accent-green hover:underline">
+          <a href="mailto:support@flixtally.com" className="font-medium text-accent-green underline-offset-2 hover:underline">
             support@flixtally.com
           </a>
           .

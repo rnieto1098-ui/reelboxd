@@ -1,15 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { Check, Pencil, Target, Trash2 } from "lucide-react";
 import { useToast } from "@/components/Toast";
+import { ProgressBar, ProgressRing } from "@/components/Progress";
+
+const MAX_TARGET = 2000;
 
 export function WatchGoalWidget({
   year,
   target,
   count,
   percent,
+  pace = null,
   isOwner,
   username,
 }: {
@@ -17,19 +22,29 @@ export function WatchGoalWidget({
   target: number | null;
   count: number;
   percent: number | null;
+  // "12 to go, 3 ahead of pace…": worked out on the server (see goals.ts).
+  pace?: string | null;
   isOwner: boolean;
   username: string;
 }) {
   const router = useRouter();
   const showToast = useToast();
+  const inputId = useId();
   const [editing, setEditing] = useState(false);
   const [confirmingRemove, setConfirmingRemove] = useState(false);
   const [value, setValue] = useState(target ? String(target) : "50");
+  const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   async function save() {
     const n = Number(value);
-    if (!Number.isFinite(n) || n < 1) return;
+    // Say why nothing happened. An out-of-range number used to make the
+    // Save button do nothing at all, with no message.
+    if (!Number.isInteger(n) || n < 1 || n > MAX_TARGET) {
+      setError(`Enter a whole number from 1 to ${MAX_TARGET}.`);
+      return;
+    }
+    setError(null);
     setSaving(true);
 
     let res: Response;
@@ -37,7 +52,7 @@ export function WatchGoalWidget({
       res = await fetch("/api/goals", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ year, target: Math.round(n) }),
+        body: JSON.stringify({ year, target: n }),
       });
     } catch {
       setSaving(false);
@@ -53,6 +68,7 @@ export function WatchGoalWidget({
     }
 
     setEditing(false);
+    showToast(`${year} goal set to ${n} films`);
     router.refresh();
   }
 
@@ -80,138 +96,155 @@ export function WatchGoalWidget({
     router.refresh();
   }
 
+  const editor = (
+    <form
+      className="flex flex-wrap items-center gap-2 text-sm"
+      onSubmit={(e) => {
+        e.preventDefault();
+        save();
+      }}
+    >
+      <label htmlFor={inputId} className="text-muted">
+        Watch
+      </label>
+      <input
+        id={inputId}
+        type="number"
+        inputMode="numeric"
+        min={1}
+        max={MAX_TARGET}
+        autoFocus
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        aria-invalid={!!error}
+        className="input w-24 text-center"
+      />
+      <span className="text-muted">films in {year}</span>
+      <button type="submit" disabled={saving} className="btn btn-primary btn-sm">
+        {saving ? "Saving…" : "Save goal"}
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          setEditing(false);
+          setError(null);
+        }}
+        className="btn btn-ghost btn-sm"
+      >
+        Cancel
+      </button>
+      {error && (
+        <p role="alert" className="w-full text-xs text-danger">
+          {error}
+        </p>
+      )}
+    </form>
+  );
+
   if (target == null && !isOwner) return null;
 
   if (target == null) {
     return editing ? (
-      <div className="flex items-center gap-2 rounded-lg border border-border bg-surface p-4 text-sm">
-        <span className="text-muted">Watch</span>
-        <input
-          type="number"
-          min={1}
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          className="w-16 rounded-md border border-border bg-background px-2 py-1 text-center focus:outline-none focus:border-accent-green"
-        />
-        <span className="text-muted">films in {year}</span>
-        <button
-          type="button"
-          onClick={save}
-          disabled={saving}
-          className="ml-2 rounded-md bg-accent-green px-3 py-1 text-xs font-medium text-black hover:opacity-90 disabled:opacity-50"
-        >
-          Save
-        </button>
-        <button
-          type="button"
-          onClick={() => setEditing(false)}
-          className="text-xs text-muted hover:text-foreground"
-        >
-          Cancel
-        </button>
-      </div>
+      <div className="card p-5">{editor}</div>
     ) : (
       <button
         type="button"
         onClick={() => setEditing(true)}
-        className="rounded-lg border border-dashed border-border p-4 text-left text-sm text-muted transition-colors hover:border-accent-green hover:text-foreground"
+        className="flex w-full items-center gap-4 rounded-[0.875rem] border border-dashed border-border-strong p-5 text-left transition-colors hover:border-accent-green hover:bg-accent-green-soft"
       >
-        + Set a watch goal for {year}
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-accent-green-soft text-accent-green">
+          <Target aria-hidden className="h-5 w-5" />
+        </span>
+        <span>
+          <span className="block font-semibold">Set a watch goal for {year}</span>
+          <span className="block text-sm text-muted">
+            Pick a number of films and track your pace through the year.
+          </span>
+        </span>
       </button>
     );
   }
 
   const diaryHref = `/profile/${username}/diary?year=${year}`;
+  const reached = percent != null && percent >= 100;
 
   return (
-    <div className="rounded-lg border border-border bg-surface p-4">
-      <div className="mb-2 flex items-center justify-between">
-        <Link href={diaryHref} className="text-sm font-semibold hover:text-accent-green hover:underline">
-          {year} Challenge: {count} / {target} films
-        </Link>
-        {isOwner &&
-          (editing ? (
-            <div className="flex items-center gap-2">
-              <input
-                type="number"
-                min={1}
-                value={value}
-                onChange={(e) => setValue(e.target.value)}
-                className="w-16 rounded-md border border-border bg-background px-2 py-1 text-center text-xs focus:outline-none focus:border-accent-green"
-              />
-              <button
-                type="button"
-                onClick={save}
-                disabled={saving}
-                className="rounded-md bg-accent-green px-2 py-1 text-xs font-medium text-black hover:opacity-90 disabled:opacity-50"
-              >
-                Save
-              </button>
-              <button
-                type="button"
-                onClick={() => setEditing(false)}
-                className="text-xs text-muted hover:text-foreground"
-              >
-                Cancel
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-3 text-xs">
-              {/* Two-step, like DeleteChallengeButton right below it on this
-                  same page — deleting a year's goal used to be one misclick
-                  with nothing to undo it. */}
-              {confirmingRemove ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={remove}
-                    disabled={saving}
-                    className="text-red-400 hover:underline disabled:opacity-50"
-                  >
-                    {saving ? "Removing..." : "Confirm"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setConfirmingRemove(false)}
-                    className="text-muted hover:text-foreground"
-                  >
-                    Cancel
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setEditing(true)}
-                    className="text-muted hover:text-foreground"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setConfirmingRemove(true)}
-                    className="text-muted hover:text-red-400"
-                  >
-                    Remove
-                  </button>
-                </>
-              )}
-            </div>
-          ))}
-      </div>
-      <Link href={diaryHref} className="block">
-        <div className="h-3 overflow-hidden rounded-full bg-background">
-          <div
-            className="h-full rounded-full bg-accent-green transition-all"
-            style={{ width: `${percent ?? 0}%` }}
-          />
+    <section
+      aria-label={`${year} watch goal`}
+      className={`card p-5 ${reached ? "border-accent-green/45 bg-gradient-to-br from-accent-green-soft to-surface" : ""}`}
+    >
+      <div className="flex items-center gap-4 sm:gap-5">
+        <ProgressRing percent={percent} size={72} stroke={6}>
+          {reached ? <Check className="h-7 w-7" strokeWidth={3} /> : undefined}
+        </ProgressRing>
+
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-subtle">
+            {year} watch goal
+          </p>
+          <Link href={diaryHref} className="group inline-block">
+            <p className="font-[family-name:var(--font-display)] text-2xl font-bold tracking-tight group-hover:text-accent-green">
+              {count} <span className="text-base font-medium text-muted">of {target} films</span>
+            </p>
+          </Link>
+          {pace && <p className="mt-0.5 text-sm text-muted">{pace}</p>}
         </div>
-        <p className="mt-1.5 text-xs text-muted hover:text-foreground">
-          {percent != null && percent >= 100
-            ? "Goal reached! 🎉"
-            : `${percent ?? 0}% of the way there`}
-        </p>
-      </Link>
-    </div>
+
+        {isOwner && !editing && (
+          <div className="flex shrink-0 items-center gap-1 self-start">
+            {/* Two-step: deleting a year's goal used to be one misclick with
+                nothing to undo it. */}
+            {confirmingRemove ? (
+              <>
+                <button
+                  type="button"
+                  onClick={remove}
+                  disabled={saving}
+                  className="btn btn-danger btn-sm"
+                >
+                  {saving ? "Removing…" : "Remove goal"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmingRemove(false)}
+                  className="btn btn-ghost btn-sm"
+                >
+                  Keep
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setEditing(true)}
+                  aria-label={`Change ${year} goal`}
+                  title="Change goal"
+                  className="flex h-9 w-9 items-center justify-center rounded-lg text-muted transition-colors hover:bg-white/[0.07] hover:text-foreground"
+                >
+                  <Pencil aria-hidden className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmingRemove(true)}
+                  aria-label={`Remove ${year} goal`}
+                  title="Remove goal"
+                  className="flex h-9 w-9 items-center justify-center rounded-lg text-muted transition-colors hover:bg-danger/10 hover:text-danger"
+                >
+                  <Trash2 aria-hidden className="h-4 w-4" />
+                </button>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
+      {editing ? (
+        <div className="mt-4 border-t border-border pt-4">{editor}</div>
+      ) : (
+        <div className="mt-4">
+          <ProgressBar percent={percent} label={`${year} watch goal`} className="h-2.5" />
+        </div>
+      )}
+    </section>
   );
 }

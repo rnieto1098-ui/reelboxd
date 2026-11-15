@@ -98,7 +98,7 @@ export default async function YearInReviewPage({
       </Link>
 
       <div className="mt-1 mb-8 flex items-center gap-3">
-        <h1 className="text-2xl font-bold">
+        <h1 className="page-title">
           {username}&apos;s {year} in Review
         </h1>
         <div className="flex items-center gap-2 text-sm">
@@ -196,7 +196,7 @@ export default async function YearInReviewPage({
 
           {review.topGenres.length > 0 && (
             <section>
-              <h2 className="mb-3 text-lg font-semibold">Top genres</h2>
+              <h2 className="section-title mb-3">Top genres</h2>
               <div className="space-y-1.5">
                 {review.topGenres.map((genre) => (
                   <div key={genre.name} className="flex items-center gap-2 text-xs">

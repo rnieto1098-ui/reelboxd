@@ -1,11 +1,17 @@
 import { prisma } from "@/lib/prisma";
 import { yearBounds } from "@/lib/dates";
+import { goalPace } from "@/lib/challengeStatus";
 
 export type GoalProgress = {
   year: number;
   target: number | null;
   count: number;
   percent: number | null;
+  // One line on how the goal is going ("12 to go, 3 ahead of pace..."), or
+  // null when there's nothing to say. Worked out here on the server so the
+  // browser never has to compute it from its own clock (which can disagree
+  // with the server's about what day it is, and show a different number).
+  pace: string | null;
 };
 
 export async function getGoalProgress(userId: string, year: number): Promise<GoalProgress> {
@@ -18,11 +24,13 @@ export async function getGoalProgress(userId: string, year: number): Promise<Goa
     }),
   ]);
 
+  const target = goal?.target ?? null;
   return {
     year,
-    target: goal?.target ?? null,
+    target,
     count,
     percent: goal && goal.target > 0 ? Math.min(100, Math.round((count / goal.target) * 100)) : null,
+    pace: goalPace({ year, target, count }),
   };
 }
 

@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useId } from "react";
 import { useRouter } from "next/navigation";
+import { Plus } from "lucide-react";
 import { useToast } from "@/components/Toast";
+import { Dialog } from "@/components/Dialog";
 
 type PersonResult = {
   id: number;
@@ -24,6 +26,8 @@ type ChallengeTypeKey = (typeof CHALLENGE_TYPES)[number]["key"];
 export function NewChallengeForm({ genres }: { genres: string[] }) {
   const router = useRouter();
   const showToast = useToast();
+  const titleId = useId();
+  const [formError, setFormError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [type, setType] = useState<ChallengeTypeKey>("GENRE");
   const [saving, setSaving] = useState(false);
@@ -145,15 +149,30 @@ export function NewChallengeForm({ genres }: { genres: string[] }) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setFormError(null);
 
     let payload: Record<string, unknown>;
     if (type === "GENRE") {
       const target = Number(genreTarget);
-      if (!genreName || !Number.isFinite(target) || target < 1) return;
+      if (!genreName || !Number.isFinite(target) || target < 1) {
+        setFormError("Enter how many films, 1 or more.");
+        return;
+      }
       payload = { type: "GENRE", genreName, target: Math.round(target) };
     } else if (type === "TIMEFRAME") {
       const target = Number(timeframeTarget);
-      if (!startDate || !endDate || !Number.isFinite(target) || target < 1) return;
+      if (!startDate || !endDate) {
+        setFormError("Pick both a start and an end date.");
+        return;
+      }
+      if (endDate < startDate) {
+        setFormError("The end date can't be before the start date.");
+        return;
+      }
+      if (!Number.isFinite(target) || target < 1) {
+        setFormError("Enter how many films, 1 or more.");
+        return;
+      }
       payload = { type: "TIMEFRAME", startDate, endDate, target: Math.round(target) };
     } else {
       if (!selectedPerson || !department) return;
@@ -197,39 +216,38 @@ export function NewChallengeForm({ genres }: { genres: string[] }) {
     router.refresh();
   }
 
-  if (!open) {
-    return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="rounded-md bg-accent-green px-3 py-1.5 text-sm font-medium text-black hover:opacity-90 transition-opacity"
-      >
-        + New challenge
-      </button>
-    );
+  function close() {
+    setOpen(false);
+    setCustomTitle("");
+    setFormError(null);
+    resetCrewFields();
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="space-y-4 rounded-lg border border-border bg-surface p-4"
-    >
-      <input
-        type="text"
-        value={customTitle}
-        onChange={(e) => setCustomTitle(e.target.value)}
-        placeholder="Custom title (optional)"
-        maxLength={100}
-        className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm placeholder:text-muted focus:outline-none focus:border-accent-green"
-      />
+    <>
+      <button type="button" onClick={() => setOpen(true)} className="btn btn-primary">
+        <Plus aria-hidden className="h-4 w-4" />
+        New challenge
+      </button>
 
-      <div className="flex w-fit gap-1 rounded-full border border-border p-1 text-xs">
+      {open && (
+        <Dialog title="New challenge" onClose={close} size="md">
+    <form onSubmit={handleSubmit} className="space-y-5">
+      <div
+        role="group"
+        aria-label="Kind of challenge"
+        className="flex w-fit gap-1 rounded-full border border-border-strong p-1 text-sm"
+      >
         {CHALLENGE_TYPES.map((t) => (
           <button
             key={t.key}
             type="button"
-            onClick={() => setType(t.key)}
-            className={`rounded-full px-3 py-1 transition-colors ${
+            aria-pressed={type === t.key}
+            onClick={() => {
+              setType(t.key);
+              setFormError(null);
+            }}
+            className={`rounded-full px-3.5 py-1.5 font-medium transition-colors ${
               type === t.key ? "bg-accent-green text-black" : "text-muted hover:text-foreground"
             }`}
           >
@@ -247,12 +265,14 @@ export function NewChallengeForm({ genres }: { genres: string[] }) {
               min={1}
               value={genreTarget}
               onChange={(e) => setGenreTarget(e.target.value)}
-              className="w-16 rounded-md border border-border bg-background px-2 py-1 text-center focus:outline-none focus:border-accent-green"
+              aria-label="Number of films"
+              className="input w-20 text-center"
             />
             <select
+              aria-label="Genre"
               value={genreName}
               onChange={(e) => setGenreName(e.target.value)}
-              className="rounded-md border border-border bg-background px-2 py-1 focus:outline-none focus:border-accent-green"
+              className="input w-auto"
             >
               {genres.map((g) => (
                 <option key={g} value={g}>
@@ -280,21 +300,27 @@ export function NewChallengeForm({ genres }: { genres: string[] }) {
               min={1}
               value={timeframeTarget}
               onChange={(e) => setTimeframeTarget(e.target.value)}
-              className="w-16 rounded-md border border-border bg-background px-2 py-1 text-center focus:outline-none focus:border-accent-green"
+              aria-label="Number of films"
+              className="input w-20 text-center"
             />
             <span className="text-muted">movies between</span>
             <input
               type="date"
+              required
+              aria-label="Start date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="rounded-md border border-border bg-background px-2 py-1 focus:outline-none focus:border-accent-green"
+              className="input w-auto"
             />
             <span className="text-muted">and</span>
             <input
               type="date"
+              required
+              aria-label="End date"
+              min={startDate || undefined}
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              className="rounded-md border border-border bg-background px-2 py-1 focus:outline-none focus:border-accent-green"
+              className="input w-auto"
             />
           </div>
           {startDate && endDate && (
@@ -318,19 +344,20 @@ export function NewChallengeForm({ genres }: { genres: string[] }) {
                   value={personQuery}
                   onChange={(e) => setPersonQuery(e.target.value)}
                   placeholder="Search for a director, actor..."
+                  aria-label="Search for a person"
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       e.preventDefault();
                       searchPeople();
                     }
                   }}
-                  className="flex-1 rounded-md border border-border bg-background px-3 py-1.5 placeholder:text-muted focus:outline-none focus:border-accent-green"
+                  className="input min-w-0 flex-1"
                 />
                 <button
                   type="button"
                   onClick={searchPeople}
                   disabled={searching || !personQuery.trim()}
-                  className="rounded-md border border-border px-3 py-1.5 text-muted hover:text-foreground disabled:opacity-50"
+                  className="btn btn-secondary shrink-0"
                 >
                   {searching ? "Searching..." : "Search"}
                 </button>
@@ -375,11 +402,8 @@ export function NewChallengeForm({ genres }: { genres: string[] }) {
                         key={d.department}
                         type="button"
                         onClick={() => setDepartment(d.department)}
-                        className={`rounded-full px-2.5 py-1 text-xs transition-colors ${
-                          department === d.department
-                            ? "bg-accent-green text-black"
-                            : "border border-border text-muted hover:text-foreground"
-                        }`}
+                        aria-pressed={department === d.department}
+                        className={`chip ${department === d.department ? "chip-active" : "hover:text-foreground"}`}
                       >
                         {d.department} ({d.count})
                       </button>
@@ -403,26 +427,42 @@ export function NewChallengeForm({ genres }: { genres: string[] }) {
         </div>
       )}
 
-      <div className="flex gap-2">
+      <div>
+        <label htmlFor={titleId} className="field-label">
+          Name <span className="font-normal text-subtle">(optional)</span>
+        </label>
+        <input
+          id={titleId}
+          type="text"
+          value={customTitle}
+          onChange={(e) => setCustomTitle(e.target.value)}
+          placeholder="We'll name it for you if you leave this blank"
+          maxLength={100}
+          className="input"
+        />
+      </div>
+
+      {formError && (
+        <p role="alert" className="text-sm text-danger">
+          {formError}
+        </p>
+      )}
+
+      <div className="flex justify-end gap-2 border-t border-border pt-4">
+        <button type="button" onClick={close} className="btn btn-ghost">
+          Cancel
+        </button>
         <button
           type="submit"
           disabled={saving || (type === "CREW" && (!selectedPerson || !department))}
-          className="rounded-md bg-accent-green px-3 py-1.5 text-sm font-medium text-black hover:opacity-90 disabled:opacity-50"
+          className="btn btn-primary"
         >
-          {saving ? "Adding..." : "Add challenge"}
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setOpen(false);
-            setCustomTitle("");
-            resetCrewFields();
-          }}
-          className="text-sm text-muted hover:text-foreground"
-        >
-          Cancel
+          {saving ? "Adding…" : "Add challenge"}
         </button>
       </div>
     </form>
+        </Dialog>
+      )}
+    </>
   );
 }

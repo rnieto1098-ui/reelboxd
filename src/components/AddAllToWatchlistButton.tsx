@@ -68,7 +68,7 @@ export function AddAllToWatchlistButton({
       type="button"
       onClick={handleClick}
       disabled={saving}
-      className="rounded-md border border-border px-3 py-1.5 text-sm text-muted hover:text-foreground hover:border-accent-green transition-colors disabled:opacity-50"
+      className="btn btn-outline btn-sm"
     >
       {saving ? "Adding..." : "+ Add all to watchlist"}
     </button>

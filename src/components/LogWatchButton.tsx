@@ -66,10 +66,10 @@ export function LogWatchButton({ tmdbId, signedIn }: { tmdbId: number; signedIn:
     }
     showToast(isToday ? "Logged as watched today" : `Logged for ${formatDate(watchedDate)}`);
     for (const challenge of body?.completedChallenges ?? []) {
-      showToast(`Challenge complete: ${challenge.title}`);
+      showToast(`Challenge complete: ${challenge.title}`, "celebrate");
     }
     if (body?.completedGoal) {
-      showToast(`${body.completedGoal.year} watch goal complete!`);
+      showToast(`${body.completedGoal.year} watch goal complete!`, "celebrate");
     }
     router.refresh();
     return true;

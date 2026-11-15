@@ -51,30 +51,30 @@ export function ChangePasswordForm() {
     <form onSubmit={handleSubmit} className="flex flex-col gap-3">
       <div className="flex flex-wrap gap-3">
         <div>
-          <label className="mb-1 block text-xs text-muted">Current password</label>
+          <label className="field-label">Current password</label>
           <input
             type="password"
             value={currentPassword}
             onChange={(e) => setCurrentPassword(e.target.value)}
-            className="rounded-md border border-border bg-background px-3 py-1.5 text-sm"
+            className="input w-auto"
           />
         </div>
         <div>
-          <label className="mb-1 block text-xs text-muted">New password</label>
+          <label className="field-label">New password</label>
           <input
             type="password"
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
-            className="rounded-md border border-border bg-background px-3 py-1.5 text-sm"
+            className="input w-auto"
           />
         </div>
         <div>
-          <label className="mb-1 block text-xs text-muted">Confirm new password</label>
+          <label className="field-label">Confirm new password</label>
           <input
             type="password"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
-            className="rounded-md border border-border bg-background px-3 py-1.5 text-sm"
+            className="input w-auto"
           />
         </div>
       </div>

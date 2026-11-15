@@ -45,7 +45,7 @@ export function MakeListChallengeButton({ listId }: { listId: string }) {
       type="button"
       onClick={create}
       disabled={saving}
-      className="rounded-md border border-border px-3 py-1.5 text-sm text-muted transition-colors hover:border-accent-green hover:text-foreground disabled:opacity-50"
+      className="btn btn-outline btn-sm"
     >
       {saving ? "Adding..." : "Make it a challenge"}
     </button>

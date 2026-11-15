@@ -50,7 +50,7 @@ export default async function StudioPage({
           )}
         </div>
         <div>
-          <h1 className="text-2xl font-bold">{details.name}</h1>
+          <h1 className="page-title">{details.name}</h1>
           {(details.headquarters || details.origin_country) && (
             <p className="text-sm text-muted">
               {[details.headquarters, details.origin_country].filter(Boolean).join(" · ")}
@@ -64,7 +64,7 @@ export default async function StudioPage({
         </div>
       </div>
 
-      <h2 className="mb-3 text-lg font-semibold">Movies</h2>
+      <h2 className="section-title mb-3">Movies</h2>
       {cleanedMovies.length === 0 ? (
         <p className="text-muted">No movies found.</p>
       ) : (

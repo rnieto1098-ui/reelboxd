@@ -74,6 +74,7 @@
   --animate-shimmer: shimmer 1.6s linear infinite;
   --animate-pop: pop 0.4s var(--ease-out) both;
   --animate-progress: progress-grow 0.9s var(--ease-out) both;
+  --animate-ring: ring-draw 1s var(--ease-out) both;
 }
 
 @keyframes fade-in {
@@ -130,10 +131,18 @@
 }
 
 /* Progress bars animate with a transform, not width, so the browser never
-   has to lay the page out again while one fills. */
+   has to lay the page out again while one fills. The bar slides in from the
+   left inside a clipped track (rather than stretching) so its rounded end
+   keeps its shape at every size. */
 @keyframes progress-grow {
   from {
-    transform: scaleX(0);
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes ring-draw {
+  from {
+    stroke-dashoffset: var(--ring-length);
   }
 }
 

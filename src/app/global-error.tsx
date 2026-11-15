@@ -26,9 +26,9 @@ export default function GlobalError({
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          background: "#14181c",
-          color: "#e7e9eb",
-          fontFamily: "sans-serif",
+          background: "#0a0c10",
+          color: "#f2f4f7",
+          fontFamily: "ui-sans-serif, system-ui, sans-serif",
           textAlign: "center",
           padding: "1rem",
         }}
@@ -42,12 +42,12 @@ export default function GlobalError({
           onClick={reset}
           style={{
             marginTop: "1.5rem",
-            borderRadius: "0.375rem",
+            borderRadius: "0.625rem",
             background: "#00e054",
             color: "#000",
             padding: "0.5rem 1rem",
             fontSize: "0.875rem",
-            fontWeight: 500,
+            fontWeight: 600,
             border: "none",
             cursor: "pointer",
           }}

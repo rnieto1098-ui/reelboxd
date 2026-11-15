@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { parseGenres } from "@/lib/movies";
+import { isReleased } from "@/lib/challengeStatus";
 import {
   discoverMovies,
   getGenres,
@@ -50,9 +51,14 @@ export async function getCrewFilmography(
   department: string | null
 ): Promise<(TmdbCastCredit | TmdbCrewCredit)[]> {
   const credits = await getPersonMovieCredits(personId).catch(() => ({ cast: [], crew: [] }));
-  return department
+  const all = department
     ? dedupeById(credits.crew.filter((c) => c.department === department))
     : dedupeById(credits.cast);
+  // Released films only. TMDB lists a person's announced and in-production
+  // work too, and counting those made "watch all of an active director's
+  // films" impossible to finish: there was always one that isn't out yet.
+  const today = new Date().toISOString().slice(0, 10);
+  return all.filter((c) => isReleased(c.release_date, today));
 }
 
 // A genre quota asks how many films of a genre you've seen, not when, so
@@ -86,15 +92,24 @@ async function timeframeCount(userId: string, startDate: Date, endDate: Date): P
 // single comma-joined string rather than a real relation, so this counts by
 // tallying in JS rather than a SQL group-by.
 export async function getGenreCounts(userId: string): Promise<Record<string, number>> {
-  const entries = await prisma.diaryEntry.findMany({
-    where: { userId },
-    select: { movie: { select: { genres: true } } },
-    distinct: ["movieId"],
-  });
+  // The same three signals genreCount (above) counts. This used to read the
+  // diary alone, so the form's "you've already seen N" preview disagreed
+  // with the progress the new challenge then started at.
+  const select = { movieId: true, movie: { select: { genres: true } } } as const;
+  const [logged, marked, rated] = await Promise.all([
+    prisma.diaryEntry.findMany({ where: { userId }, select, distinct: ["movieId"] }),
+    prisma.watchedItem.findMany({ where: { userId }, select }),
+    prisma.rating.findMany({ where: { userId }, select }),
+  ]);
+
+  const genresByMovie = new Map<string, string | null>();
+  for (const row of [...logged, ...marked, ...rated]) {
+    genresByMovie.set(row.movieId, row.movie.genres);
+  }
 
   const counts: Record<string, number> = {};
-  for (const entry of entries) {
-    for (const genre of parseGenres(entry.movie.genres)) {
+  for (const genres of genresByMovie.values()) {
+    for (const genre of parseGenres(genres)) {
       counts[genre] = (counts[genre] ?? 0) + 1;
     }
   }
@@ -381,7 +396,7 @@ const RECENT_WINDOW_DAYS = 30;
 // the next 30 days" time-frame goal. One candidate is picked per call,
 // weighted by how strongly it shows up in their diary, so clicking again
 // can surface something different each time.
-export async function generateRandomChallenge(userId: string): Promise<RandomChallengeInput> {
+export async function generateRandomChallenge(userId: string): Promise<RandomChallengeInput | null> {
   const [entries, existing, recentCount] = await Promise.all([
     prisma.diaryEntry.findMany({
       where: { userId },
@@ -390,7 +405,7 @@ export async function generateRandomChallenge(userId: string): Promise<RandomCha
     }),
     prisma.challenge.findMany({
       where: { userId },
-      select: { type: true, genreName: true, personId: true, department: true },
+      select: { type: true, genreName: true, personId: true, department: true, endDate: true },
     }),
     timeframeCount(
       userId,
@@ -399,6 +414,10 @@ export async function generateRandomChallenge(userId: string): Promise<RandomCha
     ),
   ]);
 
+  const rightNow = Date.now();
+  const hasRunningTimeframe = existing.some(
+    (c) => c.type === "TIMEFRAME" && c.endDate != null && c.endDate.getTime() >= rightNow
+  );
   const existingGenreNames = new Set(
     existing.filter((c) => c.type === "GENRE").map((c) => c.genreName)
   );
@@ -433,10 +452,15 @@ export async function generateRandomChallenge(userId: string): Promise<RandomCha
   const typeChoices: { item: "GENRE" | "CREW" | "TIMEFRAME"; weight: number }[] = [
     ...(genreCandidates.length > 0 ? [{ item: "GENRE" as const, weight: 2 }] : []),
     ...(crewCandidates.length > 0 ? [{ item: "CREW" as const, weight: 2 }] : []),
-    { item: "TIMEFRAME" as const, weight: 1 },
+    // Not while a date-range challenge is already running. This option used
+    // to be offered unconditionally, so a new account (no genres or
+    // directors to draw on yet) got an identical "Watch 3 movies" card on
+    // every press of the button.
+    ...(hasRunningTimeframe ? [] : [{ item: "TIMEFRAME" as const, weight: 1 }]),
   ];
 
-  const chosenType = pickWeighted(typeChoices) ?? "TIMEFRAME";
+  const chosenType = pickWeighted(typeChoices);
+  if (chosenType == null) return null;
 
   if (chosenType === "GENRE") {
     const genreName = pickWeighted(genreCandidates)!;
@@ -454,8 +478,13 @@ export async function generateRandomChallenge(userId: string): Promise<RandomCha
     };
   }
 
-  const startDate = new Date();
-  const endDate = new Date(startDate.getTime() + RECENT_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+  // Whole days, like a hand-made date-range challenge: midnight UTC today to
+  // the last millisecond of the final day. Using the instant the button was
+  // pressed left out a film synced or imported for today (stored at
+  // midnight, so before the start) and cut the final day short.
+  const now = new Date();
+  const startDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const endDate = new Date(startDate.getTime() + (RECENT_WINDOW_DAYS + 1) * 24 * 60 * 60 * 1000 - 1);
   return { type: "TIMEFRAME", startDate, endDate, target: Math.max(3, recentCount) };
 }
 

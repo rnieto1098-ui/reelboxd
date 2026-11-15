@@ -20,10 +20,10 @@ export default async function SettingsPage() {
 
   return (
     <div className="max-w-xl">
-      <h1 className="mb-6 text-2xl font-bold">Settings</h1>
+      <h1 className="page-title mb-6">Settings</h1>
 
-      <section className="mb-8 rounded-lg border border-border bg-surface p-4">
-        <h2 className="mb-3 text-lg font-semibold">Profile picture</h2>
+      <section className="card mb-8 p-5">
+        <h2 className="section-title mb-3">Profile picture</h2>
         <div className="flex items-center gap-4">
           <div className="h-14 w-14 shrink-0 overflow-hidden rounded-full border border-border bg-background">
             {user?.image ? (
@@ -44,8 +44,8 @@ export default async function SettingsPage() {
         </div>
       </section>
 
-      <section className="mb-8 rounded-lg border border-border bg-surface p-4">
-        <h2 className="mb-3 text-lg font-semibold">Site background</h2>
+      <section className="card mb-8 p-5">
+        <h2 className="section-title mb-3">Site background</h2>
         <p className="mb-3 text-sm text-muted">
           By default each tab has its own backdrop. Pick one to use it everywhere instead.
         </p>
@@ -70,21 +70,21 @@ export default async function SettingsPage() {
         </div>
       </section>
 
-      <section className="mb-8 rounded-lg border border-border bg-surface p-4">
-        <h2 className="mb-3 text-lg font-semibold">Username</h2>
+      <section className="card mb-8 p-5">
+        <h2 className="section-title mb-3">Username</h2>
         <ChangeUsernameForm currentUsername={session.user.name} />
       </section>
 
-      <section className="mb-8 rounded-lg border border-border bg-surface p-4">
-        <h2 className="mb-3 text-lg font-semibold">Password</h2>
+      <section className="card mb-8 p-5">
+        <h2 className="section-title mb-3">Password</h2>
         <ChangePasswordForm />
       </section>
 
-      <section className="rounded-lg border border-border bg-surface p-4">
-        <h2 className="mb-3 text-lg font-semibold">Data &amp; privacy</h2>
+      <section className="card p-5">
+        <h2 className="section-title mb-3">Data &amp; privacy</h2>
         <p className="mb-3 text-sm text-muted">
           Download a .zip of your ratings, watchlist, and diary as CSV files — the same format{" "}
-          <a href="/import" className="text-accent-green hover:underline">
+          <a href="/import" className="font-medium text-accent-green underline-offset-2 hover:underline">
             Import
           </a>{" "}
           reads, so it doubles as a backup you can restore from.
@@ -97,11 +97,11 @@ export default async function SettingsPage() {
         </a>
         <p className="mt-4 text-sm text-muted">
           See our{" "}
-          <a href="/privacy" className="text-accent-green hover:underline">
+          <a href="/privacy" className="font-medium text-accent-green underline-offset-2 hover:underline">
             Privacy Policy
           </a>{" "}
           for what we collect and how it&apos;s used, or the{" "}
-          <a href="/terms" className="text-accent-green hover:underline">
+          <a href="/terms" className="font-medium text-accent-green underline-offset-2 hover:underline">
             Terms of Service
           </a>
           .

@@ -78,7 +78,7 @@ export function AvailabilityFilterLinks({
       {(streamingOnly || offOnly) && !canFilterByAvailability && (
         <span className={c.hint}>
           You haven&apos;t added any services or marked anything as owned yet —{" "}
-          <Link href="/streaming" className="text-accent-green hover:underline">
+          <Link href="/streaming" className="font-medium text-accent-green underline-offset-2 hover:underline">
             add your services here
           </Link>
           .

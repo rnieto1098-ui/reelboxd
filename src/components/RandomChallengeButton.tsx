@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Dices } from "lucide-react";
 import { useToast } from "@/components/Toast";
 
 export function RandomChallengeButton() {
@@ -32,18 +33,14 @@ export function RandomChallengeButton() {
       return;
     }
 
-    showToast(`🎲 ${body.title}`);
+    showToast(`New challenge: ${body.title}`);
     router.refresh();
   }
 
   return (
-    <button
-      type="button"
-      onClick={generate}
-      disabled={saving}
-      className="rounded-md border border-border px-3 py-1.5 text-sm text-muted hover:text-foreground hover:border-accent-green transition-colors disabled:opacity-50"
-    >
-      {saving ? "Rolling..." : "🎲 Random challenge"}
+    <button type="button" onClick={generate} disabled={saving} className="btn btn-secondary">
+      <Dices aria-hidden className={`h-4 w-4 ${saving ? "animate-spin" : ""}`} />
+      {saving ? "Rolling…" : "Surprise me"}
     </button>
   );
 }

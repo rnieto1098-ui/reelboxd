@@ -70,27 +70,27 @@ export function CreateListForm() {
         onChange={(e) => setTitle(e.target.value)}
         placeholder="List name"
         autoFocus
-        className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm placeholder:text-muted focus:outline-none focus:border-accent-green"
+        className="input"
       />
       <textarea
         value={description}
         onChange={(e) => setDescription(e.target.value)}
         placeholder="Description (optional)"
         rows={2}
-        className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm placeholder:text-muted focus:outline-none focus:border-accent-green"
+        className="input"
       />
       <input
         type="text"
         value={tags}
         onChange={(e) => setTags(e.target.value)}
         placeholder="Tags, comma separated (optional)"
-        className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm placeholder:text-muted focus:outline-none focus:border-accent-green"
+        className="input"
       />
       <div className="flex gap-2">
         <button
           type="submit"
           disabled={saving || !title.trim()}
-          className="rounded-md bg-accent-green px-3 py-1.5 text-sm font-medium text-black hover:opacity-90 disabled:opacity-50"
+          className="btn btn-primary btn-sm"
         >
           {saving ? "Creating..." : "Create"}
         </button>

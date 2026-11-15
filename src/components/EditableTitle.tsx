@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Pencil } from "lucide-react";
 import { useToast } from "@/components/Toast";
 
 // Rename-in-place for anything the owner titled themselves. Shared by
@@ -115,21 +116,22 @@ export function EditableTitle({
           }}
           maxLength={100}
           disabled={saving}
-          className={`min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-1 focus:border-accent-green focus:outline-none disabled:opacity-50 ${className}`}
+          aria-label="Title"
+          className={`input min-w-0 flex-1 py-1 disabled:opacity-50 ${className}`}
         />
         <button
           type="button"
           onClick={save}
           disabled={saving}
-          className="shrink-0 text-xs text-accent-green hover:underline disabled:opacity-50"
+          className="btn btn-primary btn-sm shrink-0"
         >
-          {saving ? "..." : "Save"}
+          {saving ? "Saving…" : "Save"}
         </button>
         <button
           type="button"
           onClick={cancel}
           disabled={saving}
-          className="shrink-0 text-xs text-muted hover:text-foreground"
+          className="btn btn-ghost btn-sm shrink-0"
         >
           Cancel
         </button>
@@ -143,9 +145,11 @@ export function EditableTitle({
       <button
         type="button"
         onClick={() => setEditing(true)}
-        className="shrink-0 text-xs text-muted hover:text-foreground"
+        aria-label={`Rename "${title}"`}
+        title="Rename"
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-subtle transition-colors hover:bg-white/[0.07] hover:text-foreground"
       >
-        Edit
+        <Pencil aria-hidden className="h-3.5 w-3.5" />
       </button>
     </div>
   );

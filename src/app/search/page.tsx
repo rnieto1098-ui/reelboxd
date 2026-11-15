@@ -47,7 +47,7 @@ export default async function SearchPage({
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-bold">
+      <h1 className="page-title mb-6">
         {query ? `Results for "${query}"` : "Search"}
       </h1>
 
@@ -73,7 +73,7 @@ export default async function SearchPage({
         </div>
       )}
 
-      {people.length > 0 && <h2 className="mb-3 text-lg font-semibold">Movies</h2>}
+      {people.length > 0 && <h2 className="section-title mb-3">Movies</h2>}
 
       {!query ? (
         <p className="text-muted">Search for a movie or person to get started.</p>

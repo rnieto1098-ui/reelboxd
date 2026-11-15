@@ -206,7 +206,7 @@ export function PosterQuickActions({
 
     if (!wasWatched) {
       for (const challenge of body?.completedChallenges ?? []) {
-        showToast(`🎉 Challenge complete: ${challenge.title}`);
+        showToast(`Challenge complete: ${challenge.title}`, "celebrate");
       }
     } else if (body?.stillWatchedBecause === "diary") {
       showToast("Still watched — it's logged in your diary.");

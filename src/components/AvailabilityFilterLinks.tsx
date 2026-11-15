@@ -13,13 +13,13 @@ const VARIANT_CLASSES: Record<
   sm: {
     wrapper: "flex flex-wrap items-center gap-3 text-sm",
     label: "text-muted",
-    link: "rounded-full px-3 py-1 transition-colors",
+    link: "rounded-full px-3 py-1 transition-colors pointer-coarse:py-2",
     hint: "text-xs text-muted",
   },
   xs: {
     wrapper: "flex flex-wrap items-center gap-1 text-xs",
     label: "mr-1 text-muted",
-    link: "rounded-full px-2.5 py-1 transition-colors",
+    link: "rounded-full px-2.5 py-1 transition-colors pointer-coarse:px-3 pointer-coarse:py-2",
     hint: "text-muted",
   },
 };

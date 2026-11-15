@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import { NavIcon, type NavIconName } from "@/components/NavIcon";
 import { isActivePath } from "@/components/NavLinks";
+import { InstallAppMenuItem } from "@/components/InstallApp";
 
 export type MobileNavItem = { href: string; label: string; icon: NavIconName };
 
@@ -49,7 +50,9 @@ export function MobileNav({ items }: { items: MobileNavItem[] }) {
         onClick={() => setOpen(true)}
         aria-label="Open menu"
         aria-expanded={open}
-        className="-ml-2 flex h-10 w-10 items-center justify-center rounded-lg text-muted transition-colors hover:bg-white/5 hover:text-foreground lg:hidden"
+        // In the installed app a deep page shows Back here instead (see
+        // AppBackButton); the menu stays one tap away on every tab-bar page.
+        className="-ml-2 flex h-10 w-10 items-center justify-center rounded-lg text-muted transition-colors hover:bg-white/5 hover:text-foreground lg:hidden standalone:[[data-app-back]+&]:hidden"
       >
         <Menu aria-hidden className="h-5 w-5" />
       </button>
@@ -65,7 +68,7 @@ export function MobileNav({ items }: { items: MobileNavItem[] }) {
           />
           <nav
             ref={panelRef}
-            className="absolute inset-y-0 left-0 flex w-72 max-w-[85%] animate-slide-in-left flex-col border-r border-border bg-surface shadow-pop"
+            className="absolute inset-y-0 left-0 flex w-72 max-w-[85%] animate-slide-in-left flex-col border-r border-border bg-surface pl-[env(safe-area-inset-left)] pt-[env(safe-area-inset-top)] shadow-pop"
           >
             <div className="flex h-[var(--header-height)] shrink-0 items-center justify-between border-b border-border px-4">
               <span className="flex items-center gap-2 font-[family-name:var(--font-display)] text-lg font-bold tracking-tight">
@@ -103,6 +106,8 @@ export function MobileNav({ items }: { items: MobileNavItem[] }) {
                 );
               })}
             </div>
+            {/* Renders nothing unless this device can install the app. */}
+            <InstallAppMenuItem />
           </nav>
         </div>
       )}

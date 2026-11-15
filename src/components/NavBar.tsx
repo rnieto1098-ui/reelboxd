@@ -8,6 +8,7 @@ import { getSiteSettings } from "@/lib/siteSettings";
 import { SearchBox } from "@/components/SearchBox";
 import { MobileNav, type MobileNavItem } from "@/components/MobileNav";
 import { NavLinks, type NavItem } from "@/components/NavLinks";
+import { AppBackButton } from "@/components/AppBackButton";
 
 export async function NavBar() {
   const session = await auth();
@@ -60,9 +61,12 @@ export async function NavBar() {
 
   return (
     <>
-      <header className="sticky top-0 z-40 border-b border-white/[0.06] bg-background/80 backdrop-blur-xl">
+      {/* pt keeps the bar below the notch and status bar when the site runs
+          full screen as an installed app. */}
+      <header className="sticky top-0 z-40 border-b border-white/[0.06] bg-background/80 pt-[env(safe-area-inset-top)] backdrop-blur-xl">
         <div className="container-page flex h-[var(--header-height)] items-center gap-3 lg:gap-6">
           <div className="flex shrink-0 items-center gap-1.5">
+            <AppBackButton />
             <MobileNav items={mobileNavItems} />
             <Link
               href="/"

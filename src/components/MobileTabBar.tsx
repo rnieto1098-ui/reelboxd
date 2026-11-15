@@ -34,7 +34,7 @@ export function MobileTabBar({ username }: { username: string | null }) {
       aria-label="Quick navigation"
       // env(safe-area-inset-bottom) keeps the bar clear of the iPhone home
       // indicator.
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-white/[0.06] bg-background/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 select-none border-t border-white/[0.06] bg-background/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden"
     >
       <ul className="mx-auto flex max-w-lg">
         {tabs.map((tab) => {
@@ -44,11 +44,28 @@ export function MobileTabBar({ username }: { username: string | null }) {
               <Link
                 href={tab.href}
                 aria-current={active ? "page" : undefined}
-                className={`flex h-14 flex-col items-center justify-center gap-0.5 text-[10.5px] font-medium transition-colors ${
+                // Tapping the tab you're already on goes back to the top of
+                // the page, as it does in a phone's own apps.
+                onClick={(e) => {
+                  if (pathname !== tab.href) return;
+                  e.preventDefault();
+                  const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+                  window.scrollTo({ top: 0, behavior: calm ? "auto" : "smooth" });
+                }}
+                className={`group relative flex h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium transition-colors ${
                   active ? "text-accent-green" : "text-muted hover:text-foreground"
                 }`}
               >
-                <NavIcon name={tab.icon} className="h-[22px] w-[22px]" />
+                {active && (
+                  <span
+                    aria-hidden
+                    className="absolute top-0 h-0.5 w-8 animate-fade-in rounded-full bg-accent-green"
+                  />
+                )}
+                <NavIcon
+                  name={tab.icon}
+                  className="h-[22px] w-[22px] transition-transform duration-150 group-active:scale-90"
+                />
                 {tab.label}
               </Link>
             </li>

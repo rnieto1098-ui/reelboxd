@@ -28,7 +28,7 @@ export function SortChips<K extends string>({
           <Link
             key={key}
             href={hrefFor(key, nextDir)}
-            className={`rounded-full px-2.5 py-1 transition-colors ${
+            className={`rounded-full px-2.5 py-1 transition-colors pointer-coarse:px-3 pointer-coarse:py-2 ${
               isActive ? "bg-accent-green text-black" : "text-muted hover:text-foreground"
             }`}
           >

@@ -329,7 +329,7 @@ export default async function MovieDetailPage({
                 </p>
               )}
             </div>
-            <div className="mt-4 flex flex-wrap gap-2 border-t border-border pt-4">
+            <div className="mt-4 grid grid-cols-2 gap-2 border-t border-border pt-4 sm:flex sm:flex-wrap">
               <WatchedButton tmdbId={tmdbId} initialWatched={isWatched} signedIn={signedIn} />
               <LikeButton
                 tmdbId={tmdbId}

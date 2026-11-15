@@ -8,6 +8,7 @@ import {
   Palette,
   RefreshCw,
   ShieldCheck,
+  Smartphone,
   Tv,
   UserRound,
   type LucideIcon,
@@ -22,6 +23,7 @@ import { ProfileImageUpload } from "@/components/ProfileImageUpload";
 import { BackgroundPicker } from "@/components/BackgroundPicker";
 import { LetterboxdSyncCard } from "@/components/LetterboxdSyncCard";
 import { DeleteAccountForm } from "@/components/DeleteAccountForm";
+import { InstallAppCard } from "@/components/InstallApp";
 import { SignOutEverywhereButton } from "@/components/SignOutEverywhereButton";
 import { pickerSelection, resolveBackground } from "@/lib/backgrounds";
 
@@ -30,6 +32,7 @@ export const metadata: Metadata = { title: "Settings" };
 const SECTIONS: { id: string; label: string; icon: LucideIcon }[] = [
   { id: "profile", label: "Profile", icon: UserRound },
   { id: "appearance", label: "Appearance", icon: Palette },
+  { id: "app", label: "Get the app", icon: Smartphone },
   { id: "streaming", label: "Streaming services", icon: Tv },
   { id: "sync", label: "Import and sync", icon: RefreshCw },
   { id: "account", label: "Sign-in and security", icon: ShieldCheck },
@@ -186,6 +189,10 @@ export default async function SettingsPage() {
                 hasImage={background.kind === "upload"}
               />
             </div>
+          </Section>
+
+          <Section id="app" title="Get the app">
+            <InstallAppCard />
           </Section>
 
           <Section

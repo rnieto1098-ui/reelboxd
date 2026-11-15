@@ -162,7 +162,7 @@ export function SearchBox() {
           onChange={(e) => handleChange(e.target.value)}
           onFocus={() => setOpen(true)}
           onKeyDown={handleKeyDown}
-          placeholder="Search films, people…"
+          placeholder="Search films…"
           aria-label="Search films and people"
           role="combobox"
           aria-expanded={showDropdown}
@@ -199,7 +199,7 @@ export function SearchBox() {
           // On phones the box itself is narrow, so the suggestions span the
           // screen under the header instead of hanging off the box (where
           // they ran past the right edge).
-          className="fixed inset-x-3 top-[calc(var(--header-height)+0.25rem)] z-50 animate-scale-in overflow-hidden rounded-xl border border-border-strong bg-surface-raised shadow-pop sm:absolute sm:inset-x-0 sm:top-full sm:mt-2 sm:min-w-[20rem] sm:origin-top"
+          className="fixed inset-x-3 top-[calc(var(--header-height)+env(safe-area-inset-top)+0.25rem)] z-50 animate-scale-in overflow-hidden rounded-xl border border-border-strong bg-surface-raised shadow-pop sm:absolute sm:inset-x-0 sm:top-full sm:mt-2 sm:min-w-[20rem] sm:origin-top"
         >
           {status === "loading" && <p className="px-3 py-2.5 text-sm text-muted">Searching…</p>}
           {status === "error" && (

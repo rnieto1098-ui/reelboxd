@@ -276,27 +276,27 @@ export default async function ProfilePage({
             {user._count.owned} owned ·{" "}
             {user._count.diaryEntries} logged
           </p>
-          <div className="mt-1 flex gap-3 text-xs">
+          <div className="mt-2.5 flex flex-wrap gap-2">
             <Link
               href={`/profile/${username}/diary`}
-              className="font-medium text-accent-green underline-offset-2 hover:underline"
+              className="chip hover:border-accent-green hover:text-accent-green"
             >
               Diary
             </Link>
             <Link
               href={`/profile/${username}/stats`}
-              className="font-medium text-accent-green underline-offset-2 hover:underline"
+              className="chip hover:border-accent-green hover:text-accent-green"
             >
               Stats
             </Link>
             <Link
               href={`/profile/${username}/year`}
-              className="font-medium text-accent-green underline-offset-2 hover:underline"
+              className="chip hover:border-accent-green hover:text-accent-green"
             >
               Year in Review
             </Link>
             {isOwnProfile && (
-              <Link href="/challenges" className="font-medium text-accent-green underline-offset-2 hover:underline">
+              <Link href="/challenges" className="chip hover:border-accent-green hover:text-accent-green">
                 Challenges
               </Link>
             )}

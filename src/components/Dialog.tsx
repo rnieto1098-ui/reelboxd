@@ -88,11 +88,30 @@ export function Dialog({
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
-      className={`m-auto w-[calc(100vw-1.5rem)] ${SIZES[size]} max-h-[calc(100dvh-2rem)] animate-scale-in overflow-hidden rounded-2xl border border-border-strong bg-surface-raised p-0 text-foreground shadow-pop backdrop:bg-black/75 backdrop:backdrop-blur-sm`}
+      // On phones an ordinary dialog becomes a sheet that slides up from the
+      // bottom edge, where a thumb can reach its buttons. `bare` ones (the
+      // trailer player) stay centred.
+      className={`m-auto w-[calc(100vw-1.5rem)] ${SIZES[size]} max-h-[calc(100dvh-2rem)] animate-scale-in overflow-hidden rounded-2xl border border-border-strong bg-surface-raised p-0 text-foreground shadow-pop backdrop:bg-black/75 backdrop:backdrop-blur-sm ${
+        bare
+          ? ""
+          : "max-sm:mb-0 max-sm:w-full max-sm:max-w-none max-sm:animate-sheet-up max-sm:rounded-b-none max-sm:border-x-0 max-sm:border-b-0 max-sm:max-h-[calc(100dvh-env(safe-area-inset-top)-2.5rem)]"
+      }`}
     >
-      <div className="flex max-h-[calc(100dvh-2rem)] flex-col">
+      <div
+        className={`flex max-h-[calc(100dvh-2rem)] flex-col ${
+          bare
+            ? ""
+            : "max-sm:max-h-[calc(100dvh-env(safe-area-inset-top)-2.5rem)] max-sm:pb-[env(safe-area-inset-bottom)]"
+        }`}
+      >
         {!bare && (
-          <header className="flex shrink-0 items-center justify-between gap-4 border-b border-border px-5 py-3.5">
+          <span
+            aria-hidden
+            className="mx-auto mt-2 h-1 w-9 shrink-0 rounded-full bg-white/20 sm:hidden"
+          />
+        )}
+        {!bare && (
+          <header className="flex shrink-0 items-center justify-between gap-4 border-b border-border px-5 py-3 sm:py-3.5">
             <h2 className={hideTitle ? "sr-only" : "section-title truncate"}>{title}</h2>
             <button
               type="button"
@@ -118,7 +137,7 @@ export function Dialog({
           {children}
         </div>
         {footer && (
-          <footer className="flex shrink-0 justify-end gap-2 border-t border-border px-5 py-3">
+          <footer className="flex shrink-0 justify-end gap-2 border-t border-border px-5 py-3 max-sm:[&>*]:flex-1">
             {footer}
           </footer>
         )}

@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* `standalone:` styles apply only when the site is running as an installed
+   app (opened from the home screen, with no browser toolbar). */
+@custom-variant standalone (@media (display-mode: standalone));
+
 /* ---------------------------------------------------------------------------
    Design tokens. Every colour, radius and motion value the app uses comes
    from here, so a component that only says `bg-surface` or `border-border`
@@ -71,6 +75,7 @@
   --animate-scale-in: scale-in 0.2s var(--ease-out) both;
   --animate-slide-in-left: slide-in-left 0.28s var(--ease-out) both;
   --animate-slide-up: slide-up 0.28s var(--ease-out) both;
+  --animate-sheet-up: sheet-up 0.32s var(--ease-out) both;
   --animate-shimmer: shimmer 1.6s linear infinite;
   --animate-pop: pop 0.4s var(--ease-out) both;
   --animate-progress: progress-grow 0.9s var(--ease-out) both;
@@ -107,6 +112,13 @@
   from {
     opacity: 0;
     transform: translateY(16px);
+  }
+}
+
+/* A bottom sheet rising from the edge of a phone screen. */
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
   }
 }
 
@@ -161,8 +173,25 @@
    Base
 --------------------------------------------------------------------------- */
 html {
-  scroll-padding-top: calc(var(--header-height) + 16px);
+  scroll-padding-top: calc(var(--header-height) + env(safe-area-inset-top, 0px) + 16px);
   -webkit-text-size-adjust: 100%;
+  /* The grey flash phones paint over anything tapped. Buttons and cards
+     have their own pressed state instead. */
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Tells phones a double tap here isn't a zoom, so the first tap acts
+   immediately instead of waiting to see if a second one follows. */
+a,
+button,
+summary,
+label,
+select,
+input,
+textarea,
+[role="button"],
+[role="slider"] {
+  touch-action: manipulation;
 }
 
 body {
@@ -260,10 +289,14 @@ select:focus-visible {
   margin-inline: auto;
   width: 100%;
   max-width: 1600px;
-  padding-inline: 1rem;
+  /* max() keeps content out from under the notch when a phone is held
+     sideways; everywhere else the inset is zero and the rem value wins. */
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
 
   @media (min-width: 640px) {
-    padding-inline: 1.5rem;
+    padding-left: max(1.5rem, env(safe-area-inset-left));
+    padding-right: max(1.5rem, env(safe-area-inset-right));
   }
 
   @media (min-width: 1024px) {
@@ -309,8 +342,10 @@ select:focus-visible {
   background: var(--accent-green);
   color: #04130a;
 
-  &:hover:not(:disabled) {
-    background: #2bef74;
+  @media (hover: hover) {
+    &:hover:not(:disabled) {
+      background: #2bef74;
+    }
   }
 }
 
@@ -319,9 +354,11 @@ select:focus-visible {
   border-color: rgba(255, 255, 255, 0.1);
   color: var(--foreground);
 
-  &:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.14);
-    border-color: rgba(255, 255, 255, 0.18);
+  @media (hover: hover) {
+    &:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.14);
+      border-color: rgba(255, 255, 255, 0.18);
+    }
   }
 }
 
@@ -331,8 +368,10 @@ select:focus-visible {
   background: var(--accent-green-soft);
   color: var(--accent-green);
 
-  &:hover:not(:disabled) {
-    background: rgba(0, 224, 84, 0.2);
+  @media (hover: hover) {
+    &:hover:not(:disabled) {
+      background: rgba(0, 224, 84, 0.2);
+    }
   }
 }
 
@@ -340,18 +379,22 @@ select:focus-visible {
   border-color: var(--border-strong);
   color: var(--foreground);
 
-  &:hover:not(:disabled) {
-    border-color: var(--accent-green);
-    color: var(--accent-green);
+  @media (hover: hover) {
+    &:hover:not(:disabled) {
+      border-color: var(--accent-green);
+      color: var(--accent-green);
+    }
   }
 }
 
 @utility btn-ghost {
   color: var(--muted);
 
-  &:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.06);
-    color: var(--foreground);
+  @media (hover: hover) {
+    &:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--foreground);
+    }
   }
 }
 
@@ -359,9 +402,11 @@ select:focus-visible {
   border-color: rgba(255, 92, 92, 0.4);
   color: var(--danger);
 
-  &:hover:not(:disabled) {
-    background: rgba(255, 92, 92, 0.12);
-    border-color: var(--danger);
+  @media (hover: hover) {
+    &:hover:not(:disabled) {
+      background: rgba(255, 92, 92, 0.12);
+      border-color: var(--danger);
+    }
   }
 }
 
@@ -390,10 +435,16 @@ select:focus-visible {
     background-color 0.2s ease,
     transform 0.25s var(--ease-out);
 
-  &:hover {
-    border-color: var(--border-strong);
-    background: var(--surface-raised);
-    transform: translateY(-2px);
+  &:active {
+    transform: scale(0.985);
+  }
+
+  @media (hover: hover) {
+    &:hover {
+      border-color: var(--border-strong);
+      background: var(--surface-raised);
+      transform: translateY(-2px);
+    }
   }
 }
 
@@ -415,8 +466,10 @@ select:focus-visible {
     color: var(--subtle);
   }
 
-  &:hover {
-    border-color: #46515f;
+  @media (hover: hover) {
+    &:hover {
+      border-color: #46515f;
+    }
   }
 
   &:focus,
@@ -562,6 +615,46 @@ select:focus-visible {
     rgba(10, 12, 16, 0.1) 70%,
     transparent 100%
   );
+}
+
+/* ---------------------------------------------------------------------------
+   Touch screens. Written as plain rules (outside Tailwind's layers) so they
+   apply on top of whatever size a component asked for.
+--------------------------------------------------------------------------- */
+@media (pointer: coarse) {
+  /* iPhones zoom the whole page in when a field with text smaller than 16px
+     is focused, and don't zoom back out. */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  /* Big enough to hit with a thumb. */
+  .btn {
+    min-height: 2.75rem;
+  }
+
+  .btn.btn-sm {
+    min-height: 2.25rem;
+    padding-inline: 0.875rem;
+  }
+
+  .chip {
+    min-height: 2rem;
+    padding-inline: 0.875rem;
+  }
+}
+
+/* In the installed app, the bars at the top and bottom behave like an app's:
+   a long press doesn't select their text or pop up a link preview. */
+@media (display-mode: standalone) {
+  header,
+  nav {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
 }
 
 /* ---------------------------------------------------------------------------

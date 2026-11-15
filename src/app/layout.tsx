@@ -10,6 +10,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { SITE_URL } from "@/lib/siteUrl";
 import { PageBackground } from "@/components/PageBackground";
+import { ServiceWorker } from "@/components/ServiceWorker";
 
 // Self-hosted by next/font at build time: no request to Google from the
 // visitor's browser, and no layout shift while the font loads.
@@ -28,6 +29,12 @@ export const metadata: Metadata = {
   title: { default: TITLE, template: `%s · ${TITLE}` },
   description: DESCRIPTION,
   applicationName: TITLE,
+  // For iPhones and iPads, which read these instead of the web manifest
+  // when the site is added to the Home Screen. "black-translucent" lets the
+  // page draw under the status bar; the header pads itself clear of it.
+  appleWebApp: { capable: true, title: TITLE, statusBarStyle: "black-translucent" },
+  // Stops iOS turning strings of digits (years, counts) into phone links.
+  formatDetection: { telephone: false },
   openGraph: {
     title: TITLE,
     description: DESCRIPTION,
@@ -45,6 +52,9 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   themeColor: "#0a0c10",
   colorScheme: "dark",
+  // Lets the page run edge to edge on phones with a notch; the header, tab
+  // bar and side padding then keep clear of it with env(safe-area-inset-*).
+  viewportFit: "cover",
 };
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
@@ -75,11 +85,15 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           <RewatchIdsProvider ids={rewatchTmdbIds}>
             <NavBar />
             {/* pb on small screens leaves room for the fixed tab bar. */}
-            <main id="main" className="container-page flex-1 py-8 pb-24 lg:pb-12">
+            <main
+              id="main"
+              className="container-page flex-1 py-6 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:py-8 lg:pb-12"
+            >
               {children}
             </main>
             <Footer />
             <MobileTabBar username={session?.user?.name ?? null} />
+            <ServiceWorker />
           </RewatchIdsProvider>
         </ToastProvider>
       </body>

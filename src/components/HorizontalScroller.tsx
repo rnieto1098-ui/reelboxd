@@ -165,7 +165,10 @@ export function HorizontalScroller({
               a scrolling container would otherwise clip. */}
           <div
             ref={scrollerRef}
-            className="no-scrollbar -mx-4 -my-2 flex gap-3 overflow-x-auto px-4 py-2 sm:-mx-6 sm:gap-4 sm:px-6 lg:-mx-10 lg:px-10"
+            // Snapping lets a swipe come to rest with a poster lined up at the
+            // edge; overscroll-x-contain stops a swipe at the end of the row
+            // from turning into the browser's "go back" gesture.
+            className="no-scrollbar -mx-4 -my-2 flex snap-x snap-proximity scroll-px-4 gap-3 overflow-x-auto overscroll-x-contain px-4 py-2 sm:-mx-6 sm:scroll-px-6 sm:gap-4 sm:px-6 lg:-mx-10 lg:scroll-px-10 lg:px-10 [&>*]:snap-start"
           >
             {children}
           </div>

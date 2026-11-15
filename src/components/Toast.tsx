@@ -74,7 +74,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       {confettiKey > 0 && <Confetti key={confettiKey} />}
       {/* bottom-20 on small screens clears the fixed tab bar. Errors are
           announced immediately (role="alert"); the rest wait their turn. */}
-      <div className="pointer-events-none fixed inset-x-4 bottom-20 z-[60] flex flex-col items-center gap-2 sm:inset-x-auto sm:right-5 sm:items-end lg:bottom-5">
+      <div className="pointer-events-none fixed inset-x-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-[60] flex flex-col items-center gap-2 sm:inset-x-auto sm:right-5 sm:items-end lg:bottom-5">
         {toasts.map((t) => (
           <div
             key={t.id}

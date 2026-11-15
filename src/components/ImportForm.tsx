@@ -9,6 +9,7 @@ type ImportSummary = {
   watchlistImported: number;
   watchlistSkippedWatched: number;
   diaryImported: number;
+  skippedBadDates?: number;
   unmatched: { title: string; year: string }[];
   completedChallenges: { id: string; title: string }[];
   completedGoal: { year: number; target: number } | null;
@@ -101,6 +102,14 @@ export function ImportForm() {
             </p>
           )}
 
+          {(summary.skippedBadDates ?? 0) > 0 && (
+            <p className="mt-2 text-sm text-muted">
+              Skipped {summary.skippedBadDates} diary{" "}
+              {summary.skippedBadDates === 1 ? "entry" : "entries"} whose date couldn&apos;t be
+              read. This usually means the file was opened and re-saved in a spreadsheet, which
+              rewrites dates. Importing the original .zip from Letterboxd avoids it.
+            </p>
+          )}
           {summary.unmatched.length > 0 && (
             <div>
               <p className="text-sm text-muted">

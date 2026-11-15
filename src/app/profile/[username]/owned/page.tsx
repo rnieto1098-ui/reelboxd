@@ -7,6 +7,7 @@ import { getUserWatchlistedTmdbIds } from "@/lib/movies";
 import { getWatchedTmdbIds } from "@/lib/recommendations";
 import { OwnedMovieGrid, type OwnedGridEntry } from "@/components/OwnedMovieGrid";
 import { Pagination } from "@/components/Pagination";
+import { getUserOwnedTmdbIds } from "@/lib/streaming";
 
 // A collection has no natural ceiling, and this page used to load every row
 // (each with its full Movie join) into one response and one DOM. Paged so
@@ -30,7 +31,8 @@ export default async function OwnedMoviesPage({
   const requestedPage = Number(pageParam);
   const page = Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
 
-  const [owned, totalCount, watchlistedTmdbIds, watchedTmdbIds] = await Promise.all([
+  const isOwnCollection = session?.user?.id === user.id;
+  const [owned, totalCount, watchlistedTmdbIds, watchedTmdbIds, viewerOwnedTmdbIds] = await Promise.all([
     prisma.ownedItem.findMany({
       where: { userId: user.id },
       include: { movie: true },
@@ -44,6 +46,11 @@ export default async function OwnedMoviesPage({
     // state reflects whoever is looking, not whoever the page belongs to.
     getUserWatchlistedTmdbIds(session?.user?.id),
     getWatchedTmdbIds(session?.user?.id),
+    // Every poster here used to show as "owned" to whoever was looking,
+    // because the grid assumed the viewer was the collection's owner. On
+    // someone else's page that lit the button for films the viewer doesn't
+    // own, and clicking it sent a "remove from owned" for their own account.
+    isOwnCollection ? Promise.resolve(null) : getUserOwnedTmdbIds(session?.user?.id),
   ]);
 
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
@@ -59,6 +66,7 @@ export default async function OwnedMoviesPage({
     title: o.movie.title,
     posterPath: posterOverrides.get(o.movie.tmdbId) ?? o.movie.posterPath,
     year: o.movie.releaseDate?.slice(0, 4),
+    owned: viewerOwnedTmdbIds ? viewerOwnedTmdbIds.has(o.movie.tmdbId) : true,
     inWatchlist: watchlistedTmdbIds.has(o.movie.tmdbId),
     watched: watchedTmdbIds.has(o.movie.tmdbId),
   }));
@@ -71,7 +79,7 @@ export default async function OwnedMoviesPage({
       >
         ← {username}
       </Link>
-      <h1 className="mt-1 text-2xl font-bold">{username}&apos;s Owned Movies</h1>
+      <h1 className="page-title mt-1">{username}&apos;s owned films</h1>
       <p className="mb-8 text-sm text-muted">
         {totalCount} movie{totalCount === 1 ? "" : "s"} owned
       </p>

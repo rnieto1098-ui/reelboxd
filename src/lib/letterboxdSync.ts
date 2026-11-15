@@ -184,7 +184,14 @@ export async function syncLetterboxdDiary(
       summary.likesImported++;
     }
 
-    await prisma.letterboxdSyncItem.create({ data: { userId, guid: entry.guid } });
+    // upsert, not create: a manual "Sync now" overlapping the daily job (or a
+    // double-click) reaches this for the same entry twice, and the second
+    // create failed on the unique constraint and aborted the sync.
+    await prisma.letterboxdSyncItem.upsert({
+      where: { userId_guid: { userId, guid: entry.guid } },
+      update: {},
+      create: { userId, guid: entry.guid },
+    });
   }
 
   summary.completedChallenges = await diffNewlyCompletedChallenges(

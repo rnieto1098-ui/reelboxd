@@ -101,7 +101,11 @@ export async function getTopPeopleStats(userId: string): Promise<TopPeopleStats>
     .slice(0, BACKFILL_CAP);
   for (let i = 0; i < needsBackfill.length; i += BACKFILL_CONCURRENCY) {
     const batch = needsBackfill.slice(i, i + BACKFILL_CONCURRENCY);
-    const updated = await Promise.all(batch.map((m) => backfillMovieCredits(m)));
+    // A failed lookup keeps the row as it is (it is retried on a later
+    // visit) instead of failing the whole stats page.
+    const updated = await Promise.all(
+      batch.map((m) => backfillMovieCredits(m).catch(() => m))
+    );
     for (const m of updated) byMovieId.set(m.id, m);
   }
 

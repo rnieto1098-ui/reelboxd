@@ -9,7 +9,10 @@ import {
   hasStreamingAvailability,
 } from "@/lib/streaming";
 import { getUserWatchlistedTmdbIds } from "@/lib/movies";
+import { Check } from "lucide-react";
 import { formatTimeLeft } from "@/lib/dates";
+import { challengeStatus } from "@/lib/challengeStatus";
+import { ProgressBar } from "@/components/Progress";
 import {
   getChallengeSuggestions,
   getCrewFilmography,
@@ -71,6 +74,8 @@ export default async function ChallengeDetailPage({
   let credits: CreditDisplay[];
   let target: number | null = challenge.target;
   let subtitle: string;
+  // How many films count so far, for the progress bar in the header.
+  let progressCount = 0;
 
   if (challenge.type === "CREW" && challenge.personId != null) {
     const filmography = await getCrewFilmography(challenge.personId, challenge.department);
@@ -93,7 +98,8 @@ export default async function ChallengeDetailPage({
         inWatchlist: watchlistIds.has(credit.id),
         watched: watchedTmdbIds.has(credit.id),
       }));
-    subtitle = `${watchedTmdbIds.size} / ${target} of ${challenge.personName}'s ${
+    progressCount = watchedTmdbIds.size;
+    subtitle = `${watchedTmdbIds.size} of ${target} of ${challenge.personName}'s ${
       challenge.department ? challenge.department.toLowerCase() : "acting"
     } movies watched`;
   } else if (challenge.type === "LIST" && challenge.listId) {
@@ -119,33 +125,80 @@ export default async function ChallengeDetailPage({
       inWatchlist: watchlistIds.has(item.tmdbId),
       watched: watchedTmdbIds.has(item.tmdbId),
     }));
-    subtitle = `${watchedTmdbIds.size} / ${target} watched`;
+    progressCount = watchedTmdbIds.size;
+    subtitle = `${watchedTmdbIds.size} of ${target} watched`;
   } else {
-    const entries = await prisma.diaryEntry.findMany({
-      where:
-        challenge.type === "GENRE" && challenge.genreName
-          ? { userId: ownerId, movie: { genres: { contains: challenge.genreName } } }
-          : challenge.type === "TIMEFRAME" && challenge.startDate && challenge.endDate
-            ? { userId: ownerId, watchedDate: { gte: challenge.startDate, lte: challenge.endDate } }
-            : { userId: ownerId, id: "never-matches" },
-      include: { movie: true },
-      orderBy: { watchedDate: "desc" },
-      distinct: ["movieId"],
-    });
+    // The films that count, found the same way the progress on the card is
+    // counted (see genreCount and timeframeCount in lib/challenges.ts). A
+    // genre challenge counts every film seen, however that was recorded:
+    // diary entry, rating, or the undated "watched" mark. This page used to
+    // list diary entries only, so a card could read "Complete, 10 of 10"
+    // while the page behind it said "7 of 10" and showed three fewer films.
+    // A date-range challenge can only count dated diary entries.
+    type CountedMovie = {
+      tmdbId: number;
+      title: string;
+      posterPath: string | null;
+      releaseDate: string | null;
+    };
+    const movieSelect = {
+      tmdbId: true,
+      title: true,
+      posterPath: true,
+      releaseDate: true,
+    } as const;
+    const counted = new Map<number, CountedMovie>();
 
-    credits = entries.map((entry) => ({
-      id: entry.movie.tmdbId,
-      title: entry.movie.title,
-      posterPath: entry.movie.posterPath,
-      year: entry.movie.releaseDate?.slice(0, 4),
-      owned: ownedIds.has(entry.movie.tmdbId),
-      inWatchlist: watchlistIds.has(entry.movie.tmdbId),
+    if (challenge.type === "GENRE" && challenge.genreName) {
+      const where = { userId: ownerId, movie: { genres: { contains: challenge.genreName } } };
+      const [logged, marked, rated] = await Promise.all([
+        prisma.diaryEntry.findMany({
+          where,
+          select: { movie: { select: movieSelect } },
+          orderBy: { watchedDate: "desc" },
+          distinct: ["movieId"],
+        }),
+        prisma.watchedItem.findMany({
+          where,
+          select: { movie: { select: movieSelect } },
+          orderBy: { addedAt: "desc" },
+        }),
+        prisma.rating.findMany({
+          where,
+          select: { movie: { select: movieSelect } },
+          orderBy: { createdAt: "desc" },
+        }),
+      ]);
+      for (const row of [...logged, ...marked, ...rated]) {
+        if (!counted.has(row.movie.tmdbId)) counted.set(row.movie.tmdbId, row.movie);
+      }
+    } else if (challenge.type === "TIMEFRAME" && challenge.startDate && challenge.endDate) {
+      const logged = await prisma.diaryEntry.findMany({
+        where: {
+          userId: ownerId,
+          watchedDate: { gte: challenge.startDate, lte: challenge.endDate },
+        },
+        select: { movie: { select: movieSelect } },
+        orderBy: { watchedDate: "desc" },
+        distinct: ["movieId"],
+      });
+      for (const row of logged) counted.set(row.movie.tmdbId, row.movie);
+    }
+
+    credits = [...counted.values()].map((movie) => ({
+      id: movie.tmdbId,
+      title: movie.title,
+      posterPath: movie.posterPath,
+      year: movie.releaseDate?.slice(0, 4),
+      owned: ownedIds.has(movie.tmdbId),
+      inWatchlist: watchlistIds.has(movie.tmdbId),
       watched: true,
     }));
+    progressCount = counted.size;
     subtitle =
       target != null
-        ? `${entries.length} / ${target} films logged`
-        : `${entries.length} films logged`;
+        ? `${counted.size} of ${target} films ${challenge.type === "GENRE" ? "seen" : "logged"}`
+        : `${counted.size} films logged`;
     if (challenge.type === "TIMEFRAME" && challenge.endDate) {
       subtitle += ` · ${formatTimeLeft(challenge.endDate)}`;
     }
@@ -169,6 +222,10 @@ export default async function ChallengeDetailPage({
   // films worth adding are the "What to watch next" suggestions.
   const hasAddableFilms = filterableType ? credits.length > 0 : suggestions.length > 0;
 
+  const percent =
+    target != null && target > 0 ? Math.min(100, Math.round((progressCount / target) * 100)) : null;
+  const status = challengeStatus({ type: challenge.type, percent, endDate: challenge.endDate });
+
   return (
     <div>
       <Link
@@ -181,8 +238,26 @@ export default async function ChallengeDetailPage({
         {TYPE_LABEL[challenge.type] ?? "Challenge"}
         {!isOwner && ` · ${challenge.user.username}`}
       </p>
-      <h1 className="page-title">{challenge.title}</h1>
+      <h1 className="page-title flex flex-wrap items-center gap-x-3 gap-y-1">
+        {challenge.title}
+        {status === "complete" && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-accent-green px-2.5 py-1 font-sans text-xs font-semibold tracking-normal text-black">
+            <Check aria-hidden className="h-3.5 w-3.5" strokeWidth={3} />
+            Complete
+          </span>
+        )}
+        {status === "ended" && (
+          <span className="rounded-full bg-white/10 px-2.5 py-1 font-sans text-xs font-semibold tracking-normal text-muted">
+            Ended
+          </span>
+        )}
+      </h1>
       <p className="mt-1 text-sm text-muted">{subtitle}</p>
+      {percent != null && (
+        <div className="mt-3 max-w-xl">
+          <ProgressBar percent={percent} label={`${challenge.title} progress`} className="h-2.5" />
+        </div>
+      )}
       {challenge.type === "LIST" && challenge.list && (
         <Link
           href={`/lists/${challenge.list.id}`}

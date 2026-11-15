@@ -4,7 +4,7 @@ import { RecommendForm } from "@/components/RecommendForm";
 
 export default async function RecommendPage() {
   const session = await auth();
-  if (!session?.user?.id) redirect("/login");
+  if (!session?.user?.id) redirect("/login?next=/recommend");
 
   return (
     <div className="mx-auto max-w-3xl">

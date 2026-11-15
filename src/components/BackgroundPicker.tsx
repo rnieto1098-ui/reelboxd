@@ -19,6 +19,7 @@ export function BackgroundPicker({ selected }: { selected: string }) {
   const router = useRouter();
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [confirmChoice, setConfirmChoice] = useState<string | null>(null);
   // Hold the optimistic pick until the refreshed `selected` prop arrives.
   const [prevSelected, setPrevSelected] = useState(selected);
   if (selected !== prevSelected) {
@@ -27,8 +28,17 @@ export function BackgroundPicker({ selected }: { selected: string }) {
   }
   const current = pending ?? selected;
 
-  async function choose(choice: string) {
-    if (choice === current) return;
+  async function choose(choice: string, confirmed = false) {
+    // One change at a time: rapid clicks used to send overlapping requests
+    // that could land out of order.
+    if (choice === current || pending != null) return;
+    // Picking anything else permanently deletes an uploaded image (it isn't
+    // kept as an option to go back to), so that takes a second click.
+    if (selected === "upload" && !confirmed) {
+      setConfirmChoice(choice);
+      return;
+    }
+    setConfirmChoice(null);
     setPending(choice);
     setError(null);
 
@@ -99,6 +109,27 @@ export function BackgroundPicker({ selected }: { selected: string }) {
         )}
         {tile(NO_BACKGROUND, "Plain")}
       </div>
+      {confirmChoice && (
+        <div
+          role="alert"
+          className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-accent-orange/40 bg-accent-orange/10 px-3 py-2 text-sm"
+        >
+          <span className="min-w-0 flex-1">
+            Switching will delete the image you uploaded. You&apos;d have to upload it again to get
+            it back.
+          </span>
+          <button
+            type="button"
+            onClick={() => choose(confirmChoice, true)}
+            className="btn btn-danger btn-sm"
+          >
+            Switch and delete it
+          </button>
+          <button type="button" onClick={() => setConfirmChoice(null)} className="btn btn-ghost btn-sm">
+            Keep my image
+          </button>
+        </div>
+      )}
       {error && <p className="mt-2 text-xs text-red-400">{error}</p>}
     </div>
   );

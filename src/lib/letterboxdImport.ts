@@ -3,6 +3,7 @@ import Papa from "papaparse";
 import { prisma } from "@/lib/prisma";
 import { searchMovies } from "@/lib/tmdb";
 import { ensureMovieCached } from "@/lib/movies";
+import { parseCalendarDate } from "@/lib/dates";
 import { createDiaryEntry } from "@/lib/diary";
 import { addToWatchlist } from "@/lib/watchlist";
 import { unguardSpreadsheetCell } from "@/lib/csv";
@@ -93,9 +94,21 @@ function parseTitleYearCsv(text: string): CsvRow[] {
 }
 
 async function readCsv(zip: JSZip, filename: string): Promise<CsvRow[] | null> {
-  const entry = Object.values(zip.files).find(
-    (f) => !f.dir && f.name.toLowerCase().endsWith(filename)
-  );
+  const files = Object.values(zip.files).filter((f) => !f.dir);
+  const lower = (f: JSZip.JSZipObject) => f.name.toLowerCase();
+  // The real file sits at the top level of the export (sometimes inside one
+  // wrapping folder). Letterboxd also ships "deleted/", "orphaned/" and
+  // "lists/" folders whose files can share its name; those are never the
+  // one to import.
+  const skipFolder = /(^|\/)(deleted|orphaned|lists)\//;
+  const entry =
+    files.find((f) => lower(f) === filename) ??
+    files.find((f) => {
+      const name = lower(f);
+      if (!name.endsWith(`/${filename}`)) return false;
+      // The folders the file sits in, e.g. "letterboxd-export/deleted/".
+      return !skipFolder.test(name.slice(0, name.length - filename.length));
+    });
   if (!entry) return null;
 
   const text = stripBom(await entry.async("string"));
@@ -141,6 +154,8 @@ export type ImportSummary = {
   // not added — see addToWatchlist.
   watchlistSkippedWatched: number;
   diaryImported: number;
+  // Diary rows left out because their date wasn't a real date.
+  skippedBadDates: number;
   unmatched: { title: string; year: string }[];
   completedChallenges: ChallengeCompletion[];
   completedGoal: { year: number; target: number } | null;
@@ -189,7 +204,8 @@ export async function importLetterboxdZip(
     const ratingStr = row["Rating"];
     if (!name || !ratingStr) continue;
     const score = Number(ratingStr);
-    if (!Number.isFinite(score) || score <= 0) continue;
+    // Half stars from 0.5 to 5, the only values the app's ratings can hold.
+    if (!Number.isFinite(score) || score < 0.5 || score > 5 || (score * 2) % 1 !== 0) continue;
     ratingsByKey.set(filmKey(name, row["Year"] ?? ""), score);
   }
 
@@ -235,7 +251,15 @@ export async function importLetterboxdZip(
           return;
         }
 
-        const movie = await ensureMovieCached(tmdbId);
+        // A film TMDB can't supply right now (an outage, or an id that has
+        // since been removed) is reported with the other unmatched films.
+        // It used to throw, ending the whole import part-way through with
+        // some of it already saved.
+        const movie = await ensureMovieCached(tmdbId).catch(() => null);
+        if (!movie) {
+          unmatched.push({ title: film.name, year: film.year });
+          return;
+        }
         movieByKey.set(key, movie);
 
         const rating = ratingsByKey.get(key);
@@ -257,6 +281,8 @@ export async function importLetterboxdZip(
   // many times with different watched dates — each one is its own log, not
   // a dedup target like ratings/watchlist are.
   let diaryImported = 0;
+  // Rows whose watched date isn't a real "YYYY-MM-DD" date are skipped.
+  let skippedBadDates = 0;
 
   // Snapshot what was already finished before writing anything, so the
   // whole import costs one pass here and one after the loop instead of a
@@ -273,7 +299,11 @@ export async function importLetterboxdZip(
       const movie = movieByKey.get(row.key);
       if (!movie) continue;
 
-      const watchedDate = new Date(`${row.watchedDate}T00:00:00.000Z`);
+      const watchedDate = parseCalendarDate(row.watchedDate);
+      if (!watchedDate) {
+        skippedBadDates++;
+        continue;
+      }
 
       // createDiaryEntry itself enforces one log per movie per day — a
       // duplicate CSV row (or a re-import of the same file) is a no-op,
@@ -311,6 +341,7 @@ export async function importLetterboxdZip(
     watchlistImported,
     watchlistSkippedWatched,
     diaryImported,
+    skippedBadDates,
     unmatched,
     completedChallenges,
     completedGoal,
@@ -380,7 +411,11 @@ export async function importWatchlistFile(
           return;
         }
 
-        const movie = await ensureMovieCached(tmdbId);
+        const movie = await ensureMovieCached(tmdbId).catch(() => null);
+        if (!movie) {
+          unmatched.push(film);
+          return;
+        }
         const { added } = await addToWatchlist(userId, [movie.id]);
         if (added > 0) imported++;
         else skippedWatched++;
@@ -426,7 +461,11 @@ export async function importOwnedFile(userId: string, file: File): Promise<Owned
           return;
         }
 
-        const movie = await ensureMovieCached(tmdbId);
+        const movie = await ensureMovieCached(tmdbId).catch(() => null);
+        if (!movie) {
+          unmatched.push(film);
+          return;
+        }
         await prisma.ownedItem.upsert({
           where: { userId_movieId: { userId, movieId: movie.id } },
           update: {},
@@ -482,7 +521,11 @@ export async function importRewatchFile(userId: string, file: File): Promise<Rew
           return;
         }
 
-        const movie = await ensureMovieCached(tmdbId);
+        const movie = await ensureMovieCached(tmdbId).catch(() => null);
+        if (!movie) {
+          unmatched.push(film);
+          return;
+        }
         const where = { userId_movieId: { userId, movieId: movie.id } };
         if (await prisma.rewatchItem.findUnique({ where, select: { id: true } })) {
           alreadyOnList++;

@@ -24,6 +24,7 @@ import { cleanMovieList } from "@/lib/movieListHygiene";
 import { FadeWatchedControl } from "@/components/FadeWatchedControl";
 import { AvailabilityFilterLinks } from "@/components/AvailabilityFilterLinks";
 import { CreditGrid, type CreditDisplay } from "@/components/CreditGrid";
+import { getWatchedTmdbIds } from "@/lib/recommendations";
 
 const DEPARTMENT_ORDER = [
   "Directing",
@@ -249,7 +250,7 @@ async function PersonCredits({
       ? new Set(primaryDeptCredits.map((c) => c.id))
       : allCreditIds;
 
-  const [ratingMap, ownedIds, watchlistIds, userProviderIds] = await Promise.all([
+  const [ratingMap, ownedIds, watchlistIds, userProviderIds, watchedIds] = await Promise.all([
     userId && allCreditIds.size > 0
       ? prisma.rating
           .findMany({
@@ -261,6 +262,13 @@ async function PersonCredits({
     getUserOwnedTmdbIds(userId),
     getUserWatchlistedTmdbIds(userId),
     getUserProviderIds(userId),
+    // Everything the viewer has seen, by any of the three ways the app
+    // records that (rating, diary entry, or the undated "watched" mark).
+    // This page used to count ratings alone, so a film logged or marked
+    // watched without a rating showed as unseen here and was left out of
+    // the "% watched" figure, which then disagreed with the same person's
+    // filmography challenge.
+    getWatchedTmdbIds(userId),
   ]);
 
   const runtimeMap =
@@ -271,7 +279,7 @@ async function PersonCredits({
   const canFilterByAvailability = hasStreamingAvailability(userProviderIds, ownedIds);
   const applyStreamingFilter = streamingOnly && canFilterByAvailability;
 
-  const watchedCount = [...primaryCreditIds].filter((id) => ratingMap.has(id)).length;
+  const watchedCount = [...primaryCreditIds].filter((id) => watchedIds.has(id)).length;
   const watchedPercent =
     userId && primaryCreditIds.size > 0 ? Math.round((watchedCount / primaryCreditIds.size) * 100) : null;
 
@@ -334,7 +342,7 @@ async function PersonCredits({
         year: credit.release_date?.slice(0, 4),
         owned: ownedIds.has(credit.id),
         inWatchlist: watchlistIds.has(credit.id),
-        watched: ratingMap.has(credit.id),
+        watched: watchedIds.has(credit.id),
       })
     ),
   }));

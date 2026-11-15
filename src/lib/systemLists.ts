@@ -5800,8 +5800,27 @@ const SYSTEM_LIST_KEYS = [
 // homepage/lists page view for the rest of the server's lifetime.
 let allSystemListsConfirmed = false;
 
+// A list row is created *before* its films are looked up (that is what
+// stops two requests seeding the same list at once), and the lookup takes a
+// while. If it dies part-way (a timeout, TMDB refusing requests) the row is
+// left behind with no films, and because only the row's existence was ever
+// checked, the list stayed empty for good. An empty list this old is a
+// failed seed, not one in progress.
+const STALLED_SEED_MS = 10 * 60 * 1000;
+
 export async function ensureSystemLists() {
   if (allSystemListsConfirmed) return;
+
+  // Clear out failed seeds so the checks below see them as missing and run
+  // them again.
+  await prisma.list.deleteMany({
+    where: {
+      isSystem: true,
+      key: { in: SYSTEM_LIST_KEYS },
+      items: { none: {} },
+      createdAt: { lt: new Date(Date.now() - STALLED_SEED_MS) },
+    },
+  });
 
   const existing = await prisma.list.findMany({
     where: { key: { in: SYSTEM_LIST_KEYS } },

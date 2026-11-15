@@ -10,6 +10,9 @@ export type OwnedGridEntry = {
   title: string;
   posterPath: string | null;
   year: string | undefined;
+  // All three describe the person looking at the page, who is not always
+  // the person whose collection it is.
+  owned: boolean;
   inWatchlist: boolean;
   watched: boolean;
 };
@@ -30,7 +33,7 @@ export function OwnedMovieGrid({ entries }: { entries: OwnedGridEntry[] }) {
             title={entry.title}
             posterPath={entry.posterPath}
             year={entry.year}
-            owned
+            owned={entry.owned}
             inWatchlist={entry.inWatchlist}
             watched={entry.watched}
           />

@@ -5,7 +5,7 @@ import { StreamingServiceToggle } from "@/components/StreamingServiceToggle";
 
 export default async function StreamingPage() {
   const session = await auth();
-  if (!session?.user?.id) redirect("/login");
+  if (!session?.user?.id) redirect("/login?next=/streaming");
 
   const [providers, selectedIds] = await Promise.all([
     getBrowsableProviders(),

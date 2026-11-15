@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { syncLetterboxdDiary } from "@/lib/letterboxdSync";
 import { syncLetterboxdWatchlist } from "@/lib/letterboxdWatchlistSync";
+import { userFacingError } from "@/lib/userFacingError";
 
 const connectSchema = z.object({
   username: z.string().trim().min(1).max(50),
@@ -34,7 +35,7 @@ export async function POST(request: Request) {
     summary = await syncLetterboxdDiary(session.user.id, username);
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Couldn't connect that account" },
+      { error: userFacingError(error, "Couldn't connect that account") },
       { status: 400 }
     );
   }
@@ -50,7 +51,7 @@ export async function POST(request: Request) {
     added: 0,
     unmatched: [] as string[],
     remaining: 0,
-    error: error instanceof Error ? error.message : "Watchlist sync failed",
+    error: userFacingError(error, "Watchlist sync failed"),
   }));
 
   return NextResponse.json({

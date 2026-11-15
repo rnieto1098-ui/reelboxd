@@ -59,6 +59,11 @@ const SORT_OPTIONS = {
 
 type SortKey = keyof typeof SORT_OPTIONS;
 
+const SAVED_LISTS = [
+  { href: "/watchlist", label: "Watchlist" },
+  { href: "/rewatch", label: "Rewatch list" },
+];
+
 // The "streaming" dropdown's value: "" (all), "on"/"off" (aggregate across
 // every configured service), "owned", or "svc:<providerId>" for one specific
 // service. Kept as one plain string since it only ever needs to round-trip
@@ -298,6 +303,25 @@ export async function SavedMoviesPage({
 
   return (
     <div>
+      {/* The two saved lists side by side. The rewatch list has a button on
+          every poster and a page of its own, but the only link to that page
+          was one button on your profile, so it was easy to add films to it
+          and never find them again. */}
+      <nav aria-label="Saved lists" className="mb-5 flex gap-2">
+        {SAVED_LISTS.map((list) => (
+          <Link
+            key={list.href}
+            href={list.href}
+            aria-current={basePath === list.href ? "page" : undefined}
+            className={`chip px-4 py-1.5 text-sm ${
+              basePath === list.href ? "chip-active" : "hover:border-white/30 hover:text-foreground"
+            }`}
+          >
+            {list.label}
+          </Link>
+        ))}
+      </nav>
+
       <div className="mb-1 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         <h1 className="page-title">{title}</h1>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
@@ -390,7 +414,25 @@ export async function SavedMoviesPage({
           </Link>
         </p>
       ) : (
-        <WatchlistGrid entries={visibleEntries} />
+        <WatchlistGrid
+          entries={visibleEntries.map(({ item, owned, watched, inWatchlist }) => ({
+            item: {
+              id: item.id,
+              movie: {
+                tmdbId: item.movie.tmdbId,
+                title: item.movie.title,
+                posterPath: item.movie.posterPath,
+                releaseDate: item.movie.releaseDate,
+                customPosters: item.movie.customPosters.map((c) => ({
+                  posterPath: c.posterPath,
+                })),
+              },
+            },
+            owned,
+            watched,
+            inWatchlist,
+          }))}
+        />
       )}
     </div>
   );

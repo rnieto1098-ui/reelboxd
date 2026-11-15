@@ -13,9 +13,16 @@ export async function sendPasswordResetEmail(to: string, resetUrl: string): Prom
     // the link just goes to the server log instead of an inbox. Vercel's
     // function logs catch this too, so a misconfigured production env is
     // still visible there rather than silently swallowed.
-    console.error(
-      `RESEND_API_KEY is not set — skipping email send. Reset link for ${to}: ${resetUrl}`
-    );
+    // The link itself is only ever printed outside production. It contains
+    // the reset token, and on the live site that would put a working
+    // "change this person's password" link in the hosting provider's logs.
+    if (process.env.NODE_ENV === "production") {
+      console.error("RESEND_API_KEY is not set — password reset email was NOT sent.");
+    } else {
+      console.error(
+        `RESEND_API_KEY is not set — skipping email send. Reset link for ${to}: ${resetUrl}`
+      );
+    }
     return;
   }
 

@@ -4,8 +4,14 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { movieForRoute } from "@/lib/movieRoute";
 
+// A TMDB image path looks like "/kqjL17yufvn9OVLyXYpvtyrFfak.jpg". Anything
+// else is refused: this value is later turned into an image URL, and it
+// used to accept any string of any length.
 const posterSchema = z.object({
-  posterPath: z.string().min(1),
+  posterPath: z
+    .string()
+    .max(100)
+    .regex(/^\/[\w.-]+$/, "That isn't a valid poster"),
 });
 
 export async function POST(

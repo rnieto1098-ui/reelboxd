@@ -1,4 +1,5 @@
-import { ensureMovieCached } from "@/lib/movies";
+import { prisma } from "@/lib/prisma";
+import { ensureMovieCached, movieNeedsRefresh } from "@/lib/movies";
 import type { TmdbMovieSummary } from "@/lib/tmdb";
 
 // Nothing under this length gets algorithmically suggested anywhere in the
@@ -25,14 +26,34 @@ const RUNTIME_CHECK_CONCURRENCY = 8;
 export async function excludeShortFilms(
   movies: TmdbMovieSummary[]
 ): Promise<TmdbMovieSummary[]> {
-  const kept: TmdbMovieSummary[] = [];
-  for (let i = 0; i < movies.length; i += RUNTIME_CHECK_CONCURRENCY) {
-    const batch = movies.slice(i, i + RUNTIME_CHECK_CONCURRENCY);
-    const cached = await Promise.all(batch.map((m) => ensureMovieCached(m.id).catch(() => null)));
-    batch.forEach((movie, idx) => {
-      const runtime = cached[idx]?.runtime;
-      if (runtime != null && runtime >= MIN_RECOMMENDABLE_RUNTIME_MINUTES) kept.push(movie);
-    });
+  if (movies.length === 0) return [];
+
+  // One query for every film that is already cached and settled, instead of
+  // a separate lookup per film. A home page load checks several hundred
+  // films this way; nearly all of them are cached, so this replaces several
+  // hundred round trips to the database with one.
+  const cachedRows = await prisma.movie.findMany({
+    where: { tmdbId: { in: movies.map((m) => m.id) } },
+    select: { tmdbId: true, runtime: true, releaseDate: true, cachedAt: true },
+  });
+  const runtimeById = new Map<number, number | null>();
+  for (const row of cachedRows) {
+    // Rows that are due a refresh go through ensureMovieCached below, which
+    // is what refreshes them.
+    if (!movieNeedsRefresh(row)) runtimeById.set(row.tmdbId, row.runtime);
   }
-  return kept;
+
+  // Only films not cached yet (or due a refresh) need the per-film path,
+  // which fetches from TMDB the first time anyone looks at a film.
+  const missing = movies.filter((m) => !runtimeById.has(m.id));
+  for (let i = 0; i < missing.length; i += RUNTIME_CHECK_CONCURRENCY) {
+    const batch = missing.slice(i, i + RUNTIME_CHECK_CONCURRENCY);
+    const fetched = await Promise.all(batch.map((m) => ensureMovieCached(m.id).catch(() => null)));
+    batch.forEach((movie, idx) => runtimeById.set(movie.id, fetched[idx]?.runtime ?? null));
+  }
+
+  return movies.filter((movie) => {
+    const runtime = runtimeById.get(movie.id);
+    return runtime != null && runtime >= MIN_RECOMMENDABLE_RUNTIME_MINUTES;
+  });
 }

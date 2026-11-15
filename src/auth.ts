@@ -4,10 +4,12 @@ import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
-import { isRateLimited, recordHit } from "@/lib/rateLimit";
+import { getClientIp, isRateLimited, recordHit } from "@/lib/rateLimit";
 import { normalizeEmail } from "@/lib/normalizeEmail";
 
 const LOGIN_FAIL_LIMIT = 10;
+// Across every network location combined, for one account.
+const LOGIN_ACCOUNT_FAIL_LIMIT = 100;
 const LOGIN_FAIL_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
 
 // A real cost-12 hash of a throwaway string, compared against when no user
@@ -44,7 +46,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
-      async authorize(credentials) {
+      async authorize(credentials, request) {
         const rawEmail = credentials?.email;
         const password = credentials?.password;
         if (typeof rawEmail !== "string" || typeof password !== "string") {
@@ -58,8 +60,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // anyway). Only failed attempts count below, so a user who just
         // fumble-typed their own password a few times in a row is never
         // the one who gets locked out.
-        const rateLimitKey = `login:${email}`;
-        if (await isRateLimited(rateLimitKey, LOGIN_FAIL_LIMIT, LOGIN_FAIL_WINDOW_MS)) {
+        // Counted per address *and* per network location. Keyed on the
+        // email alone, anyone could lock a person out of their own account
+        // indefinitely just by sending ten wrong passwords for it every
+        // fifteen minutes, since the check runs before the password is even
+        // looked at. A second, much higher limit on the email alone still
+        // stops a spread-out attack on one account.
+        const ip = getClientIp(request);
+        const rateLimitKey = `login:${ip}:${email}`;
+        const accountKey = `login:${email}`;
+        const [limitedHere, limitedEverywhere] = await Promise.all([
+          isRateLimited(rateLimitKey, LOGIN_FAIL_LIMIT, LOGIN_FAIL_WINDOW_MS),
+          isRateLimited(accountKey, LOGIN_ACCOUNT_FAIL_LIMIT, LOGIN_FAIL_WINDOW_MS),
+        ]);
+        if (limitedHere || limitedEverywhere) {
           // Returning null (not throwing) keeps this indistinguishable
           // from "wrong password" to the client — no signal to a would-be
           // attacker that they've been throttled.
@@ -72,13 +86,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           // TIMING_EQUALIZER_HASH above. The result is discarded; it can
           // never match, since nothing hashes to this.
           await bcrypt.compare(password, TIMING_EQUALIZER_HASH);
-          await recordHit(rateLimitKey);
+          await Promise.all([recordHit(rateLimitKey), recordHit(accountKey)]);
           return null;
         }
 
         const valid = await bcrypt.compare(password, user.hashedPassword);
         if (!valid) {
-          await recordHit(rateLimitKey);
+          await Promise.all([recordHit(rateLimitKey), recordHit(accountKey)]);
           return null;
         }
 

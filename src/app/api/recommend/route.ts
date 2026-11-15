@@ -49,15 +49,26 @@ export async function POST(request: Request) {
     );
   }
 
-  const recommendation = await getPromptRecommendations(session.user.id, parsed.data.prompt, {
-    genreNames: parsed.data.genres,
-    maxRuntimeMinutes: parsed.data.maxRuntimeMinutes ?? null,
-    onlyWatchlist: parsed.data.onlyWatchlist,
-    excludeWatchlist: parsed.data.excludeWatchlist,
-    onlyStreaming: parsed.data.onlyStreaming,
-    allowR: parsed.data.allowR,
-    excludeIds: parsed.data.excludeIds,
-  });
+  // The picks come from several TMDB requests. One of them failing used to
+  // surface as a bare 500; now it is a message the form can show.
+  let recommendation: Awaited<ReturnType<typeof getPromptRecommendations>>;
+  try {
+    recommendation = await getPromptRecommendations(session.user.id, parsed.data.prompt, {
+      genreNames: parsed.data.genres,
+      maxRuntimeMinutes: parsed.data.maxRuntimeMinutes ?? null,
+      onlyWatchlist: parsed.data.onlyWatchlist,
+      excludeWatchlist: parsed.data.excludeWatchlist,
+      onlyStreaming: parsed.data.onlyStreaming,
+      allowR: parsed.data.allowR,
+      excludeIds: parsed.data.excludeIds,
+    });
+  } catch (error) {
+    console.error("Recommendation request failed:", error);
+    return NextResponse.json(
+      { error: "Couldn't reach the movie database just now. Try again in a moment." },
+      { status: 502 }
+    );
+  }
 
   const [posterOverrides, ownedIds, watchlistIds] = await Promise.all([
     getCustomPosterMap(session.user.id, recommendation.results.map((m) => m.id)),

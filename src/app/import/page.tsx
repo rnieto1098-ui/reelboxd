@@ -4,7 +4,7 @@ import { ImportForm } from "@/components/ImportForm";
 
 export default async function ImportPage() {
   const session = await auth();
-  if (!session?.user?.id) redirect("/login");
+  if (!session?.user?.id) redirect("/login?next=/import");
 
   return (
     <div className="mx-auto max-w-xl">

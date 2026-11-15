@@ -39,7 +39,7 @@ export function DeleteListButton({ listId }: { listId: string }) {
       <button
         type="button"
         onClick={() => setConfirming(true)}
-        className="text-sm text-muted hover:text-red-400"
+        className="btn btn-ghost btn-sm hover:bg-danger/10 hover:text-danger"
       >
         Delete list
       </button>
@@ -47,23 +47,25 @@ export function DeleteListButton({ listId }: { listId: string }) {
   }
 
   return (
-    <div className="flex items-center gap-2 text-sm">
-      <span className="text-muted">Delete this list?</span>
-      <button
-        type="button"
-        onClick={handleDelete}
-        disabled={deleting}
-        className="text-red-400 hover:underline disabled:opacity-50"
-      >
-        {deleting ? "Deleting..." : "Yes, delete"}
-      </button>
-      <button
-        type="button"
-        onClick={() => setConfirming(false)}
-        className="text-muted hover:text-foreground"
-      >
-        Cancel
-      </button>
+    <div role="alert" className="flex flex-col items-end gap-2 text-sm">
+      {/* Deleting a list also deletes every challenge built on it, which
+          the old one-line "Delete this list?" never mentioned. */}
+      <span className="max-w-[16rem] text-right text-muted">
+        Delete this list for good? Any challenge based on it is deleted too.
+      </span>
+      <span className="flex gap-2">
+        <button
+          type="button"
+          onClick={handleDelete}
+          disabled={deleting}
+          className="btn btn-danger btn-sm"
+        >
+          {deleting ? "Deleting…" : "Delete list"}
+        </button>
+        <button type="button" onClick={() => setConfirming(false)} className="btn btn-ghost btn-sm">
+          Keep
+        </button>
+      </span>
     </div>
   );
 }

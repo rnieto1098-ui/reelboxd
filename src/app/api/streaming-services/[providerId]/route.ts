@@ -4,8 +4,13 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
 const bodySchema = z.object({
-  providerName: z.string().min(1),
-  logoPath: z.string().nullable().optional(),
+  providerName: z.string().min(1).max(100),
+  logoPath: z
+    .string()
+    .max(100)
+    .regex(/^\/[\w.-]+$/)
+    .nullable()
+    .optional(),
 });
 
 export async function POST(

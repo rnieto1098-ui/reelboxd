@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { syncLetterboxdDiary } from "@/lib/letterboxdSync";
 import { syncLetterboxdWatchlist } from "@/lib/letterboxdWatchlistSync";
+import { userFacingError } from "@/lib/userFacingError";
 
 export async function POST() {
   const session = await auth();
@@ -23,7 +24,7 @@ export async function POST() {
     summary = await syncLetterboxdDiary(session.user.id, user.letterboxdUsername);
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Sync failed" },
+      { error: userFacingError(error, "Sync failed") },
       { status: 502 }
     );
   }
@@ -36,7 +37,7 @@ export async function POST() {
       skippedWatched: 0,
       unmatched: [] as string[],
       remaining: 0,
-      error: error instanceof Error ? error.message : "Watchlist sync failed",
+      error: userFacingError(error, "Watchlist sync failed"),
     })
   );
 

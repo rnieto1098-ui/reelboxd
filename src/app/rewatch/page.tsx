@@ -6,7 +6,7 @@ import { ListImportForm } from "@/components/ListImportForm";
 
 export default async function RewatchPage({ searchParams }: PageProps<"/rewatch">) {
   const session = await auth();
-  if (!session?.user?.id) redirect("/login");
+  if (!session?.user?.id) redirect("/login?next=/rewatch");
   const userId = session.user.id;
 
   return (

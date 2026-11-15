@@ -15,6 +15,9 @@ export type RecentlyLoggedEntry = {
   logCount: number;
   owned: boolean;
   inWatchlist: boolean;
+  // Whether the person *viewing* has seen it. The profile's owner has, by
+  // definition, but a visitor may not have.
+  watched: boolean;
 };
 
 export function RecentlyLoggedRow({ entries }: { entries: RecentlyLoggedEntry[] }) {
@@ -35,9 +38,7 @@ export function RecentlyLoggedRow({ entries }: { entries: RecentlyLoggedEntry[] 
             year={e.year}
             owned={e.owned}
             inWatchlist={e.inWatchlist}
-            // Every entry here came from a rating or a diary log, so it's
-            // definitionally watched.
-            watched
+            watched={e.watched}
           />
           <p className="mt-1 text-xs text-accent-green">
             {e.score != null ? `${e.score.toFixed(1)} ★` : "Logged"}

@@ -399,6 +399,7 @@ export default async function ProfilePage({
           logCount: e.logCount,
           owned: viewerOwnedIds.has(e.movie.tmdbId),
           inWatchlist: viewerWatchlistIds.has(e.movie.tmdbId),
+          watched: viewerWatchedIds.has(e.movie.tmdbId),
         }))}
       />
 

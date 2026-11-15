@@ -1,3 +1,4 @@
+import { userFacingError } from "@/lib/userFacingError";
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { importRewatchFile } from "@/lib/letterboxdImport";
@@ -19,7 +20,7 @@ export async function POST(request: Request) {
     const summary = await importRewatchFile(session.user.id, file);
     return NextResponse.json(summary);
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Import failed";
+    const message = userFacingError(err, "The import failed part-way. Anything already imported is saved; try the file again.");
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }

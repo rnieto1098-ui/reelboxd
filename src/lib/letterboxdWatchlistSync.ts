@@ -196,8 +196,10 @@ export async function syncLetterboxdWatchlist(
         // A film already watched here is skipped rather than added, but is
         // still recorded as synced — otherwise every future run would
         // re-resolve the same slug just to skip it again.
-        await prisma.letterboxdWatchlistItem.create({
-          data: { userId, filmSlug: entry.slug },
+        await prisma.letterboxdWatchlistItem.upsert({
+          where: { userId_filmSlug: { userId, filmSlug: entry.slug } },
+          update: {},
+          create: { userId, filmSlug: entry.slug },
         });
         if (addedNow > 0) added++;
         else skippedWatched++;

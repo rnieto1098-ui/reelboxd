@@ -5,7 +5,7 @@ export default function Loading() {
   return (
     <div aria-busy="true" aria-label="Loading film">
       <div className="bleed -mt-8 bg-surface">
-        <div className="container-page grid items-end gap-6 pb-10 pt-16 sm:gap-10 sm:pt-28 md:grid-cols-[240px_1fr] lg:grid-cols-[280px_1fr] lg:pt-36">
+        <div className="container-page grid grid-cols-[minmax(0,1fr)] items-end gap-6 pb-10 pt-16 sm:gap-10 sm:pt-28 md:grid-cols-[240px_1fr] lg:grid-cols-[280px_1fr] lg:pt-36">
           <div className="skeleton mx-auto aspect-[2/3] w-44 sm:w-56 md:mx-0 md:w-full" />
           <div className="flex flex-col items-center gap-4 md:items-start">
             <div className="skeleton h-4 w-48" />
@@ -18,7 +18,7 @@ export default function Loading() {
           </div>
         </div>
       </div>
-      <div className="mt-8 grid gap-10 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="mt-8 grid grid-cols-[minmax(0,1fr)] gap-10 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-6">
           <div className="skeleton h-32 w-full" />
           <div className="skeleton h-4 w-full max-w-3xl" />

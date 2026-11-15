@@ -134,7 +134,7 @@ export default async function StatsPage({ params }: PageProps<"/profile/[usernam
               title="How you rate"
               description="The shape of your scale, and where it sits next to everyone else's."
             >
-              <div className="grid gap-4 lg:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <Card>
                   <CardLabel>Rating distribution</CardLabel>
                   <RatingColumns histogram={ratings} />
@@ -191,7 +191,7 @@ export default async function StatsPage({ params }: PageProps<"/profile/[usernam
               title="Hot takes"
               description="The films where your rating and the crowd's disagree the most."
             >
-              <div className="grid gap-4 lg:grid-cols-3">
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
                 <HotTakeList
                   label="You championed"
                   description="Rated well above the community average."
@@ -221,7 +221,7 @@ export default async function StatsPage({ params }: PageProps<"/profile/[usernam
             title="What you watch"
             description="Counted once per film — rewatches don't stack the deck."
           >
-            <div className="grid gap-4 lg:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               <Card>
                 <CardLabel>Genres</CardLabel>
                 <BarList
@@ -284,7 +284,7 @@ export default async function StatsPage({ params }: PageProps<"/profile/[usernam
           )}
 
           <StatSection title="Length and rating boards">
-            <div className="grid gap-4 lg:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               <Card>
                 <CardLabel>Runtime</CardLabel>
                 <BarList rows={runtimes.buckets.map((b) => ({ key: b.label, label: b.label, count: b.count }))} labelWidth="w-24" />
@@ -356,7 +356,7 @@ export default async function StatsPage({ params }: PageProps<"/profile/[usernam
               title="When you watch"
               description="Every log you've ever made, folded onto a single week and a single year."
             >
-              <div className="grid gap-4 lg:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <Card>
                   <CardLabel>By day of week</CardLabel>
                   <RhythmColumns buckets={stats.weekdays} />
@@ -370,7 +370,7 @@ export default async function StatsPage({ params }: PageProps<"/profile/[usernam
           )}
 
           <StatSection title="Your top films">
-            <div className="grid gap-4 lg:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               <MovieRankList
                 label="Most rewatched"
                 entries={stats.leaderboards.mostRewatched}

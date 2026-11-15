@@ -121,7 +121,7 @@ export function LandingHero({
         <h2 id="features-heading" className="sr-only">
           What you can do with Flixtally
         </h2>
-        <div className="stagger grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="stagger grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {FEATURES.map(({ icon: Icon, title, body }, i) => (
             <div key={title} className="card p-5" style={{ "--i": i } as React.CSSProperties}>
               <span className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-accent-green-soft text-accent-green">

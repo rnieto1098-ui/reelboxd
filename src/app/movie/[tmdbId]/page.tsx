@@ -230,7 +230,7 @@ export default async function MovieDetailPage({
         <div aria-hidden className="scrim-left absolute inset-0" />
         <div aria-hidden className="scrim-bottom absolute inset-0" />
 
-        <div className="container-page relative grid items-end gap-6 pb-10 pt-16 sm:gap-10 sm:pt-28 md:grid-cols-[240px_1fr] lg:grid-cols-[280px_1fr] lg:pt-36">
+        <div className="container-page relative grid grid-cols-[minmax(0,1fr)] items-end gap-6 pb-10 pt-16 sm:gap-10 sm:pt-28 md:grid-cols-[240px_1fr] lg:grid-cols-[280px_1fr] lg:pt-36">
           <div className="mx-auto w-44 sm:w-56 md:mx-0 md:w-full">
             {/* PosterImage covers both a missing poster_path and one that 404s
                 when fetched, with the same title-card placeholder as the rows. */}
@@ -313,7 +313,7 @@ export default async function MovieDetailPage({
         </div>
       </section>
 
-      <div className="mt-8 grid gap-10 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="mt-8 grid grid-cols-[minmax(0,1fr)] gap-10 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0 space-y-10">
           {/* Everything the viewer has said about this film, in one place. */}
           <section className="card p-5" aria-label="Your activity">

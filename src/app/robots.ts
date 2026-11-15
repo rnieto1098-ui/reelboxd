@@ -9,7 +9,19 @@ export default function robots(): MetadataRoute.Robots {
         allow: "/",
         // Personal, auth-gated pages have no value indexed and would just
         // dilute crawl budget away from the pages worth ranking.
-        disallow: ["/api/", "/settings", "/watchlist", "/import", "/forgot-password", "/reset-password"],
+        disallow: [
+          "/api/",
+          "/admin",
+          "/settings",
+          "/watchlist",
+          "/rewatch",
+          "/challenges",
+          "/recommend",
+          "/streaming",
+          "/import",
+          "/forgot-password",
+          "/reset-password",
+        ],
       },
     ],
     sitemap: `${SITE_URL}/sitemap.xml`,

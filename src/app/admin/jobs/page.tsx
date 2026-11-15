@@ -51,7 +51,7 @@ export default async function AdminJobsPage() {
           These run on their own every day. Each run is recorded here, so you can see that last
           night&apos;s happened and what it did, or run one yourself.
         </p>
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {JOB_KEYS.map((key) => {
             const job = JOBS[key];
             const last = lastSuccessByJob.get(key);
@@ -104,7 +104,7 @@ export default async function AdminJobsPage() {
             Nothing recorded yet. Runs appear here from the next scheduled job onward.
           </p>
         ) : (
-          <div className="card overflow-x-auto">
+          <div className="card relative overflow-x-auto">
             <table className="w-full min-w-[640px] text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-xs font-semibold uppercase tracking-[0.08em] text-subtle">

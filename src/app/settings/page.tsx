@@ -101,10 +101,10 @@ export default async function SettingsPage() {
         <p className="mt-1 text-muted">Your profile, how the site looks, and your account.</p>
       </header>
 
-      <div className="grid gap-8 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-12">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-12">
         {/* A list of the sections below. Stays in view on wide screens; on
             small ones it scrolls sideways above the content. */}
-        <nav aria-label="Settings sections" className="lg:sticky lg:top-24 lg:self-start">
+        <nav aria-label="Settings sections" className="min-w-0 lg:sticky lg:top-24 lg:self-start">
           <ul className="no-scrollbar -mx-4 flex gap-1 overflow-x-auto px-4 lg:mx-0 lg:flex-col lg:px-0">
             {SECTIONS.map(({ id, label, icon: Icon }) => (
               <li key={id} className="shrink-0">
@@ -131,7 +131,7 @@ export default async function SettingsPage() {
           </ul>
         </nav>
 
-        <div className="max-w-3xl space-y-6">
+        <div className="min-w-0 max-w-3xl space-y-6">
           <Section
             id="profile"
             title="Profile"

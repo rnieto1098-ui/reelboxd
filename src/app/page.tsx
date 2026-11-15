@@ -292,7 +292,8 @@ async function HomeHero({
     const top = withArt[0];
     return (
       <LandingHero
-        backdrop={top ? backdropUrl(top.backdrop_path) : null}
+        // No film still (TMDB unreachable): use one of the site's own backdrops.
+        backdrop={top ? backdropUrl(top.backdrop_path) : "/backgrounds/projector-prism.webp"}
         still={
           top ? { id: top.id, title: top.title, year: top.release_date?.slice(0, 4) || null } : null
         }

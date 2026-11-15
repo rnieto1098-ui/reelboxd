@@ -87,7 +87,7 @@ export default async function AdminUsersPage({ searchParams }: PageProps<"/admin
           No members match that search.
         </p>
       ) : (
-        <div className="card overflow-x-auto">
+        <div className="card relative overflow-x-auto">
           <table className="w-full min-w-[640px] text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs font-semibold uppercase tracking-[0.08em] text-subtle">

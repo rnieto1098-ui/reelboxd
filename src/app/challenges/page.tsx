@@ -106,7 +106,7 @@ export default async function ChallengesPage() {
             </Link>
           </div>
         ) : (
-          <div className="stagger grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="stagger grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {active.map(({ challenge }, i) => (
               <div key={challenge.id} style={{ "--i": i } as React.CSSProperties}>
                 <ChallengeCard challenge={challenge} canEdit />
@@ -122,7 +122,7 @@ export default async function ChallengesPage() {
             <Trophy aria-hidden className="h-5 w-5 text-accent-gold" />
             Completed
           </h2>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {complete.map(({ challenge }) => (
               <ChallengeCard key={challenge.id} challenge={challenge} canEdit />
             ))}
@@ -138,7 +138,7 @@ export default async function ChallengesPage() {
           <p className="mb-4 text-sm text-muted">
             Date ranges that closed before the target was reached.
           </p>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {ended.map(({ challenge }) => (
               <ChallengeCard key={challenge.id} challenge={challenge} canEdit />
             ))}

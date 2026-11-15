@@ -55,7 +55,7 @@ export function ChangeUsernameForm({ currentUsername }: { currentUsername: strin
     <form onSubmit={handleSubmit}>
       <div className="flex flex-wrap items-end gap-3">
         <div className="min-w-0 flex-1 sm:max-w-xs">
-          <label htmlFor={fieldId} className="field-label">
+          <label htmlFor={fieldId} className="sr-only">
             Username
           </label>
           <input

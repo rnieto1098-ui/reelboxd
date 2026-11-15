@@ -45,7 +45,7 @@ export function Footer() {
     // mb on small screens keeps the last line clear of the fixed tab bar.
     <footer className="mt-8 border-t border-white/[0.06] bg-background/60 pb-20 lg:pb-0">
       <div className="container-page py-10">
-        <div className="grid gap-8 sm:grid-cols-[1.4fr_repeat(4,1fr)]">
+        <div className="grid grid-cols-1 gap-8 sm:grid-cols-[1.4fr_repeat(4,1fr)]">
           <div>
             <Link
               href="/"

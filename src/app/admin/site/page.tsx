@@ -42,7 +42,7 @@ export default async function AdminSitePage() {
   ];
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
       <section className="card p-5 sm:p-6">
         <h2 className="section-title mb-5">Site settings</h2>
         <SiteSettingsForm

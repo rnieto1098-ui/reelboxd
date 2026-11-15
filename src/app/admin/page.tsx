@@ -154,12 +154,12 @@ export default async function AdminOverviewPage() {
         />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <DayChart title="New members" unit="member" data={signupsByDay} />
         <DayChart title="Films logged" unit="film" data={logsByDay} />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <section className="card p-5">
           <div className="mb-3 flex items-baseline justify-between">
             <h2 className="font-sans text-sm font-semibold tracking-normal">Newest members</h2>

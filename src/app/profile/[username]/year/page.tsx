@@ -148,7 +148,7 @@ export default async function YearInReviewPage({
             </p>
           )}
 
-          <div className="grid gap-6 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
             {review.firstWatch && (
               <MovieMomentCard
                 label="First watch of the year"

@@ -271,7 +271,7 @@ export function DailyGame({
   const blur = posterBlur(wrongCount, finished);
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[minmax(0,300px)_minmax(0,1fr)] lg:gap-12">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,300px)_minmax(0,1fr)] lg:gap-12">
       {/* Poster: blurred until the game ends, sharper with each wrong guess. */}
       <div className="mx-auto w-full max-w-[260px] lg:max-w-none">
         <div className="relative aspect-[2/3] overflow-hidden rounded-2xl bg-surface shadow-pop ring-1 ring-white/15">

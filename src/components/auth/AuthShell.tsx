@@ -25,7 +25,7 @@ export function AuthShell({
   footer?: ReactNode;
 }) {
   return (
-    <div className="mx-auto my-2 grid max-w-4xl animate-fade-up overflow-hidden rounded-2xl border border-border bg-surface shadow-pop sm:my-8 md:grid-cols-[1fr_1.1fr]">
+    <div className="mx-auto my-2 grid grid-cols-1 max-w-4xl animate-fade-up overflow-hidden rounded-2xl border border-border bg-surface shadow-pop sm:my-8 md:grid-cols-[1fr_1.1fr]">
       <div className="relative hidden min-h-[34rem] md:block">
         <Image
           src="/backgrounds/empty-theater.webp"

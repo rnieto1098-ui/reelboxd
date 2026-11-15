@@ -18,7 +18,7 @@ export function UpcomingReleasesRow({
   return (
     <HorizontalScroller title={title} isEmpty={movies.length === 0}>
       {movies.map((movie) => (
-        <div key={movie.id} className="w-28 flex-shrink-0 sm:w-32 md:w-36">
+        <div key={movie.id} className="row-card">
           <MovieCard
             tmdbId={movie.id}
             title={movie.title}

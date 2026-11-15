@@ -33,7 +33,17 @@ import { AvailabilityFilterLinks } from "@/components/AvailabilityFilterLinks";
 import { OnboardingChecklist, type ChecklistItem } from "@/components/OnboardingChecklist";
 import { WatchGoalWidget } from "@/components/WatchGoalWidget";
 import { HomeRowsSkeleton } from "@/components/HomeRowsSkeleton";
+import { HeroBillboard, type BillboardItem } from "@/components/HeroBillboard";
+import { LandingHero } from "@/components/LandingHero";
+import { getSiteSettings } from "@/lib/siteSettings";
+import { backdropUrl } from "@/lib/tmdb";
 import { currentYearUTC } from "@/lib/dates";
+
+// How many films rotate through the billboard at the top of the page.
+const BILLBOARD_COUNT = 6;
+// Below this many votes a TMDB average is noise (a handful of 10s), so the
+// billboard shows no score at all rather than a misleading one.
+const MIN_VOTES_FOR_RATING = 50;
 
 const WELCOME_PHRASES = [
   "Here's what we think you'll love next.",
@@ -101,11 +111,11 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
 
   const session = await auth();
   const userId = session?.user?.id;
-  // A different phrase per page load is the point — this is a Server
-  // Component that runs fresh per request, not a client render the
-  // purity rule needs to protect from re-render flicker.
-  // eslint-disable-next-line react-hooks/purity -- intentional per-request randomness in a Server Component
-  const welcomePhrase = WELCOME_PHRASES[Math.floor(Math.random() * WELCOME_PHRASES.length)];
+  // One phrase per user per day. It used to be picked at random on every
+  // render, and since every poster click re-renders this page, the line
+  // under "Welcome back" changed each time you ticked a film off.
+  const welcomePhrase =
+    WELCOME_PHRASES[hashString(`${userId ?? ""}:${new Date().toISOString().slice(0, 10)}`) % WELCOME_PHRASES.length];
 
   const currentYear = currentYearUTC();
 
@@ -157,10 +167,26 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
 
   return (
     <div className="space-y-10">
+      <Suspense fallback={<HeroSkeleton />}>
+        <HomeHero
+          isSignedIn={!!session?.user}
+          watchedIds={watchedIds}
+          watchlistTmdbIds={watchlistTmdbIds}
+        />
+      </Suspense>
+
       {session?.user && (
-        <div>
-          <h1 className="text-2xl font-bold">Welcome back, {session.user.name}.</h1>
-          <p className="mt-1 text-muted">{welcomePhrase}</p>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h1 className="page-title">Welcome back, {session.user.name}.</h1>
+            <p className="mt-1 text-muted">{welcomePhrase}</p>
+          </div>
+          <AvailabilityFilterLinks
+            allHref="/"
+            streamingHref="/?streaming=1"
+            streamingOnly={streamingOnly}
+            canFilterByAvailability={canFilterByAvailability}
+          />
         </div>
       )}
 
@@ -172,15 +198,6 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
           percent={goal.percent}
           isOwner
           username={session.user.name ?? ""}
-        />
-      )}
-
-      {session?.user && (
-        <AvailabilityFilterLinks
-          allHref="/"
-          streamingHref="/?streaming=1"
-          streamingOnly={streamingOnly}
-          canFilterByAvailability={canFilterByAvailability}
         />
       )}
 
@@ -232,6 +249,76 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
       </Suspense>
     </div>
   );
+}
+
+function hashString(value: string): number {
+  let hash = 0;
+  for (let i = 0; i < value.length; i++) hash = (hash * 31 + value.charCodeAt(i)) >>> 0;
+  return hash;
+}
+
+function HeroSkeleton() {
+  return (
+    <div
+      aria-busy="true"
+      aria-label="Loading featured films"
+      className="bleed skeleton -mt-8 mb-10 h-[68vh] max-h-[660px] min-h-[440px] rounded-none sm:h-[62vh]"
+    />
+  );
+}
+
+// The panel at the very top of the page. Signed-in members get this week's
+// trending films to flick through; visitors get the pitch for the site over
+// a still from the top one. Fetches only page one of trending, which the
+// rows below request too, so it costs no extra TMDB call.
+async function HomeHero({
+  isSignedIn,
+  watchedIds,
+  watchlistTmdbIds,
+}: {
+  isSignedIn: boolean;
+  watchedIds: Set<number>;
+  watchlistTmdbIds: Set<number>;
+}) {
+  const [trending, genreCatalog, settings] = await Promise.all([
+    getTrendingMoviesMultiPage("week", 1).catch(() => [] as TmdbMovieSummary[]),
+    getGenres().catch(() => ({ genres: [] })),
+    getSiteSettings(),
+  ]);
+  const withArt = trending.filter((m) => m.backdrop_path && m.title);
+
+  if (!isSignedIn) {
+    const top = withArt[0];
+    return (
+      <LandingHero
+        backdrop={top ? backdropUrl(top.backdrop_path) : null}
+        still={
+          top ? { id: top.id, title: top.title, year: top.release_date?.slice(0, 4) || null } : null
+        }
+        signupsOpen={settings.signupsOpen}
+      />
+    );
+  }
+
+  const genreNameById = new Map(genreCatalog.genres.map((g) => [g.id, g.name]));
+  const items: BillboardItem[] = withArt
+    .filter((m) => !watchedIds.has(m.id))
+    .slice(0, BILLBOARD_COUNT)
+    .map((m) => ({
+      id: m.id,
+      title: m.title,
+      year: m.release_date?.slice(0, 4) || null,
+      overview: m.overview ?? "",
+      backdrop: backdropUrl(m.backdrop_path)!,
+      rating:
+        (m.vote_count ?? 0) >= MIN_VOTES_FOR_RATING && m.vote_average > 0 ? m.vote_average : null,
+      genres: (m.genre_ids ?? [])
+        .map((id) => genreNameById.get(id))
+        .filter((name): name is string => !!name),
+      inWatchlist: watchlistTmdbIds.has(m.id),
+    }));
+
+  return <HeroBillboard items={items} signedIn />;
 }
 
 // Split out from HomePage so the shell above (header, goal widget,

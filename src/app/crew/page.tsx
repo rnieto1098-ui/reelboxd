@@ -90,7 +90,7 @@ export default async function CrewPage({ searchParams }: PageProps<"/crew">) {
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-3 gap-4 sm:grid-cols-4 md:grid-cols-6">
+              <div className="poster-grid">
                 {people.results.map((person) => {
                   const photo = profileUrl(person.profile_path, "w185");
                   return (
@@ -134,7 +134,7 @@ export default async function CrewPage({ searchParams }: PageProps<"/crew">) {
             {companies.results.length === 0 ? (
               <p className="text-sm text-muted">No studios found.</p>
             ) : (
-              <div className="grid grid-cols-3 gap-4 sm:grid-cols-4 md:grid-cols-6">
+              <div className="poster-grid">
                 {companies.results.map((company) => {
                   const logo = logoUrl(company.logo_path, "w154");
                   return (

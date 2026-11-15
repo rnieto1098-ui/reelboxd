@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import Link from "next/link";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
-const SCROLL_DURATION_MS = 400;
+const SCROLL_DURATION_MS = 450;
 
 // Ease-out cubic: fast start, gentle settle — standard curve for a "jump
 // forward one screen" motion like this.
@@ -12,6 +14,7 @@ function easeOutCubic(t: number): number {
 
 export function HorizontalScroller({
   title,
+  href,
   headerAction,
   isEmpty,
   // Defaulted rather than optional-at-the-render-site: this used to only
@@ -23,6 +26,8 @@ export function HorizontalScroller({
   children,
 }: {
   title?: string;
+  // Makes the heading a link to a page showing the whole collection.
+  href?: string;
   headerAction?: ReactNode;
   isEmpty: boolean;
   emptyMessage?: ReactNode;
@@ -30,14 +35,36 @@ export function HorizontalScroller({
 }) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const animationFrameRef = useRef<number | null>(null);
+  // Which directions there is anything left to scroll toward. Arrows for a
+  // direction with nothing in it aren't shown at all.
+  const [canScroll, setCanScroll] = useState({ left: false, right: false });
 
-  // Cancel a still-running animation on unmount so it doesn't keep ticking
-  // (and touching a detached element) after the row is gone.
+  const measure = useCallback(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const max = el.scrollWidth - el.clientWidth;
+    const next = { left: el.scrollLeft > 4, right: el.scrollLeft < max - 4 };
+    // Scroll events fire every frame; only re-render when an arrow actually
+    // needs to appear or disappear.
+    setCanScroll((prev) => (prev.left === next.left && prev.right === next.right ? prev : next));
+  }, []);
+
   useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    measure();
+    el.addEventListener("scroll", measure, { passive: true });
+    // Covers window resizes and posters arriving late and widening the row.
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
     return () => {
+      el.removeEventListener("scroll", measure);
+      observer.disconnect();
+      // Cancel a still-running animation on unmount so it doesn't keep
+      // ticking (and touching a detached element) after the row is gone.
       if (animationFrameRef.current != null) cancelAnimationFrame(animationFrameRef.current);
     };
-  }, []);
+  }, [measure, isEmpty]);
 
   function scroll(direction: "left" | "right") {
     const el = scrollerRef.current;
@@ -52,7 +79,7 @@ export function HorizontalScroller({
       animationFrameRef.current = null;
     }
 
-    const amount = el.clientWidth * 0.9;
+    const amount = el.clientWidth * 0.85;
     const startLeft = el.scrollLeft;
     const maxScrollLeft = el.scrollWidth - el.clientWidth;
     const target = Math.max(
@@ -60,6 +87,15 @@ export function HorizontalScroller({
       Math.min(maxScrollLeft, startLeft + (direction === "left" ? -amount : amount))
     );
     const distance = target - startLeft;
+
+    // This animation runs in JavaScript, so the stylesheet's reduced-motion
+    // rule can't reach it: honour the preference here by jumping straight
+    // to the destination.
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      el.scrollLeft = target;
+      return;
+    }
+
     const startTime = performance.now();
 
     // Driven by our own requestAnimationFrame loop — setting `scrollLeft`
@@ -80,66 +116,72 @@ export function HorizontalScroller({
     animationFrameRef.current = requestAnimationFrame(step);
   }
 
+  // Round, floating, and only present when there is somewhere to go. They
+  // appear on row hover or keyboard focus; touch users swipe instead.
+  const arrowClass =
+    "absolute top-[calc(50%-2.25rem)] z-10 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/15 bg-background/85 text-foreground opacity-0 shadow-pop backdrop-blur-md transition-[opacity,transform,background-color] duration-200 hover:scale-110 hover:bg-surface-hover focus-visible:opacity-100 group-hover/row:opacity-100 sm:flex";
+
   return (
     <section>
       {(title || headerAction) && (
-        <div className="mb-3 flex items-center justify-between gap-4">
-          {title && <h2 className="text-lg font-semibold">{title}</h2>}
+        <div className="mb-3 flex items-center justify-between gap-4 sm:mb-4">
+          {title &&
+            (href ? (
+              <h2 className="section-title">
+                <Link href={href} className="group/title inline-flex items-center gap-1 hover:text-accent-green">
+                  {title}
+                  <ChevronRight
+                    aria-hidden
+                    className="h-4 w-4 text-muted transition-transform duration-200 group-hover/title:translate-x-0.5 group-hover/title:text-accent-green"
+                  />
+                </Link>
+              </h2>
+            ) : (
+              <h2 className="section-title">{title}</h2>
+            ))}
           {headerAction}
         </div>
       )}
       {isEmpty ? (
-        <p className="text-sm text-muted">{emptyMessage}</p>
+        <p className="rounded-xl border border-dashed border-border-strong px-4 py-6 text-sm text-muted">
+          {emptyMessage}
+        </p>
       ) : (
         <div className="group/row relative">
-          {/* w-10 here has to match the scroller's own sm:px-10 gutter below
-              exactly — otherwise the arrow sits on top of the edge card
-              instead of in the space reserved for it. Mobile keeps the
-              existing edge-to-edge bleed (-mx-4/px-4): these arrows only
-              ever show on hover, which touch devices don't have, so there's
-              no real overlap to guard against there. */}
-          <button
-            type="button"
-            onClick={() => scroll("left")}
-            aria-label="Scroll left"
-            className="absolute inset-y-0 left-0 z-10 hidden w-10 items-center justify-center bg-gradient-to-r from-background to-transparent text-foreground opacity-0 transition-opacity group-hover/row:opacity-100 sm:flex"
-          >
-            <ChevronIcon direction="left" />
-          </button>
+          {canScroll.left && (
+            <button
+              type="button"
+              onClick={() => scroll("left")}
+              aria-label="Scroll left"
+              className={`${arrowClass} -left-3 lg:-left-5`}
+            >
+              <ChevronLeft aria-hidden className="h-5 w-5" />
+            </button>
+          )}
 
+          {/* The row runs to the edge of the screen (cancelling the page's
+              side padding) so posters slide off under the edge instead of
+              stopping short of it. py leaves room for the hover lift, which
+              a scrolling container would otherwise clip. */}
           <div
             ref={scrollerRef}
-            className="no-scrollbar -mx-4 flex gap-4 overflow-x-auto px-4 pb-2 sm:mx-0 sm:px-10"
+            className="no-scrollbar -mx-4 -my-2 flex gap-3 overflow-x-auto px-4 py-2 sm:-mx-6 sm:gap-4 sm:px-6 lg:-mx-10 lg:px-10"
           >
             {children}
           </div>
 
-          <button
-            type="button"
-            onClick={() => scroll("right")}
-            aria-label="Scroll right"
-            className="absolute inset-y-0 right-0 z-10 hidden w-10 items-center justify-center bg-gradient-to-l from-background to-transparent text-foreground opacity-0 transition-opacity group-hover/row:opacity-100 sm:flex"
-          >
-            <ChevronIcon direction="right" />
-          </button>
+          {canScroll.right && (
+            <button
+              type="button"
+              onClick={() => scroll("right")}
+              aria-label="Scroll right"
+              className={`${arrowClass} -right-3 lg:-right-5`}
+            >
+              <ChevronRight aria-hidden className="h-5 w-5" />
+            </button>
+          )}
         </div>
       )}
     </section>
-  );
-}
-
-function ChevronIcon({ direction }: { direction: "left" | "right" }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-6 w-6"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      {direction === "left" ? <path d="M15 18l-6-6 6-6" /> : <path d="M9 18l6-6-6-6" />}
-    </svg>
   );
 }

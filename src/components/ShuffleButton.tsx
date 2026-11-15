@@ -1,5 +1,7 @@
 "use client";
 
+import { Shuffle } from "lucide-react";
+
 export function ShuffleButton({
   onClick,
   disabled,
@@ -14,9 +16,10 @@ export function ShuffleButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`rounded-full border border-border px-2.5 py-1 text-xs text-muted transition-colors hover:text-foreground hover:border-accent-green disabled:opacity-50 disabled:hover:text-muted disabled:hover:border-border ${className}`.trim()}
+      className={`chip hover:border-accent-green hover:text-foreground disabled:opacity-40 disabled:hover:border-border-strong disabled:hover:text-muted ${className}`.trim()}
     >
-      🔀 Shuffle
+      <Shuffle aria-hidden className="h-3 w-3" />
+      Shuffle
     </button>
   );
 }

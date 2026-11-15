@@ -32,7 +32,7 @@ export function ListMovieGrid({
       <div className="mb-3 flex justify-end">
         <ShuffleButton onClick={shuffle} disabled={entries.length < 2} />
       </div>
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-6">
+      <div className="poster-grid">
         {order.map((entry) => (
           <div key={entry.id} data-watched={entry.watched}>
             <MovieCard

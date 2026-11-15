@@ -40,7 +40,7 @@ export function CreditGrid({ title, credits }: { title: string; credits: CreditD
         </h2>
         <ShuffleButton onClick={shuffle} disabled={credits.length < 2} />
       </div>
-      <div className="grid grid-cols-3 gap-4 sm:grid-cols-4 md:grid-cols-6">
+      <div className="poster-grid">
         {shown.map((credit) => (
           <div key={credit.id} data-watched={credit.watched}>
             <MovieCard

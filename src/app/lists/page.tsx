@@ -172,7 +172,7 @@ function ListGrid({
   personalCovers: Map<string, string>;
 }) {
   return (
-    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-6">
+    <div className="poster-grid">
       {lists.map((list) => {
         const cover =
           personalCovers.get(list.id) ??

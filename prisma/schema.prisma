@@ -21,6 +21,11 @@ model User {
   image         String?
   backgroundImage String?
   createdAt     DateTime  @default(now())
+  // "USER" or "ADMIN" (a plain String: the sqlite/libsql connector has no
+  // native enums). Admins can open /admin. Always read from the database
+  // when checking it (see lib/admin.ts), never from the session token, so
+  // demoting someone takes effect on their next request.
+  role          String    @default("USER")
 
   accounts  Account[]
   sessions  Session[]
@@ -37,6 +42,7 @@ model User {
   lists             List[]
   watchGoals        WatchGoal[]
   challenges        Challenge[]
+  gameResults       GameResult[]
 
   // One-way Letterboxd -> Flixtally diary sync (see lib/letterboxdSync.ts).
   // Null username means sync isn't connected.
@@ -513,3 +519,47 @@ model ListItem {
   @@unique([listId, tmdbId])
 }
 
+
+// One row per finished round of a daily game (see lib/dailyGame.ts), so a
+// signed-in player's streak and history follow their account between
+// devices. `day` is the puzzle's UTC date as "YYYY-MM-DD"; the unique
+// constraint is what makes "one result per player per day" true even if two
+// tabs submit at once.
+model GameResult {
+  id        String   @id @default(cuid())
+  game      String
+  day       String
+  attempts  Int
+  solved    Boolean
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, game, day])
+  @@index([userId, game])
+}
+
+// A record of each scheduled job run (the three /api/cron/* routes) and each
+// manual run from the admin area: when it started, whether it finished, and
+// a one-line summary. Without this the only way to know whether last night's
+// sync ran was to read the hosting provider's logs.
+model JobRun {
+  id         String    @id @default(cuid())
+  job        String
+  trigger    String    @default("cron") // "cron" | "admin"
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+  ok         Boolean   @default(false)
+  summary    String?
+
+  @@index([job, startedAt])
+}
+
+// Site-wide switches an admin can change without a deploy (the announcement
+// banner, whether new sign-ups are open). One row per setting.
+model SiteSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}

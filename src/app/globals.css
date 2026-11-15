@@ -1,41 +1,230 @@
 @import "tailwindcss";
 
+/* ---------------------------------------------------------------------------
+   Design tokens. Every colour, radius and motion value the app uses comes
+   from here, so a component that only says `bg-surface` or `border-border`
+   stays in step with the rest of the site.
+--------------------------------------------------------------------------- */
 :root {
-  --background: #14181c;
-  --surface: #1c2228;
-  --surface-hover: #253039;
-  --foreground: #e7e9eb;
-  /* Slightly brighter than the original #9ab so small secondary text
-     clears WCAG AA (4.5:1) even over the lighter parts of the photo
-     backgrounds, not just the flat #14181c. */
-  --muted: #aab7c4;
-  --border: #2c3440;
+  color-scheme: dark;
+
+  /* Layered near-black: page, then cards, then things that float above cards. */
+  --background: #0a0c10;
+  --surface: #12161c;
+  --surface-hover: #1a2029;
+  --surface-raised: #171c24;
+
+  --foreground: #f2f4f7;
+  /* Secondary text. 7:1 on the page colour and still above 4.5:1 (WCAG AA)
+     on the lightest surface it sits on. */
+  --muted: #a3aebb;
+  --subtle: #7d8896;
+
+  --border: #222933;
+  --border-strong: #343e4c;
+
+  /* Brand green (the tally-mark logo), used for primary actions and state. */
   --accent-green: #00e054;
+  --accent-green-soft: rgba(0, 224, 84, 0.12);
   --accent-blue: #40bcf4;
   --accent-orange: #ff8000;
+  /* Star ratings and scores. */
+  --accent-gold: #f5c443;
+  --danger: #ff5c5c;
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 8px 24px -12px rgba(0, 0, 0, 0.7);
+  --shadow-pop: 0 20px 50px -12px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.04);
+
+  --header-height: 60px;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-surface: var(--surface);
   --color-surface-hover: var(--surface-hover);
+  --color-surface-raised: var(--surface-raised);
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
+  --color-subtle: var(--subtle);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-accent-green: var(--accent-green);
+  --color-accent-green-soft: var(--accent-green-soft);
   --color-accent-blue: var(--accent-blue);
   --color-accent-orange: var(--accent-orange);
-  --font-sans: "Trebuchet MS", "Segoe UI", Tahoma, sans-serif;
+  --color-accent-gold: var(--accent-gold);
+  --color-danger: var(--danger);
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+  --font-display: var(--font-inter-tight), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
+  --ease-out-expo: var(--ease-out);
+
+  --shadow-card: var(--shadow-card);
+  --shadow-pop: var(--shadow-pop);
+
+  --animate-fade-in: fade-in 0.3s var(--ease-out) both;
+  --animate-fade-up: fade-up 0.5s var(--ease-out) both;
+  --animate-scale-in: scale-in 0.2s var(--ease-out) both;
+  --animate-slide-in-left: slide-in-left 0.28s var(--ease-out) both;
+  --animate-slide-up: slide-up 0.28s var(--ease-out) both;
+  --animate-shimmer: shimmer 1.6s linear infinite;
+  --animate-pop: pop 0.4s var(--ease-out) both;
+  --animate-progress: progress-grow 0.9s var(--ease-out) both;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+@keyframes slide-in-left {
+  from {
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+}
+
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes pop {
+  0% {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.06);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Progress bars animate with a transform, not width, so the browser never
+   has to lay the page out again while one fills. */
+@keyframes progress-grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@keyframes confetti-fall {
+  0% {
+    transform: translate3d(0, -10%, 0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(var(--drift, 0), 110vh, 0) rotate(var(--spin, 540deg));
+    opacity: 0.9;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Base
+--------------------------------------------------------------------------- */
+html {
+  scroll-padding-top: calc(var(--header-height) + 16px);
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
+  font-family: var(--font-sans);
+  font-feature-settings: "cv11", "ss01";
+  /* Full-bleed sections are sized with 100vw, which includes the scrollbar;
+     clipping here keeps that from ever producing a sideways scroll. */
+  overflow-x: clip;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  letter-spacing: -0.015em;
 }
 
 ::selection {
   background: var(--accent-green);
-  color: #0a0a0a;
+  color: #06120a;
+}
+
+/* Tailwind's reset leaves buttons with the default arrow cursor. */
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+summary,
+label[for],
+select {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+/* One focus ring for everything keyboard users can reach. Mouse clicks
+   don't trigger :focus-visible, so this never shows on a click. */
+:focus-visible {
+  outline: 2px solid var(--accent-green);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline-offset: 0;
+}
+
+/* Thin, quiet scrollbars that match the dark theme. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 999px;
+  border: 2px solid var(--background);
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .no-scrollbar {
@@ -53,4 +242,320 @@ body {
 [data-watched="true"] {
   filter: brightness(var(--watched-brightness, 1));
   transition: filter 200ms ease;
+}
+
+/* ---------------------------------------------------------------------------
+   Shared building blocks. Used as plain class names (`btn btn-primary`).
+--------------------------------------------------------------------------- */
+@utility container-page {
+  margin-inline: auto;
+  width: 100%;
+  max-width: 1600px;
+  padding-inline: 1rem;
+
+  @media (min-width: 640px) {
+    padding-inline: 1.5rem;
+  }
+
+  @media (min-width: 1024px) {
+    padding-inline: 2.5rem;
+  }
+}
+
+/* Breaks a section out of the page container to the full window width. */
+@utility bleed {
+  width: 100vw;
+  margin-inline: calc(50% - 50vw);
+}
+
+@utility btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.625rem;
+  border: 1px solid transparent;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    transform 0.15s var(--ease-out),
+    opacity 0.15s ease;
+
+  &:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+  }
+}
+
+@utility btn-primary {
+  background: var(--accent-green);
+  color: #04130a;
+
+  &:hover:not(:disabled) {
+    background: #2bef74;
+  }
+}
+
+@utility btn-secondary {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: var(--foreground);
+
+  &:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.14);
+    border-color: rgba(255, 255, 255, 0.18);
+  }
+}
+
+@utility btn-outline {
+  border-color: var(--border-strong);
+  color: var(--foreground);
+
+  &:hover:not(:disabled) {
+    border-color: var(--accent-green);
+    color: var(--accent-green);
+  }
+}
+
+@utility btn-ghost {
+  color: var(--muted);
+
+  &:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--foreground);
+  }
+}
+
+@utility btn-danger {
+  border-color: rgba(255, 92, 92, 0.4);
+  color: var(--danger);
+
+  &:hover:not(:disabled) {
+    background: rgba(255, 92, 92, 0.12);
+    border-color: var(--danger);
+  }
+}
+
+@utility btn-sm {
+  padding: 0.3125rem 0.75rem;
+  font-size: 0.8125rem;
+  border-radius: 0.5rem;
+}
+
+@utility btn-lg {
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  border-radius: 0.75rem;
+}
+
+@utility card {
+  border-radius: 0.875rem;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+
+@utility card-interactive {
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease,
+    transform 0.25s var(--ease-out);
+
+  &:hover {
+    border-color: var(--border-strong);
+    background: var(--surface-raised);
+    transform: translateY(-2px);
+  }
+}
+
+@utility input {
+  width: 100%;
+  border-radius: 0.625rem;
+  border: 1px solid var(--border-strong);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 0.5625rem 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  color: var(--foreground);
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    box-shadow 0.15s ease;
+
+  &::placeholder {
+    color: var(--subtle);
+  }
+
+  &:hover {
+    border-color: #46515f;
+  }
+
+  &:focus,
+  &:focus-visible {
+    outline: none;
+    border-color: var(--accent-green);
+    background: rgba(255, 255, 255, 0.05);
+    box-shadow: 0 0 0 3px var(--accent-green-soft);
+  }
+}
+
+@utility field-label {
+  display: block;
+  margin-bottom: 0.375rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+@utility chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 500;
+  color: var(--muted);
+  white-space: nowrap;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+@utility chip-active {
+  border-color: var(--accent-green);
+  background: var(--accent-green);
+  color: #04130a;
+}
+
+@utility eyebrow {
+  font-size: 0.6875rem;
+  line-height: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent-green);
+}
+
+@utility page-title {
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  line-height: 2.125rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+
+  @media (min-width: 640px) {
+    font-size: 2.125rem;
+    line-height: 2.5rem;
+  }
+}
+
+@utility section-title {
+  font-family: var(--font-display);
+  font-size: 1.1875rem;
+  line-height: 1.75rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+/* Loading placeholder with a moving highlight instead of a plain pulse. */
+@utility skeleton {
+  border-radius: 0.625rem;
+  background: linear-gradient(
+    100deg,
+    var(--surface) 30%,
+    var(--surface-hover) 50%,
+    var(--surface) 70%
+  );
+  background-size: 200% 100%;
+  animation: var(--animate-shimmer);
+}
+
+/* A row of cards that fades and rises in, each a beat after the last.
+   Children opt in with `style="--i: n"`. */
+@utility stagger {
+  & > * {
+    animation: var(--animate-fade-up);
+    /* Capped so the 60th card in a long row isn't still waiting to appear. */
+    animation-delay: calc(min(var(--i, 0), 10) * 45ms);
+  }
+}
+
+/* A grid of posters that fits as many columns as the width allows: three on
+   a phone, up to nine or ten on a wide monitor, with no breakpoints to tune. */
+@utility poster-grid {
+  display: grid;
+  gap: 1rem 0.875rem;
+  grid-template-columns: repeat(auto-fill, minmax(min(9.5rem, 30%), 1fr));
+
+  @media (min-width: 640px) {
+    gap: 1.5rem 1rem;
+  }
+}
+
+/* The width of one poster in a horizontally scrolling row. */
+@utility row-card {
+  width: 7.25rem;
+  flex-shrink: 0;
+
+  @media (min-width: 640px) {
+    width: 8.75rem;
+  }
+
+  @media (min-width: 1024px) {
+    width: 10rem;
+  }
+
+  @media (min-width: 1536px) {
+    width: 11rem;
+  }
+}
+
+/* The dark gradient that keeps text readable over a film still. */
+@utility scrim-bottom {
+  background: linear-gradient(
+    to top,
+    var(--background) 0%,
+    rgba(10, 12, 16, 0.85) 22%,
+    rgba(10, 12, 16, 0.35) 55%,
+    rgba(10, 12, 16, 0.15) 100%
+  );
+}
+
+@utility scrim-left {
+  background: linear-gradient(
+    to right,
+    rgba(10, 12, 16, 0.94) 0%,
+    rgba(10, 12, 16, 0.7) 35%,
+    rgba(10, 12, 16, 0.1) 70%,
+    transparent 100%
+  );
+}
+
+/* ---------------------------------------------------------------------------
+   Motion preferences. Anyone who has asked their device for less motion gets
+   instant state changes instead of animation, everywhere.
+--------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

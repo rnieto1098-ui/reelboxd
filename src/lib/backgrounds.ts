@@ -101,6 +101,10 @@ export function isUploadedBackground(stored: string | null | undefined): stored 
 
 // Presets are designed dark, so they need a lighter overlay than an arbitrary
 // uploaded photo to stay visible while keeping text readable.
+//
+// The photo is strongest behind the page header and fades into the plain
+// page colour further down, so it sets the mood for a tab without sitting
+// behind the posters and text the page is actually about.
 export function backgroundStyle(
   stored: string | null | undefined,
   pathname = "/"
@@ -110,8 +114,8 @@ export function backgroundStyle(
   const [url, overlay] =
     choice.kind === "upload" ? [choice.url, 0.88] : [choice.preset.src, 0.6];
   return {
-    backgroundImage: `linear-gradient(rgba(20, 24, 28, ${overlay}), rgba(20, 24, 28, ${overlay})), url(${url})`,
+    backgroundImage: `linear-gradient(to bottom, rgba(10, 12, 16, ${overlay}) 0%, rgba(10, 12, 16, 0.94) 45%, rgb(10, 12, 16) 78%), url(${url})`,
     backgroundSize: "cover",
-    backgroundPosition: "center",
+    backgroundPosition: "center top",
   };
 }

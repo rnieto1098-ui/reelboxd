@@ -27,7 +27,7 @@ export function RecentlyLoggedRow({ entries }: { entries: RecentlyLoggedEntry[] 
       emptyMessage="Nothing logged or rated yet."
     >
       {order.map((e) => (
-        <div key={e.id} className="w-28 flex-shrink-0 sm:w-32 md:w-36">
+        <div key={e.id} className="row-card">
           <MovieCard
             tmdbId={e.tmdbId}
             title={e.title}

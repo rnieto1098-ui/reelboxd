@@ -13,7 +13,7 @@ export function ListRow({ title, lists }: { title?: string; lists: ListCard[] })
           <Link
             key={list.id}
             href={`/lists/${list.id}`}
-            className="group w-28 flex-shrink-0 sm:w-32 md:w-36"
+            className="group row-card"
           >
             <div className="aspect-[2/3] w-full overflow-hidden rounded-md border border-border bg-surface">
               <PosterImage src={cover} alt={list.title} />

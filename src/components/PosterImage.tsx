@@ -4,6 +4,12 @@ import { useState } from "react";
 import Image from "next/image";
 import { ImageIcon } from "@/components/icons";
 
+// What the browser is told about how wide a poster will be drawn, so it
+// picks a file that size instead of the largest one. Row and grid cards top
+// out around 176px; without this a phone downloaded a 750px image for a
+// 116px slot.
+const CARD_SIZES = "(min-width: 1536px) 176px, (min-width: 1024px) 160px, (min-width: 640px) 140px, 33vw";
+
 /**
  * A poster/cover image with a real fallback for both ways it can be
  * missing: no path to try at all (`src` is null), and a path that TMDB
@@ -18,6 +24,8 @@ export function PosterImage({
   alt,
   year,
   quality = 80,
+  sizes = CARD_SIZES,
+  priority = false,
 }: {
   src: string | null;
   alt: string;
@@ -25,6 +33,8 @@ export function PosterImage({
   // reads like a title card rather than an empty slot.
   year?: string;
   quality?: number;
+  sizes?: string;
+  priority?: boolean;
 }) {
   const [failed, setFailed] = useState(false);
 
@@ -37,7 +47,9 @@ export function PosterImage({
       width={342}
       height={513}
       quality={quality}
-      className="h-full w-full object-cover transition-transform group-hover:scale-105"
+      sizes={sizes}
+      priority={priority}
+      className="h-full w-full object-cover transition-transform duration-500 ease-out-expo group-hover:scale-[1.04]"
       onError={() => setFailed(true)}
     />
   );

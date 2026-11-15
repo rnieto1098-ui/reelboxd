@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState, useTransition } from "react";
+import { Search } from "lucide-react";
 import type { SearchSuggestion } from "@/app/api/search/route";
 
 const DEBOUNCE_MS = 300;
@@ -13,6 +14,7 @@ export function SearchBox() {
   const router = useRouter();
   const listboxId = useId();
   const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchSuggestion[]>([]);
   const [status, setStatus] = useState<Status>("idle");
@@ -60,6 +62,20 @@ export function SearchBox() {
     document.addEventListener("pointerdown", onPointerDown);
     return () => document.removeEventListener("pointerdown", onPointerDown);
   }, [open]);
+
+  // "/" jumps to search from anywhere, the convention on most large sites.
+  // Ignored while typing in another field so it can still be typed there.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== "/" || e.ctrlKey || e.metaKey || e.altKey) return;
+      const target = e.target as HTMLElement | null;
+      if (target?.closest("input, textarea, select, [contenteditable='true']")) return;
+      e.preventDefault();
+      inputRef.current?.focus();
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   function go(href: string) {
     setOpen(false);
@@ -125,35 +141,53 @@ export function SearchBox() {
   const optionId = (i: number) => `${listboxId}-opt-${i}`;
 
   return (
-    <div ref={containerRef} className="relative w-full min-w-0 sm:max-w-xs">
+    <div ref={containerRef} className="w-full min-w-0 sm:relative sm:max-w-sm">
       <form
         role="search"
+        className="relative"
         onSubmit={(e) => {
           e.preventDefault();
           searchAll();
         }}
       >
+        <Search
+          aria-hidden
+          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle"
+        />
         <input
+          ref={inputRef}
           type="search"
+          name="q"
           value={query}
           onChange={(e) => handleChange(e.target.value)}
           onFocus={() => setOpen(true)}
           onKeyDown={handleKeyDown}
-          placeholder="Search movies, people..."
-          aria-label="Search movies and people"
+          placeholder="Search films, people…"
+          aria-label="Search films and people"
           role="combobox"
           aria-expanded={showDropdown}
           aria-controls={listboxId}
           aria-autocomplete="list"
           aria-activedescendant={showDropdown && active >= 0 ? optionId(active) : undefined}
           autoComplete="off"
-          className="w-full rounded-md border border-border bg-background px-3 py-1.5 pr-8 text-sm placeholder:text-muted focus:outline-none focus:border-accent-green [&::-webkit-search-cancel-button]:hidden"
+          enterKeyHint="search"
+          className="h-9 w-full rounded-full border border-white/10 bg-white/[0.06] pl-9 pr-9 text-sm text-foreground transition-[border-color,background-color,box-shadow] placeholder:text-subtle hover:border-white/20 focus:border-accent-green focus:bg-white/[0.09] focus:shadow-[0_0_0_3px_var(--accent-green-soft)] focus:outline-none [&::-webkit-search-cancel-button]:hidden"
         />
-        {navigating && (
+        {navigating ? (
           <span
+            role="status"
             aria-label="Loading results"
-            className="absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 animate-spin rounded-full border-2 border-muted border-t-accent-green"
+            className="absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 animate-spin rounded-full border-2 border-muted border-t-accent-green"
           />
+        ) : (
+          !query && (
+            <kbd
+              aria-hidden
+              className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded border border-white/15 px-1.5 text-[10px] font-medium leading-4 text-subtle xl:block"
+            >
+              /
+            </kbd>
+          )
         )}
       </form>
 
@@ -162,7 +196,10 @@ export function SearchBox() {
           id={listboxId}
           role="listbox"
           aria-label="Search suggestions"
-          className="absolute left-0 right-0 top-full z-50 mt-1 min-w-[16rem] overflow-hidden rounded-md border border-border bg-surface shadow-lg"
+          // On phones the box itself is narrow, so the suggestions span the
+          // screen under the header instead of hanging off the box (where
+          // they ran past the right edge).
+          className="fixed inset-x-3 top-[calc(var(--header-height)+0.25rem)] z-50 animate-scale-in overflow-hidden rounded-xl border border-border-strong bg-surface-raised shadow-pop sm:absolute sm:inset-x-0 sm:top-full sm:mt-2 sm:min-w-[20rem] sm:origin-top"
         >
           {status === "loading" && <p className="px-3 py-2.5 text-sm text-muted">Searching…</p>}
           {status === "error" && (
@@ -184,9 +221,9 @@ export function SearchBox() {
                   go(`/movie/${movie.id}`);
                 }}
                 onMouseEnter={() => setActive(i)}
-                className={`flex items-center gap-3 px-3 py-1.5 ${active === i ? "bg-surface-hover" : ""}`}
+                className={`flex items-center gap-3 px-3 py-2 ${active === i ? "bg-white/[0.07]" : ""}`}
               >
-                <span className="relative h-12 w-8 shrink-0 overflow-hidden rounded-sm bg-background">
+                <span className="relative h-12 w-8 shrink-0 overflow-hidden rounded bg-background ring-1 ring-white/10">
                   {movie.poster ? (
                     <Image src={movie.poster} alt="" fill sizes="32px" className="object-cover" />
                   ) : (
@@ -210,7 +247,7 @@ export function SearchBox() {
                 searchAll();
               }}
               onMouseEnter={() => setActive(results.length)}
-              className={`block border-t border-border px-3 py-2 text-sm text-accent-green ${active === results.length ? "bg-surface-hover" : ""}`}
+              className={`block border-t border-border px-3 py-2.5 text-sm font-medium text-accent-green ${active === results.length ? "bg-white/[0.07]" : ""}`}
             >
               See all results for &ldquo;{trimmed}&rdquo;
             </a>

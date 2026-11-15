@@ -3,18 +3,26 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { BookmarkIcon, EyeIcon, RewatchIcon, ShoppingBagIcon } from "@/components/icons";
+import { Ellipsis, X } from "lucide-react";
 import { useToast } from "@/components/Toast";
 import { useRewatchIds } from "@/components/RewatchIdsProvider";
 import { useCoalescedRefresh } from "@/lib/useCoalescedRefresh";
 
-function actionButtonClass(active: boolean) {
-  const base =
-    "pointer-events-auto flex h-7 w-7 items-center justify-center rounded-full backdrop-blur-sm transition-colors disabled:opacity-50";
-  // Active (owned/watchlisted) stays highlighted at rest, not just on
-  // hover — that's the whole point of showing it's already engaged.
+// Buttons only accept clicks while they are showing. They used to stay
+// clickable at opacity 0, and phones never fire the hover that reveals
+// them, so a tap on a poster's corner silently toggled watched or owned
+// instead of opening the film.
+function actionButtonClass(active: boolean, revealed: boolean) {
+  const base = `flex h-8 w-8 items-center justify-center rounded-full backdrop-blur-md transition-[background-color,color,transform] duration-150 active:scale-90 disabled:opacity-50 ${
+    revealed
+      ? "pointer-events-auto"
+      : "pointer-events-none group-hover:pointer-events-auto group-focus-within:pointer-events-auto"
+  }`;
+  // Active (owned/watchlisted) stays highlighted, not just on hover —
+  // that's the whole point of showing it's already engaged.
   return active
     ? `${base} bg-accent-green text-black hover:bg-accent-green/90`
-    : `${base} bg-black/70 text-white hover:bg-accent-green hover:text-black`;
+    : `${base} bg-black/65 text-white ring-1 ring-white/15 hover:bg-accent-green hover:text-black hover:ring-transparent`;
 }
 
 export function PosterQuickActions({
@@ -43,6 +51,9 @@ export function PosterQuickActions({
   const initialInRewatch = useRewatchIds().has(tmdbId);
   const [inRewatch, setInRewatch] = useState(initialInRewatch);
   const [rewatchSaving, setRewatchSaving] = useState(false);
+  // Touch screens have no hover, so there the actions sit behind a small
+  // always-visible "more" button that toggles this.
+  const [revealed, setRevealed] = useState(false);
 
   // initialOwned/initialInWatchlist can change out from under this component
   // after a router.refresh() triggered elsewhere on the page (e.g. the same
@@ -236,57 +247,96 @@ export function PosterQuickActions({
     refresh();
   }
 
+  const rowClass = `pointer-events-none absolute inset-x-0 flex items-center justify-between p-1.5 transition-opacity duration-200 ${
+    revealed ? "opacity-100" : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
+  }`;
+
   return (
     <>
-      <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between p-1.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+      {/* Darkens the poster's edges behind the buttons so they read on any
+          artwork. Purely decorative. */}
+      <div
+        aria-hidden
+        className={`pointer-events-none absolute inset-0 bg-gradient-to-b from-black/55 via-transparent to-black/65 transition-opacity duration-200 ${
+          revealed ? "opacity-100" : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
+        }`}
+      />
+
+      {/* At rest, a small mark on films you've seen. Fades out as the full
+          set of buttons fades in. */}
+      {watched && !revealed && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute bottom-1.5 left-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-accent-green text-black shadow transition-opacity duration-200 group-hover:opacity-0 group-focus-within:opacity-0"
+        >
+          <EyeIcon className="h-3 w-3" />
+        </span>
+      )}
+
+      <div className={`${rowClass} top-0`}>
         <button
           type="button"
           title={inRewatch ? "On rewatch list — click to remove" : "Add to rewatch list"}
-          aria-label="Add to rewatch list"
+          aria-label={inRewatch ? "Remove from rewatch list" : "Add to rewatch list"}
           aria-pressed={inRewatch}
           disabled={rewatchSaving}
           onClick={toggleRewatch}
-          className={actionButtonClass(inRewatch)}
+          className={actionButtonClass(inRewatch, revealed)}
         >
           <RewatchIcon />
         </button>
         <button
           type="button"
           title={owned ? "Owned — click to remove" : "Mark as owned"}
-          aria-label="Mark as owned"
+          aria-label={owned ? "Remove from owned" : "Mark as owned"}
           aria-pressed={owned}
           disabled={ownedSaving}
           onClick={toggleOwned}
-          className={actionButtonClass(owned)}
+          className={`${actionButtonClass(owned, revealed)} [@media(hover:none)]:mr-9`}
         >
           <ShoppingBagIcon />
         </button>
       </div>
 
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-between p-1.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+      <div className={`${rowClass} bottom-0`}>
         <button
           type="button"
           title={watched ? "Marked watched — click to undo" : "Mark as watched (no date, no diary entry)"}
-          aria-label="Mark watched"
+          aria-label={watched ? "Unmark watched" : "Mark watched"}
           aria-pressed={watched}
           disabled={watchedSaving}
           onClick={toggleWatched}
-          className={actionButtonClass(watched)}
+          className={actionButtonClass(watched, revealed)}
         >
           <EyeIcon />
         </button>
         <button
           type="button"
           title={inWatchlist ? "On watchlist — click to remove" : "Add to watchlist"}
-          aria-label="Add to watchlist"
+          aria-label={inWatchlist ? "Remove from watchlist" : "Add to watchlist"}
           aria-pressed={inWatchlist}
           disabled={watchlistSaving}
           onClick={toggleWatchlist}
-          className={actionButtonClass(inWatchlist)}
+          className={actionButtonClass(inWatchlist, revealed)}
         >
           <BookmarkIcon />
         </button>
       </div>
+
+      {/* Touch only: the way in to the actions above. */}
+      <button
+        type="button"
+        aria-label={revealed ? "Hide quick actions" : "Show quick actions"}
+        aria-expanded={revealed}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setRevealed((v) => !v);
+        }}
+        className="absolute right-1.5 top-1.5 hidden h-8 w-8 items-center justify-center rounded-full bg-black/65 text-white ring-1 ring-white/15 backdrop-blur-md active:scale-90 [@media(hover:none)]:flex"
+      >
+        {revealed ? <X aria-hidden className="h-4 w-4" /> : <Ellipsis aria-hidden className="h-4 w-4" />}
+      </button>
     </>
   );
 }

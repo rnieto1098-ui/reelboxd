@@ -68,7 +68,7 @@ export default async function StudioPage({
       {cleanedMovies.length === 0 ? (
         <p className="text-muted">No movies found.</p>
       ) : (
-        <div className="grid grid-cols-3 gap-4 sm:grid-cols-4 md:grid-cols-6">
+        <div className="poster-grid">
           {cleanedMovies.map((movie) => (
             <MovieCard
               key={movie.id}

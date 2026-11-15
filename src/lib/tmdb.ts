@@ -54,7 +54,31 @@ export type TmdbMovieDetails = TmdbMovieSummary & {
     }[];
   };
   keywords?: { keywords: { id: number; name: string }[] };
+  videos?: { results: TmdbVideo[] };
 };
+
+export type TmdbVideo = {
+  key: string;
+  name: string;
+  site: string; // "YouTube" | "Vimeo"
+  type: string; // "Trailer" | "Teaser" | "Clip" | "Featurette" | ...
+  official: boolean;
+  published_at?: string;
+};
+
+/**
+ * The best video to put behind a "Watch trailer" button: an official
+ * YouTube trailer if there is one, then any trailer, then a teaser. Returns
+ * null when TMDB has nothing suitable, in which case there is no button.
+ */
+export function pickTrailer(details: TmdbMovieDetails): TmdbVideo | null {
+  const youtube = (details.videos?.results ?? []).filter((v) => v.site === "YouTube" && v.key);
+  const rank = (v: TmdbVideo) =>
+    (v.type === "Trailer" ? 0 : v.type === "Teaser" ? 2 : 4) + (v.official ? 0 : 1);
+  const candidates = youtube.filter((v) => v.type === "Trailer" || v.type === "Teaser");
+  if (candidates.length === 0) return null;
+  return [...candidates].sort((a, b) => rank(a) - rank(b))[0];
+}
 
 export type TmdbImage = {
   file_path: string;
@@ -119,6 +143,9 @@ function releaseSlot(): void {
 }
 
 const MAX_RETRIES = 3;
+const REQUEST_TIMEOUT_MS = 8000;
+// However long TMDB asks us to wait, a page render won't sit longer than this.
+const MAX_BACKOFF_MS = 4000;
 
 async function tmdbFetch<T>(
   path: string,
@@ -138,46 +165,57 @@ async function tmdbFetch<T>(
     if (value !== undefined) url.searchParams.set(key, String(value));
   }
 
-  await acquireSlot();
-  try {
-    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-      const res = await fetch(url.toString(), {
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    // The slot is held only for the request itself. It used to stay taken
+    // through the back-off sleep below, so a burst of 429s could park every
+    // slot on a timer and stall all TMDB traffic on the instance.
+    await acquireSlot();
+    let res: Response;
+    try {
+      res = await fetch(url.toString(), {
         next: { revalidate: revalidateSeconds },
+        // A hung connection would otherwise hold its slot (and the page
+        // waiting on it) until the platform killed the whole request.
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
+    } finally {
+      releaseSlot();
+    }
 
-      if (res.ok) return res.json() as Promise<T>;
+    if (res.ok) return res.json() as Promise<T>;
 
-      // 429 is the only status worth retrying — TMDB tells us exactly how
-      // long to back off via Retry-After; anything else (400/401/404/5xx)
-      // won't be fixed by waiting, so fail immediately.
-      if (res.status === 429 && attempt < MAX_RETRIES) {
-        const retryAfterSeconds = Number(res.headers.get("retry-after"));
-        const waitMs = Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0
+    // 429 is the only status worth retrying — TMDB tells us how long to
+    // back off via Retry-After; anything else (400/401/404/5xx) won't be
+    // fixed by waiting, so fail immediately.
+    if (res.status === 429 && attempt < MAX_RETRIES) {
+      const retryAfterSeconds = Number(res.headers.get("retry-after"));
+      const waitMs =
+        Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0
           ? retryAfterSeconds * 1000
           : 500 * 2 ** attempt; // 500ms, 1s, 2s if TMDB doesn't say
-        await new Promise((resolve) => setTimeout(resolve, waitMs));
-        continue;
-      }
-
-      throw new Error(`TMDB request failed (${res.status}): ${path}`);
+      await new Promise((resolve) => setTimeout(resolve, Math.min(waitMs, MAX_BACKOFF_MS)));
+      continue;
     }
-    // Unreachable — the loop above always returns or throws — but keeps
-    // TypeScript satisfied that every path returns T.
-    throw new Error(`TMDB request failed after ${MAX_RETRIES} retries: ${path}`);
-  } finally {
-    releaseSlot();
+
+    throw new Error(`TMDB request failed (${res.status}): ${path}`);
   }
+  // Unreachable — the loop above always returns or throws — but keeps
+  // TypeScript satisfied that every path returns T.
+  throw new Error(`TMDB request failed after ${MAX_RETRIES} retries: ${path}`);
 }
 
 export function posterUrl(path: string | null, size: "w200" | "w342" | "w500" = "w342") {
   return path ? `${IMAGE_BASE}/${size}${path}` : null;
 }
 
-export function backdropUrl(path: string | null, size: "w780" | "w1280" = "w1280") {
+export function backdropUrl(
+  path: string | null,
+  size: "w780" | "w1280" | "original" = "w1280"
+) {
   return path ? `${IMAGE_BASE}/${size}${path}` : null;
 }
 
-export function profileUrl(path: string | null, size: "w45" | "w185" = "w185") {
+export function profileUrl(path: string | null, size: "w45" | "w185" | "h632" = "w185") {
   return path ? `${IMAGE_BASE}/${size}${path}` : null;
 }
 
@@ -264,7 +302,7 @@ export function searchMovies(query: string, page = 1, year?: number) {
 
 export function getMovieDetails(tmdbId: number) {
   return tmdbFetch<TmdbMovieDetails>(`/movie/${tmdbId}`, {
-    append_to_response: "credits,release_dates,keywords",
+    append_to_response: "credits,release_dates,keywords,videos",
   });
 }
 

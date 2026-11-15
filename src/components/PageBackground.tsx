@@ -11,5 +11,14 @@ export function PageBackground({ stored }: { stored: string | null }) {
   const pathname = usePathname();
   const style = backgroundStyle(stored, pathname);
   if (!style) return null;
-  return <div aria-hidden className="pointer-events-none fixed inset-0 -z-10" style={style} />;
+  return (
+    <div
+      // Keyed by the image so moving to a tab with a different backdrop
+      // fades the new one in instead of swapping it abruptly.
+      key={String(style.backgroundImage)}
+      aria-hidden
+      className="pointer-events-none fixed inset-0 -z-10 animate-fade-in"
+      style={style}
+    />
+  );
 }

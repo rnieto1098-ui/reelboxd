@@ -11,6 +11,7 @@ export function MovieCard({
   owned,
   inWatchlist,
   watched,
+  priority,
 }: {
   tmdbId: number;
   title: string;
@@ -22,6 +23,8 @@ export function MovieCard({
   // (recommendations, upcoming releases) — PosterQuickActions defaults it
   // to false, which is correct there.
   watched?: boolean;
+  // Set for the first few posters on a page so they load ahead of the rest.
+  priority?: boolean;
 }) {
   const src = posterUrl(posterPath);
   // `year` is sometimes a full release date (Coming Soon rows); the
@@ -32,13 +35,13 @@ export function MovieCard({
 
   return (
     <div className="group block">
-      <div className="relative aspect-[2/3] w-full overflow-hidden rounded-md bg-surface border border-border">
+      <div className="relative aspect-[2/3] w-full overflow-hidden rounded-lg bg-surface ring-1 ring-white/[0.08] transition-[transform,box-shadow] duration-300 ease-out-expo group-hover:-translate-y-1 group-hover:shadow-pop group-hover:ring-white/25 group-focus-within:ring-white/25">
         {/* A <button> can't legally sit inside an <a>, so the quick-action
             buttons are a sibling overlay on top of this link, not nested
             inside it — nesting them worked in some browsers but not
             reliably, since it's invalid HTML with undefined click behavior. */}
         <Link href={href} className="absolute inset-0">
-          <PosterImage src={src} alt={title} year={placeholderYear} />
+          <PosterImage src={src} alt={title} year={placeholderYear} priority={priority} />
         </Link>
         <PosterQuickActions
           tmdbId={tmdbId}
@@ -57,7 +60,8 @@ export function MovieCard({
         <Link
           href={href}
           title={title}
-          className="mt-1.5 block line-clamp-2 min-h-[2.5rem] text-sm font-medium group-hover:text-accent-green transition-colors"
+          tabIndex={-1}
+          className="mt-2 line-clamp-2 min-h-[2.375rem] text-[13px] font-medium leading-[1.1875rem] text-foreground/90 transition-colors group-hover:text-foreground"
         >
           {title}
         </Link>
@@ -65,9 +69,9 @@ export function MovieCard({
         // No poster: the placeholder above already shows the title, so the
         // caption doesn't repeat it — just the empty two-line slot, keeping
         // this card's date in line with its neighbors'.
-        <div aria-hidden className="mt-1.5 min-h-[2.5rem]" />
+        <div aria-hidden className="mt-2 min-h-[2.375rem]" />
       )}
-      {year && <p className="text-xs text-muted">{year}</p>}
+      {year && <p className="mt-0.5 text-xs text-subtle">{year}</p>}
     </div>
   );
 }

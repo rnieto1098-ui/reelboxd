@@ -183,7 +183,7 @@ function PersonCreditsSkeleton() {
   return (
     <div className="animate-pulse space-y-6">
       <div className="h-6 w-24 rounded-full bg-surface" />
-      <div className="grid grid-cols-3 gap-4 sm:grid-cols-4 md:grid-cols-6">
+      <div className="poster-grid">
         {Array.from({ length: 12 }).map((_, i) => (
           <div key={i} className="aspect-[2/3] rounded-md bg-surface" />
         ))}

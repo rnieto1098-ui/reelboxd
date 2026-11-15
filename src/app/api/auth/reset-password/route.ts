@@ -50,7 +50,12 @@ export async function POST(request: Request) {
   // One-time use — the token is consumed in the same transaction as the
   // password update, so a link can't be replayed even if intercepted.
   await prisma.$transaction([
-    prisma.user.update({ where: { email: record.identifier }, data: { hashedPassword } }),
+    prisma.user.update({
+      where: { email: record.identifier },
+      // A reset means the old password may be known to someone else: end
+      // every session that was signed in with it.
+      data: { hashedPassword, sessionsValidFrom: new Date() },
+    }),
     prisma.verificationToken.delete({ where: { token } }),
   ]);
 

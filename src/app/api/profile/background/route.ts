@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { del } from "@vercel/blob";
+import { deleteBlobs } from "@/lib/blob";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import {
@@ -47,7 +47,7 @@ export async function PUT(request: Request) {
 
   // Switching away from an upload frees its blob, as the remove button does.
   const oldUrl = existing?.backgroundImage;
-  if (isUploadedBackground(oldUrl)) await del(oldUrl).catch(() => null);
+  if (isUploadedBackground(oldUrl)) await deleteBlobs(oldUrl);
 
   return NextResponse.json({ ok: true });
 }

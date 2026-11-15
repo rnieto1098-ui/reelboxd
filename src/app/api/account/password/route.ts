@@ -39,7 +39,10 @@ export async function POST(request: Request) {
   const hashedPassword = await bcrypt.hash(newPassword, 12);
   await prisma.user.update({
     where: { id: session.user.id },
-    data: { hashedPassword },
+    // Ends every existing session, this one included: whoever knew the old
+    // password shouldn't stay signed in on another device. The page signs
+    // the user back in with the new one.
+    data: { hashedPassword, sessionsValidFrom: new Date() },
   });
 
   return NextResponse.json({ ok: true }, { status: 200 });

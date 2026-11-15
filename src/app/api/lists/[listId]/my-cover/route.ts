@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { del, put } from "@vercel/blob";
+import { put } from "@vercel/blob";
+import { deleteBlobs } from "@/lib/blob";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -64,7 +65,7 @@ export async function POST(request: Request, context: { params: Promise<{ listId
   });
 
   // Delete the old blob only after the new one is safely stored and saved.
-  if (existing?.imagePath) await del(existing.imagePath).catch(() => null);
+  if (existing?.imagePath) await deleteBlobs(existing.imagePath);
 
   return NextResponse.json({ path: blob.url });
 }
@@ -82,7 +83,7 @@ export async function DELETE(_request: Request, context: { params: Promise<{ lis
     select: { imagePath: true },
   });
   await prisma.customListCover.deleteMany({ where: { userId, listId } });
-  if (existing?.imagePath) await del(existing.imagePath).catch(() => null);
+  if (existing?.imagePath) await deleteBlobs(existing.imagePath);
 
   return NextResponse.json({ ok: true });
 }

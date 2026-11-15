@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { del, put } from "@vercel/blob";
+import { put } from "@vercel/blob";
+import { deleteBlobs } from "@/lib/blob";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidateListCache } from "@/lib/listCache";
@@ -61,7 +62,7 @@ export async function POST(request: Request, context: { params: Promise<{ listId
   revalidateListCache();
 
   // Delete the old blob only after the new one is safely stored and saved.
-  if (existing?.coverImage) await del(existing.coverImage).catch(() => null);
+  if (existing?.coverImage) await deleteBlobs(existing.coverImage);
 
   return NextResponse.json({ path: blob.url });
 }
@@ -80,7 +81,7 @@ export async function DELETE(_request: Request, context: { params: Promise<{ lis
   const existing = await prisma.list.findUnique({ where: { id: listId }, select: { coverImage: true } });
   await prisma.list.update({ where: { id: listId }, data: { coverImage: null } });
   revalidateListCache();
-  if (existing?.coverImage) await del(existing.coverImage).catch(() => null);
+  if (existing?.coverImage) await deleteBlobs(existing.coverImage);
 
   return NextResponse.json({ ok: true });
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { del, put } from "@vercel/blob";
+import { put } from "@vercel/blob";
+import { deleteBlobs } from "@/lib/blob";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { isUploadedBackground } from "@/lib/backgrounds";
@@ -75,7 +76,7 @@ export async function POST(request: Request) {
   // never risk losing a working image because a later step failed. A
   // background may be a preset or "none", which aren't blobs.
   if (oldUrl && (type === "avatar" || isUploadedBackground(oldUrl))) {
-    await del(oldUrl).catch(() => null);
+    await deleteBlobs(oldUrl);
   }
 
   return NextResponse.json({ path: blob.url });
@@ -104,7 +105,7 @@ export async function DELETE(request: Request) {
   });
 
   if (url && (type === "avatar" || isUploadedBackground(url))) {
-    await del(url).catch(() => null);
+    await deleteBlobs(url);
   }
 
   return NextResponse.json({ ok: true });

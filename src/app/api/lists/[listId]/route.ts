@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidateListCache } from "@/lib/listCache";
 import { parseTagsInput, tagsToStorageString } from "@/lib/listTags";
+import { deleteBlobs } from "@/lib/blob";
 
 // Both optional so one endpoint covers the tag editor and the rename
 // control without either having to send the other's field.
@@ -65,7 +66,10 @@ export async function DELETE(
   }
 
   const { listId } = await context.params;
-  const list = await prisma.list.findUnique({ where: { id: listId } });
+  const list = await prisma.list.findUnique({
+    where: { id: listId },
+    include: { customCovers: { select: { imagePath: true } } },
+  });
 
   if (!list || list.isSystem || list.ownerId !== session.user.id) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -73,6 +77,9 @@ export async function DELETE(
 
   await prisma.list.delete({ where: { id: listId } });
   revalidateListCache();
+  // The list's own cover and any personal covers other people set for it
+  // are files in blob storage; deleting the rows used to leave them behind.
+  await deleteBlobs([list.coverImage, ...list.customCovers.map((c) => c.imagePath)]);
 
   return NextResponse.json({ ok: true });
 }

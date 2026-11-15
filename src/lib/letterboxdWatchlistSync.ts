@@ -178,7 +178,15 @@ export async function syncLetterboxdWatchlist(
           return;
         }
 
-        const movie = await ensureMovieCached(tmdbId);
+        // A Letterboxd page can point at a TMDB id that has since been
+        // deleted or merged. That used to throw here on every run, at the
+        // same film, so nothing after it was ever synced. It's listed with
+        // the other films that couldn't be matched instead.
+        const movie = await ensureMovieCached(tmdbId).catch(() => null);
+        if (!movie) {
+          unmatched.push(entry.name);
+          return;
+        }
         // Sequenced, not Promise.all: both would already be in flight, so a
         // failed add would still leave the slug marked synced — and since
         // this sync is add-only and skips anything already recorded, that

@@ -73,13 +73,26 @@ export async function getUserOwnedTmdbIds(userId: string | undefined): Promise<S
   return new Set(owned.map((o) => o.movie.tmdbId));
 }
 
-export async function getFlatrateProviders(tmdbId: number): Promise<TmdbWatchProvider[]> {
+/**
+ * A film's subscription-streaming providers, or null if TMDB couldn't be
+ * asked. The difference matters to anything that *stores* the answer: "on no
+ * services" is a fact worth recording, "the request failed" is not. Treating
+ * a failed lookup as an empty list used to wipe the film's saved snapshot,
+ * and the next successful check then reported every one of its services as
+ * newly added.
+ */
+export async function fetchFlatrateProviders(tmdbId: number): Promise<TmdbWatchProvider[] | null> {
   try {
     const data = await getWatchProviders(tmdbId);
     return data.results[WATCH_REGION]?.flatrate ?? [];
   } catch {
-    return [];
+    return null;
   }
+}
+
+// For display only, where a failed lookup can reasonably show as "none".
+export async function getFlatrateProviders(tmdbId: number): Promise<TmdbWatchProvider[]> {
+  return (await fetchFlatrateProviders(tmdbId)) ?? [];
 }
 
 export function parseProviderIds(stored: string): Set<number> {
@@ -133,10 +146,12 @@ export async function getFlatrateProviderIdsByTmdbId(
   // its slowest request before the next one began.
   const seeded = await Promise.all(
     unseeded.map(async (movie) => {
-      const providers = await getFlatrateProviders(movie.tmdbId);
-      const ids = providers.map((p) => p.provider_id);
+      const providers = await fetchFlatrateProviders(movie.tmdbId);
+      const ids = (providers ?? []).map((p) => p.provider_id);
       byTmdbId.set(movie.tmdbId, new Set(ids));
-      return { movieId: movie.id, providerIds: ids.join(",") };
+      // A failed lookup shows as "not streaming" for this one page view but
+      // is not saved, so the next view asks again.
+      return providers ? { movieId: movie.id, providerIds: ids.join(",") } : null;
     })
   );
 
@@ -147,7 +162,9 @@ export async function getFlatrateProviderIdsByTmdbId(
   after(() =>
     prisma
       .$transaction(
-        seeded.map((s) =>
+        seeded
+          .filter((s): s is NonNullable<typeof s> => s != null)
+          .map((s) =>
           prisma.movieProviderSnapshot.upsert({
             where: { movieId: s.movieId },
             update: { providerIds: s.providerIds },

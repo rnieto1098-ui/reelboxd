@@ -29,8 +29,13 @@ export async function POST(request: Request) {
 
   const { username } = parsed.data;
 
-  const existing = await prisma.user.findUnique({ where: { username } });
-  if (existing && existing.id !== session.user.id) {
+  // Compared without regard to case, so "Ryan" can't be taken while "ryan"
+  // exists (the column's own unique constraint is case-sensitive). Changing
+  // only the capitalisation of your own name is allowed.
+  const matches = await prisma.$queryRaw<{ id: string }[]>`
+    SELECT "id" FROM "User" WHERE lower("username") = lower(${username})
+  `;
+  if (matches.some((m) => m.id !== session.user.id)) {
     return NextResponse.json({ error: "That username is already taken" }, { status: 409 });
   }
 

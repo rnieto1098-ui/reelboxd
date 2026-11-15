@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/Toast";
 
@@ -69,6 +69,26 @@ export function LetterboxdSyncCard({
   const showToast = useToast();
   const [username, setUsername] = useState("");
   const [busy, setBusy] = useState(false);
+  const fieldId = useId();
+  const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
+  // The "last synced" time is shown in the viewer's own timezone, which the
+  // server doesn't know. Formatting it during the first render produced one
+  // time on the server and another in the browser (a hydration mismatch), so
+  // it is filled in after the page has loaded instead.
+  const [syncedLabel, setSyncedLabel] = useState<string | null>(null);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- needs the browser's timezone
+    setSyncedLabel(
+      initialSyncedAt
+        ? new Date(initialSyncedAt).toLocaleString("en-US", {
+            month: "short",
+            day: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+          })
+        : null
+    );
+  }, [initialSyncedAt]);
 
   function announce(body: SyncSummary) {
     showToast(summaryMessage(body));
@@ -99,47 +119,71 @@ export function LetterboxdSyncCard({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-run when the connected account changes
   }, [initialUsername]);
 
+  // Every request below is wrapped the same way: a dropped connection, or a
+  // sync that outlives the server's time limit and comes back as an error
+  // page rather than JSON, used to throw past `setBusy(false)` and leave the
+  // card stuck on "Working…" until the page was reloaded.
+  async function call(
+    url: string,
+    init: RequestInit,
+    fallbackError: string
+  ): Promise<SyncSummary & { username?: string } | null> {
+    setBusy(true);
+    try {
+      const res = await fetch(url, init);
+      const body = await res.json().catch(() => null);
+      if (!res.ok) {
+        showToast(body?.error ?? fallbackError, "error");
+        return null;
+      }
+      return body ?? { imported: 0 };
+    } catch {
+      showToast(fallbackError, "error");
+      return null;
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function connect(e: React.FormEvent) {
     e.preventDefault();
     if (!username.trim()) return;
-    setBusy(true);
-    const res = await fetch("/api/account/letterboxd", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username: username.trim() }),
-    });
-    const body = await res.json();
-    setBusy(false);
-
-    if (!res.ok) {
-      showToast(body.error ?? "Couldn't connect that account", "error");
-      return;
-    }
-
+    const body = await call(
+      "/api/account/letterboxd",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: username.trim() }),
+      },
+      "Couldn't connect that account. Check the username and try again."
+    );
+    if (!body) return;
     showToast(`Connected to letterboxd.com/${body.username}`);
     announce(body);
     router.refresh();
   }
 
   async function syncNow() {
-    setBusy(true);
-    const res = await fetch("/api/account/letterboxd/sync", { method: "POST" });
-    const body = await res.json();
-    setBusy(false);
-
-    if (!res.ok) {
-      showToast(body.error ?? "Sync failed", "error");
-      return;
-    }
-
+    const body = await call(
+      "/api/account/letterboxd/sync",
+      { method: "POST" },
+      "The sync didn't finish. Try again in a minute."
+    );
+    if (!body) return;
     announce(body);
     router.refresh();
   }
 
   async function disconnect() {
-    setBusy(true);
-    await fetch("/api/account/letterboxd", { method: "DELETE" });
-    setBusy(false);
+    // Only reported as done when it is: this used to say "Disconnected"
+    // without looking at the response.
+    const body = await call(
+      "/api/account/letterboxd",
+      { method: "DELETE" },
+      "Couldn't disconnect. Try again."
+    );
+    if (!body) return;
+    setConfirmingDisconnect(false);
     showToast("Disconnected from Letterboxd");
     router.refresh();
   }
@@ -147,30 +191,30 @@ export function LetterboxdSyncCard({
   if (!initialUsername) {
     return (
       <form onSubmit={connect} className="flex flex-wrap items-end gap-2">
-        <div>
-          <label className="field-label">Sync diary &amp; watchlist from Letterboxd</label>
+        <div className="min-w-0 flex-1 sm:max-w-xs">
+          <label htmlFor={fieldId} className="field-label">
+            Your Letterboxd username
+          </label>
           <input
+            id={fieldId}
             type="text"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            placeholder="Letterboxd username"
-            className="rounded-md border border-border bg-background px-3 py-1.5 text-sm placeholder:text-muted focus:outline-none focus:border-accent-green"
+            placeholder="e.g. davidehrlich"
+            autoComplete="off"
+            className="input"
           />
         </div>
-        <button
-          type="submit"
-          disabled={busy || !username.trim()}
-          className="btn btn-primary btn-sm"
-        >
-          {busy ? "Connecting..." : "Connect"}
+        <button type="submit" disabled={busy || !username.trim()} className="btn btn-primary">
+          {busy ? "Connecting…" : "Connect"}
         </button>
       </form>
     );
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-3 text-sm">
-      <span className="text-muted">
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+      <span className="min-w-0 flex-1 text-muted">
         Synced with{" "}
         <a
           href={`https://letterboxd.com/${initialUsername}/`}
@@ -180,30 +224,36 @@ export function LetterboxdSyncCard({
         >
           letterboxd.com/{initialUsername}
         </a>
-        {initialSyncedAt &&
-          ` · last synced ${new Date(initialSyncedAt).toLocaleString("en-US", {
-            month: "short",
-            day: "numeric",
-            hour: "numeric",
-            minute: "2-digit",
-          })}`}
+        {syncedLabel && ` · last synced ${syncedLabel}`}
       </span>
-      <button
-        type="button"
-        onClick={syncNow}
-        disabled={busy}
-        className="rounded-md border border-border px-3 py-1.5 text-xs text-muted hover:text-foreground hover:border-accent-green transition-colors disabled:opacity-50"
-      >
-        {busy ? "Working..." : "Sync now"}
-      </button>
-      <button
-        type="button"
-        onClick={disconnect}
-        disabled={busy}
-        className="text-xs text-muted hover:text-red-400 disabled:opacity-50"
-      >
-        Disconnect
-      </button>
+      {confirmingDisconnect ? (
+        <span className="flex items-center gap-2">
+          <button type="button" onClick={disconnect} disabled={busy} className="btn btn-danger btn-sm">
+            {busy ? "Disconnecting…" : "Disconnect"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setConfirmingDisconnect(false)}
+            className="btn btn-ghost btn-sm"
+          >
+            Keep
+          </button>
+        </span>
+      ) : (
+        <span className="flex items-center gap-2">
+          <button type="button" onClick={syncNow} disabled={busy} className="btn btn-secondary btn-sm">
+            {busy ? "Working…" : "Sync now"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setConfirmingDisconnect(true)}
+            disabled={busy}
+            className="btn btn-ghost btn-sm"
+          >
+            Disconnect
+          </button>
+        </span>
+      )}
     </div>
   );
 }

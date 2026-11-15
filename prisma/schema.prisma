@@ -26,6 +26,12 @@ model User {
   // when checking it (see lib/admin.ts), never from the session token, so
   // demoting someone takes effect on their next request.
   role          String    @default("USER")
+  // Sessions (sign-in tokens) issued before this moment are no longer
+  // accepted. Set when the password changes or is reset, and by "sign out
+  // everywhere" in Settings; null means no session has ever been revoked.
+  // Sign-in tokens last for weeks, so without this a changed password left
+  // every device that was already signed in still signed in.
+  sessionsValidFrom DateTime?
 
   accounts  Account[]
   sessions  Session[]

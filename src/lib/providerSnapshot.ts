@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { getFlatrateProviders, parseProviderIds } from "@/lib/streaming";
+import { fetchFlatrateProviders, parseProviderIds } from "@/lib/streaming";
 
 const SNAPSHOT_CONCURRENCY = 6;
 
@@ -46,7 +46,11 @@ export async function runProviderSnapshot(): Promise<{ scanned: number; addition
     const batch = movies.slice(i, i + SNAPSHOT_CONCURRENCY);
     await Promise.all(
       batch.map(async (movie) => {
-        const providers = await getFlatrateProviders(movie.tmdbId);
+        const providers = await fetchFlatrateProviders(movie.tmdbId);
+        // Couldn't ask TMDB about this one: leave its snapshot exactly as it
+        // is and try again tomorrow. Recording "no providers" here made the
+        // next successful run report all of them as new arrivals.
+        if (!providers) return;
         const currentIds = providers.map((p) => p.provider_id);
         const previous = snapshotByMovieId.get(movie.id);
 

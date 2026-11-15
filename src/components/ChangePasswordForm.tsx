@@ -1,20 +1,32 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
+import { signIn } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { useToast } from "@/components/Toast";
 
-export function ChangePasswordForm() {
+export function ChangePasswordForm({ email }: { email: string }) {
+  const router = useRouter();
   const showToast = useToast();
+  const currentId = useId();
+  const newId = useId();
+  const confirmId = useId();
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setError(null);
 
+    if (newPassword.length < 8) {
+      setError("The new password needs at least 8 characters.");
+      return;
+    }
     if (newPassword !== confirmPassword) {
-      showToast("New passwords don't match", "error");
+      setError("The two new passwords don't match.");
       return;
     }
 
@@ -29,62 +41,105 @@ export function ChangePasswordForm() {
       });
     } catch {
       setSaving(false);
-      showToast("Something went wrong — try again.", "error");
+      setError("Couldn't reach the server. Your password wasn't changed.");
       return;
     }
 
     const data = await res.json().catch(() => null);
-    setSaving(false);
 
     if (!res.ok) {
-      showToast(data?.error ?? "Something went wrong", "error");
+      setSaving(false);
+      setError(data?.error ?? "Something went wrong. Your password wasn't changed.");
+      return;
+    }
+
+    // Changing the password ends every session on the account, this one
+    // included, so sign straight back in here with the new one. If that
+    // doesn't work for any reason, the sign-in page is the fallback.
+    const result = await signIn("credentials", {
+      email,
+      password: newPassword,
+      redirect: false,
+    }).catch(() => null);
+    setSaving(false);
+
+    if (!result || result.error) {
+      router.push("/login");
       return;
     }
 
     setCurrentPassword("");
     setNewPassword("");
     setConfirmPassword("");
-    showToast("Password updated");
+    showToast("Password changed. Your other devices have been signed out.");
+    router.refresh();
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-      <div className="flex flex-wrap gap-3">
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="sm:max-w-xs">
+        <label htmlFor={currentId} className="field-label">
+          Current password
+        </label>
+        <input
+          id={currentId}
+          name="current-password"
+          type="password"
+          autoComplete="current-password"
+          value={currentPassword}
+          onChange={(e) => setCurrentPassword(e.target.value)}
+          className="input"
+        />
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label className="field-label">Current password</label>
+          <label htmlFor={newId} className="field-label">
+            New password
+          </label>
           <input
+            id={newId}
+            name="new-password"
             type="password"
-            value={currentPassword}
-            onChange={(e) => setCurrentPassword(e.target.value)}
-            className="input w-auto"
-          />
-        </div>
-        <div>
-          <label className="field-label">New password</label>
-          <input
-            type="password"
+            autoComplete="new-password"
+            minLength={8}
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
-            className="input w-auto"
+            className="input"
           />
         </div>
         <div>
-          <label className="field-label">Confirm new password</label>
+          <label htmlFor={confirmId} className="field-label">
+            New password again
+          </label>
           <input
+            id={confirmId}
+            name="confirm-password"
             type="password"
+            autoComplete="new-password"
+            minLength={8}
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
-            className="input w-auto"
+            className="input"
           />
         </div>
       </div>
-      <button
-        type="submit"
-        disabled={saving || !currentPassword || !newPassword}
-        className="w-fit rounded-md bg-accent-green px-3 py-1.5 text-sm font-medium text-black hover:opacity-90 transition-opacity disabled:opacity-50"
-      >
-        {saving ? "Saving..." : "Change password"}
-      </button>
+      {error && (
+        <p role="alert" className="text-sm text-danger">
+          {error}
+        </p>
+      )}
+      <div>
+        <button
+          type="submit"
+          disabled={saving || !currentPassword || !newPassword || !confirmPassword}
+          className="btn btn-primary"
+        >
+          {saving ? "Saving…" : "Change password"}
+        </button>
+        <p className="mt-2 text-xs text-subtle">
+          At least 8 characters. Changing it signs you out on every other device.
+        </p>
+      </div>
     </form>
   );
 }

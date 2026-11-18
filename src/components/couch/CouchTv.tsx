@@ -367,13 +367,9 @@ function HomeScreen({
         </h2>
       </div>
 
-      <section className="mt-[0.9em]">
-        <h3 className="mb-[0.45em] text-[0.85em] font-semibold text-white/85">
-          Your apps <span className="font-normal text-white/45">{data.services.length}</span>
-        </h3>
-        {/* A wrapping grid, not a scrolling row: every service on the
-            account gets a tile you can see at once. */}
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(7.6em,1fr))] gap-[0.7em] py-[0.35em]">
+      {/* One row of every service on the account; it scrolls sideways
+          when there are more than fit, following the highlight. */}
+      <Row title={`Your apps · ${data.services.length}`}>
           {data.services.map((s) => (
           <button
             key={s.id}
@@ -381,14 +377,13 @@ function HomeScreen({
             data-tv
             onClick={() => onService(s.id)}
             onMouseEnter={(e) => e.currentTarget.focus({ preventScroll: true })}
-            className={`flex aspect-video min-w-0 flex-col items-center justify-center gap-[0.35em] rounded-[0.5em] bg-white/[0.07] ring-1 ring-white/10 ${focusRing}`}
+            className={`flex aspect-video w-[8.4em] shrink-0 flex-col items-center justify-center gap-[0.35em] rounded-[0.5em] bg-white/[0.07] ring-1 ring-white/10 ${focusRing}`}
           >
             <ServiceLogo service={s} size="2.4em" />
             <span className="max-w-full truncate px-[0.4em] text-[0.7em] text-white/80">{s.name}</span>
           </button>
           ))}
-        </div>
-      </section>
+      </Row>
 
       {picks.length > 0 && (
         <Row title="Picked for you">

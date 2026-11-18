@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X } from "lucide-react";
+import { ChevronDown, X } from "lucide-react";
 import { NavIcon, type NavIconName } from "@/components/NavIcon";
 import { isActivePath } from "@/components/NavLinks";
 import { InstallAppMenuItem } from "@/components/InstallApp";
@@ -13,7 +13,8 @@ import { InstallAppMenuItem } from "@/components/InstallApp";
 export type MobileNavItem = { href: string; label: string; icon: NavIconName };
 
 // Below-lg replacement for the desktop tab strip: a slide-in panel listing
-// every destination, opened from the menu button in the header.
+// every destination, opened by tapping the Flixtally logo in the header
+// (on desktop the logo is a plain link home; see NavBar).
 //
 // The panel is portalled to <body>. The header uses backdrop-filter, which
 // makes it the containing block for position: fixed children, so rendered in
@@ -55,10 +56,16 @@ export function MobileNav({ items }: { items: MobileNavItem[] }) {
         type="button"
         onClick={() => setOpen(true)}
         aria-label="Open menu"
+        aria-haspopup="dialog"
         aria-expanded={open}
-        className="-ml-2 flex h-10 w-10 items-center justify-center rounded-lg text-muted transition-colors hover:bg-white/5 hover:text-foreground lg:hidden standalone:[[data-app-back]+&]:ml-0"
+        className="-ml-1.5 flex h-10 touch-manipulation items-center gap-2 rounded-lg px-1.5 font-[family-name:var(--font-display)] text-xl font-bold tracking-tight text-foreground transition-colors active:bg-white/5 lg:hidden"
       >
-        <Menu aria-hidden className="h-5 w-5" />
+        {/* Same artwork as app/icon.png, pre-sized in public/ for 3x screens. */}
+        <Image src="/logo.png" alt="" width={32} height={32} priority className="pointer-events-none h-8 w-8" />
+        <span className="pointer-events-none">
+          Flix<span className="text-accent-green">tally</span>
+        </span>
+        <ChevronDown aria-hidden className="pointer-events-none -ml-1 h-4 w-4 text-muted" />
       </button>
 
       {open &&

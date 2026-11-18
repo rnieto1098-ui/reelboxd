@@ -359,11 +359,11 @@ export async function SavedMoviesPage({
       )}
 
       {items.length > 0 && (
-        <div className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-2">
+        <div className="mb-6 grid grid-cols-2 items-end gap-x-3 gap-y-2.5 sm:flex sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-2">
           {availabilityOptions.length > 1 ? (
             <FilterSelect label="Streaming" value={availRaw} options={availabilityOptions} />
           ) : (
-            <span className="text-xs text-muted">
+            <span className="col-span-2 text-xs text-muted">
               You haven&apos;t added any services or marked anything as owned yet —{" "}
               <Link href="/streaming" className="font-medium text-accent-green underline-offset-2 hover:underline">
                 add your services here
@@ -392,7 +392,10 @@ export async function SavedMoviesPage({
             />
           )}
           {filtersActive && (
-            <Link href={clearFiltersHref} className="text-xs text-muted hover:text-foreground hover:underline">
+            <Link
+              href={clearFiltersHref}
+              className="py-2 text-xs text-muted hover:text-foreground hover:underline max-sm:self-end"
+            >
               Clear filters
             </Link>
           )}

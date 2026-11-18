@@ -24,7 +24,10 @@ export function FilterSelect({
   const router = useRouter();
 
   return (
-    <label className="flex items-center gap-1.5 text-xs">
+    // On phones: label above, the select filling its grid cell, and 16px
+    // text, because iOS Safari zooms the whole page into any field with
+    // smaller text and leaves it zoomed after you pick an option.
+    <label className="flex min-w-0 flex-col gap-1 text-xs sm:flex-row sm:items-center sm:gap-1.5">
       <span className="text-muted">{label}</span>
       <select
         value={value}
@@ -32,7 +35,7 @@ export function FilterSelect({
           const option = options.find((o) => o.value === e.target.value);
           if (option) router.push(option.href);
         }}
-        className="rounded-md border border-border bg-surface px-2 py-1 text-xs text-foreground focus:outline-none focus:border-accent-green"
+        className="w-full min-w-0 truncate rounded-md border border-border bg-surface px-2 py-1.5 text-base text-foreground focus:outline-none focus:border-accent-green sm:w-auto sm:max-w-56 sm:py-1 sm:text-xs"
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>

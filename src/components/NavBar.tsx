@@ -64,9 +64,10 @@ export async function NavBar() {
           <div className="flex shrink-0 items-center gap-1.5">
             <AppBackButton />
             <MobileNav items={mobileNavItems} />
+            {/* Desktop only: below lg the logo opens the menu instead. */}
             <Link
               href="/"
-              className="flex items-center gap-2 font-[family-name:var(--font-display)] text-xl font-bold tracking-tight text-foreground"
+              className="hidden items-center gap-2 lg:flex font-[family-name:var(--font-display)] text-xl font-bold tracking-tight text-foreground"
             >
               {/* Same artwork as app/icon.png, pre-sized in public/ for 3x screens. */}
               <Image src="/logo.png" alt="" width={32} height={32} priority className="h-8 w-8" />

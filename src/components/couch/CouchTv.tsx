@@ -130,7 +130,44 @@ export function CouchTv({ data, username }: { data: CouchData; username: string 
   const [focusedFilm, setFocusedFilm] = useState<number | null>(null);
   const [watchlist, setWatchlist] = useState(() => new Set(data.watchlistIds));
   const actions = useFilmActions();
-  const servicesById = useMemo(() => new Map(data.services.map((s) => [s.id, s])), [data.services]);
+  // Each app's browse rows (new, acclaimed, genres...) load when it's
+  // first opened; "loading" until they arrive, [] if they couldn't.
+  const [moreRows, setMoreRows] = useState<Record<number, CouchService["rows"] | "loading">>({});
+  const [moreFilms, setMoreFilms] = useState<Record<number, CouchFilm>>({});
+  const films = useMemo(() => ({ ...moreFilms, ...data.films }), [moreFilms, data.films]);
+  const servicesById = useMemo(
+    () =>
+      new Map(
+        data.services.map((s) => {
+          const more = moreRows[s.id];
+          if (!Array.isArray(more)) return [s.id, s];
+          // The watchlist row already shows these; don't repeat them below.
+          const onWatchlist = new Set(s.rows[0]?.title === "On your watchlist" ? s.rows[0].ids : []);
+          // Skip rows the personal feed already covers under the same name
+          // (or, for short films, a different one).
+          const titles = new Set(s.rows.map((r) => r.title));
+          if (titles.has("Quick watches")) titles.add("Under 100 minutes");
+          const extra = more
+            .filter((r) => !titles.has(r.title))
+            .map((r) => ({ title: r.title, ids: r.ids.filter((id) => !onWatchlist.has(id)) }))
+            .filter((r) => r.ids.length >= 3);
+          return [s.id, { ...s, rows: [...s.rows, ...extra] }];
+        })
+      ),
+    [data.services, moreRows]
+  );
+
+  function loadMoreRows(serviceId: number) {
+    if (moreRows[serviceId]) return;
+    setMoreRows((m) => ({ ...m, [serviceId]: "loading" }));
+    fetch(`/api/couch/service/${serviceId}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((body: { rows: CouchService["rows"]; films: Record<number, CouchFilm> }) => {
+        setMoreFilms((f) => ({ ...body.films, ...f }));
+        setMoreRows((m) => ({ ...m, [serviceId]: body.rows }));
+      })
+      .catch(() => setMoreRows((m) => ({ ...m, [serviceId]: [] })));
+  }
 
   function go(next: Screen) {
     setHistory((h) => [...h, screen]);
@@ -209,31 +246,35 @@ export function CouchTv({ data, username }: { data: CouchData; username: string 
         <HomeScreen
           data={data}
           username={username}
-          onService={(id) => go({ kind: "service", serviceId: id })}
+          onService={(id) => {
+            loadMoreRows(id);
+            go({ kind: "service", serviceId: id });
+          }}
           onFilm={(id) => go({ kind: "film", filmId: id, serviceId: null })}
         />
       )}
       {screen.kind === "service" && servicesById.get(screen.serviceId) && (
         <ServiceScreen
           service={servicesById.get(screen.serviceId)!}
-          films={data.films}
+          films={films}
+          loadingMore={moreRows[screen.serviceId] === "loading"}
           focusedFilm={focusedFilm}
           onFocusFilm={setFocusedFilm}
           onBack={back}
           onFilm={(id) => go({ kind: "film", filmId: id, serviceId: screen.serviceId })}
         />
       )}
-      {screen.kind === "film" && data.films[screen.filmId] && (
+      {screen.kind === "film" && films[screen.filmId] && (
         <FilmScreen
           key={screen.filmId}
-          film={data.films[screen.filmId]}
+          film={films[screen.filmId]}
           service={
             servicesById.get(screen.serviceId ?? -1) ??
-            data.films[screen.filmId].providerIds.map((id) => servicesById.get(id)).find(Boolean) ??
+            films[screen.filmId].providerIds.map((id) => servicesById.get(id)).find(Boolean) ??
             null
           }
           inWatchlist={watchlist.has(screen.filmId)}
-          onWatchlist={() => toggleWatchlist(data.films[screen.filmId])}
+          onWatchlist={() => toggleWatchlist(films[screen.filmId])}
           onBack={back}
         />
       )}
@@ -399,6 +440,7 @@ function HomeScreen({
 function ServiceScreen({
   service,
   films,
+  loadingMore,
   focusedFilm,
   onFocusFilm,
   onBack,
@@ -406,6 +448,7 @@ function ServiceScreen({
 }: {
   service: CouchService;
   films: Record<number, CouchFilm>;
+  loadingMore: boolean;
   focusedFilm: number | null;
   onFocusFilm: (id: number) => void;
   onBack: () => void;
@@ -452,7 +495,7 @@ function ServiceScreen({
             </>
           )}
         </div>
-        {service.rows.length === 0 ? (
+        {service.rows.length === 0 && !loadingMore ? (
           <p className="mt-[1.5em] text-[0.9em] text-white/70">
             Nothing picked for you here yet. Rate a few films and check back.
           </p>
@@ -471,6 +514,16 @@ function ServiceScreen({
               )}
             </Row>
           ))
+        )}
+        {loadingMore && (
+          <div aria-label="Loading more rows" className="mt-[1.2em]">
+            <div className="mb-[0.5em] h-[0.8em] w-[8em] animate-pulse rounded bg-white/10" />
+            <div className="flex gap-[0.6em]">
+              {Array.from({ length: 7 }, (_, i) => (
+                <div key={i} className="aspect-[2/3] w-[5.2em] shrink-0 animate-pulse rounded-[0.35em] bg-white/10" />
+              ))}
+            </div>
+          </div>
         )}
       </div>
     </div>
@@ -529,7 +582,7 @@ function FilmScreen({
   }
 
   const backdrop = backdropUrl(film.backdropPath, "w1280");
-  const link = service ? watchLink(service.id, film.title, details?.watchLink ?? null) : null;
+  const link = service ? watchLink(service, film.title, details?.watchLink ?? null) : null;
   const facts = [film.year, formatRuntime(details?.runtime ?? null), details?.genres.slice(0, 2).join(", ")]
     .filter(Boolean)
     .join(" · ");
@@ -564,7 +617,7 @@ function FilmScreen({
                 className={`flex items-center gap-[0.4em] rounded-[0.35em] bg-white px-[0.9em] py-[0.45em] text-[0.85em] font-semibold text-black ${focusRing}`}
               >
                 <Play aria-hidden className="h-[1em] w-[1em] fill-current" />
-                {link.direct ? `Watch on ${service!.name}` : `Find it on ${service!.name}`}
+                {link.direct ? `Watch on ${link.label}` : `Find it on ${link.label}`}
                 <ExternalLink aria-hidden className="h-[0.85em] w-[0.85em] opacity-60" />
               </a>
             )}

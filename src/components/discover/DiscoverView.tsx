@@ -3,7 +3,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Bookmark, Check, Clapperboard, Eye, Play, Shuffle, ThumbsDown, Undo2 } from "lucide-react";
+import { Bookmark, Check, Clapperboard, Ellipsis, Eye, Play, Shuffle, ThumbsDown, Undo2, X } from "lucide-react";
+import { BookmarkIcon, EyeIcon } from "@/components/icons";
+import { actionButtonClass } from "@/components/PosterQuickActions";
 import { HorizontalScroller } from "@/components/HorizontalScroller";
 import { PosterImage } from "@/components/PosterImage";
 import { Dialog } from "@/components/Dialog";
@@ -189,9 +191,6 @@ function ServiceBadge({ service, size = 22 }: { service: DiscoverService; size?:
   );
 }
 
-const actionClass =
-  "flex h-7 w-7 items-center justify-center rounded-full text-muted transition-[background-color,color,transform] duration-150 hover:bg-white/10 hover:text-foreground active:scale-90";
-
 function DiscoverCard({
   film,
   priority,
@@ -218,6 +217,8 @@ function DiscoverCard({
   const state = states.get(film.id);
   const service = film.providerIds.map((id) => servicesById.get(id)).find(Boolean);
   const inWatchlist = watchlist.has(film.id);
+  // Touch screens: whether the corner buttons are showing.
+  const [revealed, setRevealed] = useState(false);
 
   if (state) {
     return (
@@ -241,17 +242,91 @@ function DiscoverCard({
     );
   }
 
+  const shown = revealed ? "opacity-100" : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100";
+  const rowClass = `pointer-events-none absolute inset-x-0 flex items-center justify-between p-1.5 transition-opacity duration-200 ${shown}`;
+  // Every action is a click on a button sitting over the poster's link, so
+  // it must not also follow the link.
+  const act = (fn: () => void) => (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    fn();
+  };
+
   return (
     <div className="group block">
-      <div className="relative aspect-[2/3] w-full overflow-hidden rounded-lg bg-surface ring-1 ring-white/[0.08] transition-[transform,box-shadow] duration-300 ease-out-expo group-hover:-translate-y-1 group-hover:shadow-pop group-hover:ring-white/25">
+      <div className="relative aspect-[2/3] w-full overflow-hidden rounded-lg bg-surface ring-1 ring-white/[0.08] transition-[transform,box-shadow] duration-300 ease-out-expo group-hover:-translate-y-1 group-hover:shadow-pop group-hover:ring-white/25 group-focus-within:ring-white/25">
         <Link href={`/movie/${film.id}`} className="absolute inset-0">
           <PosterImage src={posterUrl(film.posterPath)} alt={film.title} year={film.year ?? undefined} priority={priority} />
         </Link>
-        {service && (
-          <span className="pointer-events-none absolute left-1.5 top-1.5">
+
+        {/* The same corner buttons as every other poster on the site (see
+            PosterQuickActions), with Discover's own four actions. */}
+        <div
+          aria-hidden
+          className={`pointer-events-none absolute inset-0 bg-gradient-to-b from-black/55 via-transparent to-black/65 transition-opacity duration-200 ${shown}`}
+        />
+
+        {/* At rest: which of your services it's on. Gives way to the
+            buttons on hover. */}
+        {service && !revealed && (
+          <span className="pointer-events-none absolute left-1.5 top-1.5 transition-opacity duration-200 group-hover:opacity-0 group-focus-within:opacity-0">
             <ServiceBadge service={service} />
           </span>
         )}
+
+        <div className={`${rowClass} top-0`}>
+          <button
+            type="button"
+            onClick={act(() => onSpotlight(film))}
+            title="Watch tonight"
+            aria-label={`Watch tonight: ${film.title}`}
+            className={actionButtonClass(false, revealed)}
+          >
+            <Clapperboard aria-hidden className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={act(() => onDismiss(film))}
+            title="Not for me"
+            aria-label={`Not for me: ${film.title}`}
+            className={`${actionButtonClass(false, revealed)} [@media(hover:none)]:mr-9`}
+          >
+            <ThumbsDown aria-hidden className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className={`${rowClass} bottom-0`}>
+          <button
+            type="button"
+            onClick={act(() => onSeen(film))}
+            title="Seen it"
+            aria-label={`I've seen ${film.title}`}
+            className={actionButtonClass(false, revealed)}
+          >
+            <EyeIcon />
+          </button>
+          <button
+            type="button"
+            onClick={act(() => onWatchlist(film))}
+            title={inWatchlist ? "On watchlist — click to remove" : "Add to watchlist"}
+            aria-label={inWatchlist ? `Remove ${film.title} from watchlist` : `Add ${film.title} to watchlist`}
+            aria-pressed={inWatchlist}
+            className={actionButtonClass(inWatchlist, revealed)}
+          >
+            <BookmarkIcon />
+          </button>
+        </div>
+
+        {/* Touch only: phones have no hover, so the buttons sit behind this. */}
+        <button
+          type="button"
+          aria-label={revealed ? "Hide actions" : "Show actions"}
+          aria-expanded={revealed}
+          onClick={act(() => setRevealed((v) => !v))}
+          className="absolute right-1.5 top-1.5 hidden h-8 w-8 items-center justify-center rounded-full bg-black/65 text-white ring-1 ring-white/15 backdrop-blur-md active:scale-90 [@media(hover:none)]:flex"
+        >
+          {revealed ? <X aria-hidden className="h-4 w-4" /> : <Ellipsis aria-hidden className="h-4 w-4" />}
+        </button>
       </div>
       <Link
         href={`/movie/${film.id}`}
@@ -265,45 +340,6 @@ function DiscoverCard({
       {film.reason && (
         <p className="truncate text-[11px] font-medium text-accent-green/90">You like {film.reason}</p>
       )}
-      <div className="mt-1.5 flex items-center justify-between">
-        <button
-          type="button"
-          onClick={() => onSpotlight(film)}
-          aria-label={`Watch tonight: ${film.title}`}
-          title="Watch tonight"
-          className={actionClass}
-        >
-          <Clapperboard aria-hidden className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          onClick={() => onWatchlist(film)}
-          aria-label={inWatchlist ? `Remove ${film.title} from watchlist` : `Add ${film.title} to watchlist`}
-          aria-pressed={inWatchlist}
-          title={inWatchlist ? "On your watchlist" : "Add to watchlist"}
-          className={`${actionClass} ${inWatchlist ? "text-accent-green" : ""}`}
-        >
-          <Bookmark aria-hidden className={`h-4 w-4 ${inWatchlist ? "fill-current" : ""}`} />
-        </button>
-        <button
-          type="button"
-          onClick={() => onSeen(film)}
-          aria-label={`I've seen ${film.title}`}
-          title="Seen it"
-          className={actionClass}
-        >
-          <Eye aria-hidden className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          onClick={() => onDismiss(film)}
-          aria-label={`Not for me: ${film.title}`}
-          title="Not for me"
-          className={actionClass}
-        >
-          <ThumbsDown aria-hidden className="h-4 w-4" />
-        </button>
-      </div>
     </div>
   );
 }

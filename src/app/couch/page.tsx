@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 
 function TvMessage({ title, body, action }: { title: string; body: string; action: React.ReactNode }) {
   return (
-    <div className="animate-tv-on flex h-full flex-col items-center justify-center gap-[0.8em] bg-[radial-gradient(100%_80%_at_50%_0%,#18233d_0%,#06080d_65%)] p-[2em] text-center text-white [font-size:max(10px,2.1cqw)]">
+    <div className="flex h-full flex-col items-center justify-center gap-[0.8em] bg-[radial-gradient(100%_80%_at_50%_0%,#18233d_0%,#06080d_65%)] p-[2em] text-center text-white [font-size:max(10px,2.1cqw)]">
       <p className="font-[family-name:var(--font-display)] text-[1.7em] font-bold leading-tight">{title}</p>
       <p className="max-w-[34em] text-[0.9em] text-white/70">{body}</p>
       {action}

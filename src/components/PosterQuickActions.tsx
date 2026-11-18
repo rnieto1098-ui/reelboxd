@@ -13,7 +13,7 @@ import { useCoalescedRefresh } from "@/lib/useCoalescedRefresh";
 // clickable at opacity 0, and phones never fire the hover that reveals
 // them, so a tap on a poster's corner silently toggled watched or owned
 // instead of opening the film.
-function actionButtonClass(active: boolean, revealed: boolean) {
+export function actionButtonClass(active: boolean, revealed: boolean) {
   const base = `flex h-8 w-8 items-center justify-center rounded-full backdrop-blur-md transition-[background-color,color,transform] duration-150 active:scale-90 disabled:opacity-50 ${
     revealed
       ? "pointer-events-auto"

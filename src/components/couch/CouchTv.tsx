@@ -183,7 +183,7 @@ export function CouchTv({ data, username }: { data: CouchData; username: string 
       role="application"
       aria-roledescription="TV"
       aria-label="Flixtally TV. Use the arrow keys to move, Enter to choose and Escape to go back."
-      className="animate-tv-on relative h-full w-full overflow-hidden bg-[#06080d] text-white [font-size:max(9px,2.05cqw)]"
+      className="relative h-full w-full overflow-hidden bg-[#06080d] text-white [font-size:max(9px,2.05cqw)]"
     >
       {screen.kind === "home" && (
         <HomeScreen

@@ -3,7 +3,6 @@ import { Inter, Inter_Tight } from "next/font/google";
 import "./globals.css";
 import { NavBar } from "@/components/NavBar";
 import { Footer } from "@/components/Footer";
-import { MobileTabBar } from "@/components/MobileTabBar";
 import { ToastProvider } from "@/components/Toast";
 import { RewatchIdsProvider } from "@/components/RewatchIdsProvider";
 import { auth } from "@/auth";
@@ -84,15 +83,13 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         <ToastProvider>
           <RewatchIdsProvider ids={rewatchTmdbIds}>
             <NavBar />
-            {/* pb on small screens leaves room for the fixed tab bar. */}
             <main
               id="main"
-              className="container-page flex-1 py-6 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:py-8 lg:pb-12"
+              className="container-page flex-1 py-6 pb-12 sm:py-8"
             >
               {children}
             </main>
             <Footer />
-            <MobileTabBar username={session?.user?.name ?? null} />
             <ServiceWorker />
           </RewatchIdsProvider>
         </ToastProvider>

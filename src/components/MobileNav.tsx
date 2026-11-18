@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -13,6 +14,11 @@ export type MobileNavItem = { href: string; label: string; icon: NavIconName };
 
 // Below-lg replacement for the desktop tab strip: a slide-in panel listing
 // every destination, opened from the menu button in the header.
+//
+// The panel is portalled to <body>. The header uses backdrop-filter, which
+// makes it the containing block for position: fixed children, so rendered in
+// place the "full-screen" panel was clipped to the header's 56px height and
+// showed nothing but its title row.
 export function MobileNav({ items }: { items: MobileNavItem[] }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
@@ -50,14 +56,13 @@ export function MobileNav({ items }: { items: MobileNavItem[] }) {
         onClick={() => setOpen(true)}
         aria-label="Open menu"
         aria-expanded={open}
-        // In the installed app a deep page shows Back here instead (see
-        // AppBackButton); the menu stays one tap away on every tab-bar page.
-        className="-ml-2 flex h-10 w-10 items-center justify-center rounded-lg text-muted transition-colors hover:bg-white/5 hover:text-foreground lg:hidden standalone:[[data-app-back]+&]:hidden"
+        className="-ml-2 flex h-10 w-10 items-center justify-center rounded-lg text-muted transition-colors hover:bg-white/5 hover:text-foreground lg:hidden standalone:[[data-app-back]+&]:ml-0"
       >
         <Menu aria-hidden className="h-5 w-5" />
       </button>
 
-      {open && (
+      {open &&
+        createPortal(
         <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Menu">
           <button
             type="button"
@@ -109,8 +114,9 @@ export function MobileNav({ items }: { items: MobileNavItem[] }) {
             {/* Renders nothing unless this device can install the app. */}
             <InstallAppMenuItem />
           </nav>
-        </div>
-      )}
+        </div>,
+          document.body,
+        )}
     </>
   );
 }

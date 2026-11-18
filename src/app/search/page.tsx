@@ -52,8 +52,8 @@ export default async function SearchPage({
 
       {/* A full-width search field on the page itself. The only way to search
           used to be the box in the header, which is about a hundred pixels
-          wide on a phone, and this page (where the phone tab bar's Search
-          button lands) had no field at all. A plain GET form: it works
+          wide on a phone, and this page (where the phone menu's Search
+          item lands) had no field at all. A plain GET form: it works
           before any JavaScript loads and the result is a shareable URL. */}
       <form action="/search" role="search" className="relative mb-8 max-w-2xl">
         <Search

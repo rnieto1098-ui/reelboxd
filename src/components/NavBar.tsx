@@ -41,18 +41,14 @@ export async function NavBar() {
     { href: "/crew", label: "Crew", icon: "users" },
   ];
 
+  // Phones and tablets have no bottom tab bar: the menu is where every
+  // destination lives. Profile, Settings and Admin sit behind the avatar in
+  // the top right, as on desktop, so they aren't repeated here.
   const mobileNavItems: MobileNavItem[] = [
     ...navItems,
+    { href: "/search", label: "Search", icon: "search" },
     ...(signedIn
-      ? [
-          {
-            href: `/profile/${session.user.name}`,
-            label: "Your profile",
-            icon: "user",
-          } as const,
-          { href: "/settings", label: "Settings", icon: "settings" } as const,
-          ...(isAdmin ? [{ href: "/admin", label: "Admin", icon: "shield" } as const] : []),
-        ]
+      ? []
       : [
           { href: "/login", label: "Sign in", icon: "user" } as const,
           { href: "/signup", label: "Create account", icon: "sparkles" } as const,
@@ -94,14 +90,13 @@ export async function NavBar() {
                 isAdmin={isAdmin}
               />
             ) : (
-              // Hidden below sm: the same links are in the slide-in menu and
-              // the bottom tab bar, and at narrow widths this pair pushed the
-              // page wider than the screen.
-              <div className="hidden items-center gap-1 whitespace-nowrap sm:flex">
+              <div className="flex items-center gap-1 whitespace-nowrap">
                 <Link href="/login" className="btn btn-ghost btn-sm">
                   Sign in
                 </Link>
-                <Link href="/signup" className="btn btn-primary btn-sm">
+                {/* Only from sm up: at phone widths the pair pushed the page
+                    wider than the screen. Create account is in the menu. */}
+                <Link href="/signup" className="btn btn-primary btn-sm max-sm:hidden">
                   Join free
                 </Link>
               </div>

@@ -3,7 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 
-// The pages the bottom tab bar opens directly. They are starting points, so
+// The main destinations, reached straight from the menu. They are starting points, so
 // they don't get a back button.
 const ROOTS = new Set(["/", "/search", "/watchlist", "/challenges", "/lists", "/play", "/login"]);
 

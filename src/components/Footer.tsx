@@ -42,8 +42,8 @@ const COLUMNS: { title: string; links: { href: string; label: string }[] }[] = [
 // satisfies it. See https://www.themoviedb.org/about/logos-attribution.
 export function Footer() {
   return (
-    // mb on small screens keeps the last line clear of the fixed tab bar.
-    <footer className="mt-8 border-t border-white/[0.06] bg-background/60 pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0">
+    // pb keeps the last line clear of the iPhone home indicator.
+    <footer className="mt-8 border-t border-white/[0.06] bg-background/60 pb-[env(safe-area-inset-bottom)]">
       <div className="container-page py-10">
         <div className="grid grid-cols-1 gap-8 sm:grid-cols-[1.4fr_repeat(4,1fr)]">
           <div>

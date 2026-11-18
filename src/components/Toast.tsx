@@ -72,9 +72,9 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     <ToastContext.Provider value={showToast}>
       {children}
       {confettiKey > 0 && <Confetti key={confettiKey} />}
-      {/* bottom-20 on small screens clears the fixed tab bar. Errors are
+      {/* Bottom offset clears the iPhone home indicator. Errors are
           announced immediately (role="alert"); the rest wait their turn. */}
-      <div className="pointer-events-none fixed inset-x-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-[60] flex flex-col items-center gap-2 sm:inset-x-auto sm:right-5 sm:items-end lg:bottom-5">
+      <div className="pointer-events-none fixed inset-x-4 bottom-[calc(1.25rem+env(safe-area-inset-bottom))] z-[60] flex flex-col items-center gap-2 sm:inset-x-auto sm:right-5 sm:items-end">
         {toasts.map((t) => (
           <div
             key={t.id}

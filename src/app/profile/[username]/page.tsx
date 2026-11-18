@@ -278,6 +278,12 @@ export default async function ProfilePage({
           </p>
           <div className="mt-2.5 flex flex-wrap gap-2">
             <Link
+              href={`/profile/${username}/films`}
+              className="chip hover:border-accent-green hover:text-accent-green"
+            >
+              Films
+            </Link>
+            <Link
               href={`/profile/${username}/diary`}
               className="chip hover:border-accent-green hover:text-accent-green"
             >

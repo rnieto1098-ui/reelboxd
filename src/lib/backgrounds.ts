@@ -29,12 +29,13 @@ export const BACKGROUND_PRESETS: BackgroundPreset[] = [
   preset("empty-theater", "Empty Theater"),
   preset("projection-booth", "Projection Booth"),
   preset("drive-in", "Drive-In"),
+  preset("tonight", "Tonight"),
 ];
 
 // Route prefix → preset, checked in order. Home and every page without its
 // own entry (movie pages, search, settings…) use the fallback.
 const TAB_BACKGROUNDS: [prefix: string, presetId: string][] = [
-  ["/recommend", "video-store"],
+  ["/discover", "tonight"],
   ["/lists", "planning-desk"],
   ["/watchlist", "movie-night"],
   ["/rewatch", "rewind"],

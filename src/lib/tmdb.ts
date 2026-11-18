@@ -363,6 +363,19 @@ export function discoverMovies(params: {
   // alongside it for the filter to take effect.
   certificationCountry?: string;
   maxCertification?: string;
+  // Only films streaming (flatrate) on at least one of these TMDB provider
+  // ids in watchRegion. Joined with "|" — TMDB's OR — so it means "on any of
+  // my services", not "on all of them".
+  watchProviderIds?: number[];
+  watchRegion?: string;
+  // Genres where ANY match counts (TMDB "|"), unlike genreIds above, which
+  // TMDB treats as "has every one of these".
+  anyGenreIds?: number[];
+  // People where any match counts — a film with this director OR that actor.
+  anyPeopleIds?: number[];
+  maxVoteCount?: number;
+  releasedAfter?: string; // YYYY-MM-DD
+  releasedBefore?: string; // YYYY-MM-DD
   // Homepage rows like "Highest Rated" and the genre rows barely shift
   // hour to hour — letting those sit in cache longer than the default 1hr
   // cuts TMDB request volume without the data feeling stale. Callers where
@@ -374,7 +387,28 @@ export function discoverMovies(params: {
     "/discover/movie",
     {
       with_genres:
-        params.genreIds && params.genreIds.length > 0 ? params.genreIds.join(",") : undefined,
+        params.anyGenreIds && params.anyGenreIds.length > 0
+          ? params.anyGenreIds.join("|")
+          : params.genreIds && params.genreIds.length > 0
+            ? params.genreIds.join(",")
+            : undefined,
+      with_people:
+        params.anyPeopleIds && params.anyPeopleIds.length > 0
+          ? params.anyPeopleIds.join("|")
+          : undefined,
+      with_watch_providers:
+        params.watchProviderIds && params.watchProviderIds.length > 0
+          ? params.watchProviderIds.join("|")
+          : undefined,
+      watch_region:
+        params.watchProviderIds && params.watchProviderIds.length > 0
+          ? (params.watchRegion ?? "US")
+          : undefined,
+      with_watch_monetization_types:
+        params.watchProviderIds && params.watchProviderIds.length > 0 ? "flatrate" : undefined,
+      "vote_count.lte": params.maxVoteCount,
+      "primary_release_date.gte": params.releasedAfter,
+      "primary_release_date.lte": params.releasedBefore,
       with_keywords:
         params.keywordIds && params.keywordIds.length > 0 ? params.keywordIds.join(",") : undefined,
       without_genres:

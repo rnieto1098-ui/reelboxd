@@ -27,6 +27,23 @@ export async function excludeShortFilms(
   movies: TmdbMovieSummary[]
 ): Promise<TmdbMovieSummary[]> {
   if (movies.length === 0) return [];
+  const runtimeById = await getRuntimesById(movies);
+  return movies.filter((movie) => {
+    const runtime = runtimeById.get(movie.id);
+    return runtime != null && runtime >= MIN_RECOMMENDABLE_RUNTIME_MINUTES;
+  });
+}
+
+/**
+ * Each film's runtime in minutes (null when TMDB has none), read from the
+ * local Movie cache and fetched from TMDB for films not cached yet. Also
+ * leaves every one of these films cached locally, which is what lets the
+ * caller act on them (watchlist, dismiss) without another lookup.
+ */
+export async function getRuntimesById(
+  movies: { id: number }[]
+): Promise<Map<number, number | null>> {
+  if (movies.length === 0) return new Map();
 
   // One query for every film that is already cached and settled, instead of
   // a separate lookup per film. A home page load checks several hundred
@@ -52,8 +69,5 @@ export async function excludeShortFilms(
     batch.forEach((movie, idx) => runtimeById.set(movie.id, fetched[idx]?.runtime ?? null));
   }
 
-  return movies.filter((movie) => {
-    const runtime = runtimeById.get(movie.id);
-    return runtime != null && runtime >= MIN_RECOMMENDABLE_RUNTIME_MINUTES;
-  });
+  return runtimeById;
 }

@@ -49,6 +49,8 @@ model User {
   watchGoals        WatchGoal[]
   challenges        Challenge[]
   gameResults       GameResult[]
+  // Films the user said "Not for me" to on Discover (see lib/discover).
+  dismissed         DismissedMovie[]
 
   // One-way Letterboxd -> Flixtally diary sync (see lib/letterboxdSync.ts).
   // Null username means sync isn't connected.
@@ -194,6 +196,7 @@ model Movie {
   diaryEntries  DiaryEntry[]
   customPosters CustomPoster[]
   providerSnapshot   MovieProviderSnapshot?
+  dismissedBy        DismissedMovie[]
   providerAdditions  ProviderAddition[]
 }
 
@@ -568,4 +571,19 @@ model SiteSetting {
   key       String   @id
   value     String
   updatedAt DateTime @updatedAt
+}
+
+// "Not for me" on the Discover page. The film never comes back there, and
+// its genres count against it when Discover scores other films.
+model DismissedMovie {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  userId  String
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  movieId String
+  movie   Movie  @relation(fields: [movieId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, movieId])
+  @@index([userId])
 }

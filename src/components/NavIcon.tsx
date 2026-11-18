@@ -1,5 +1,6 @@
 import {
   Bookmark,
+  Compass,
   Gamepad2,
   House,
   List,
@@ -28,6 +29,7 @@ const ICONS = {
   settings: Settings,
   shield: ShieldCheck,
   search: Search,
+  compass: Compass,
 } satisfies Record<string, LucideIcon>;
 
 export type NavIconName = keyof typeof ICONS;

@@ -16,7 +16,7 @@ export default function robots(): MetadataRoute.Robots {
           "/watchlist",
           "/rewatch",
           "/challenges",
-          "/recommend",
+          "/discover",
           "/streaming",
           "/import",
           "/forgot-password",

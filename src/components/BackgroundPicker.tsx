@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { BACKGROUND_PRESETS, MATCH_TAB, NO_BACKGROUND, tabBackground } from "@/lib/backgrounds";
 
 // Four of the per-tab backgrounds, shown as a collage on the "Match each tab" tile.
-const MATCH_TAB_PREVIEW = ["/", "/recommend", "/watchlist", "/challenges"].map(
+const MATCH_TAB_PREVIEW = ["/", "/discover", "/watchlist", "/challenges"].map(
   (path) => tabBackground(path).src
 );
 

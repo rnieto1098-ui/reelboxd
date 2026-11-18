@@ -29,7 +29,7 @@ export async function NavBar() {
   // desktop tabs, and the slide-in menu below the lg breakpoint.
   const navItems: NavItem[] = [
     { href: "/", label: "Home", icon: "home" },
-    ...(signedIn ? [{ href: "/recommend", label: "Recommend", icon: "sparkles" } as const] : []),
+    ...(signedIn ? [{ href: "/discover", label: "Discover", icon: "compass" } as const] : []),
     { href: "/lists", label: "Lists", icon: "list" },
     ...(signedIn
       ? [

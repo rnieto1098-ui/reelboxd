@@ -1,7 +1,6 @@
 // Plain utility, no "use client" — used both client-side (useShuffle, for
-// the manual Shuffle buttons) and server-side (promptRecommender, for
-// randomizing which candidates get shown) so the algorithm can't drift
-// between the two.
+// the manual Shuffle buttons) and anywhere server-side that needs a fair
+// shuffle, so the algorithm can't drift between the two.
 export function fisherYatesShuffle<T>(list: T[]): T[] {
   const result = [...list];
   for (let i = result.length - 1; i > 0; i--) {

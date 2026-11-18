@@ -639,6 +639,7 @@ async function DiscoverRow({
   return (
     <MovieRow
       title="Discover"
+      href="/discover"
       movies={cleanMovieList(applyPosterOverrides(discover, posterOverrides))}
       emptyMessage={discoverEmptyMessage}
       ownedIds={[...ownedTmdbIds]}

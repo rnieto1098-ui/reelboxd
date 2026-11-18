@@ -31,6 +31,10 @@ const nextConfig: NextConfig = {
     // copies can be kept for a month rather than the short default.
     minimumCacheTTL: 60 * 60 * 24 * 31,
   },
+  async redirects() {
+    // The old prompt-based Recommend page became Discover.
+    return [{ source: "/recommend", destination: "/discover", permanent: true }];
+  },
   async headers() {
     return [
       { source: "/:path*", headers: SECURITY_HEADERS },

@@ -2,7 +2,7 @@
  * Every stat on the profile stats page, computed from plain data.
  *
  * Deliberately dependency-free — no Prisma, no imports at all — for the same
- * reason as streamingAvailability.ts and parsePrompt.ts: it's the half of
+ * reason as streamingAvailability.ts and discover/taste.ts: it's the half of
  * the feature worth unit testing, and it can't be tested directly if
  * importing it drags in a database client. `getProfileStats` in stats.ts is
  * the other half: it does the loading and hands plain objects to these.

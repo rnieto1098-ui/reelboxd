@@ -9,6 +9,7 @@ import type { TmdbMovieSummary } from "@/lib/tmdb";
 
 export function MovieRow({
   title,
+  href,
   movies,
   emptyMessage,
   ownedIds,
@@ -17,6 +18,8 @@ export function MovieRow({
   headerExtra,
 }: {
   title: string;
+  // Makes the heading a link to a page with more of the same.
+  href?: string;
   movies: TmdbMovieSummary[];
   emptyMessage?: ReactNode;
   // Plain arrays, not Set — Set isn't serializable across the Server-to-
@@ -41,6 +44,7 @@ export function MovieRow({
   return (
     <HorizontalScroller
       title={title}
+      href={href}
       headerAction={
         (movies.length > 1 || headerExtra) && (
           <div className="flex items-center gap-3">

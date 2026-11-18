@@ -37,8 +37,8 @@ export default async function CrewPage({ searchParams }: PageProps<"/crew">) {
     <div>
       <h1 className="page-title mb-2">Crew</h1>
       <p className="mb-6 text-sm text-muted">
-        Search for directors, actors, cinematographers, composers, producers, or studios, then
-        browse everything they made.
+        Find the actors you love, from Hollywood greats to this year&apos;s breakouts, and browse
+        everything they&apos;ve been in. Directors, cinematographers and studios are here too.
       </p>
 
       <form action="/crew" className="mb-8">
@@ -46,7 +46,7 @@ export default async function CrewPage({ searchParams }: PageProps<"/crew">) {
           type="text"
           name="q"
           defaultValue={query}
-          placeholder="Search people or studios..."
+          placeholder="Search actors, directors or studios…"
           className="w-full max-w-md rounded-md border border-border bg-surface px-3 py-2 text-sm placeholder:text-muted focus:outline-none focus:border-accent-green"
         />
       </form>
@@ -172,8 +172,10 @@ export default async function CrewPage({ searchParams }: PageProps<"/crew">) {
 
       {browseRows && (
         <div className="space-y-10">
+          <PersonRow title="Popular actors right now" people={browseRows.actors} />
+          <PersonRow title="Hollywood greats" people={browseRows.greats} />
+          <PersonRow title="Rising stars" people={browseRows.rising} />
           <PersonRow title="Popular Directors" people={browseRows.directors} />
-          <PersonRow title="Popular Actors" people={browseRows.actors} />
           <PersonRow title="Cinematographers" people={browseRows.cinematographers} />
           <StudioRow title="Studios" studios={browseRows.studios} />
         </div>

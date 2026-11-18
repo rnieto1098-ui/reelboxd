@@ -480,6 +480,9 @@ export type TmdbPerson = {
   profile_path: string | null;
   known_for_department?: string;
   popularity?: number;
+  // Only on /person/popular results: the few titles TMDB thinks they're
+  // best known for.
+  known_for?: { original_language?: string; vote_count?: number; media_type?: string }[];
 };
 
 export type TmdbCompany = {

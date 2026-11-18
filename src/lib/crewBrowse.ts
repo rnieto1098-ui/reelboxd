@@ -6,8 +6,11 @@ import {
   type TmdbPerson,
 } from "@/lib/tmdb";
 import { pickCompany } from "@/lib/companyMatch";
+import { isWesternActor } from "@/lib/westernActors";
 
-const POPULAR_PEOPLE_PAGES = 4;
+// More pages than the row needs: the Western-actor filter (see
+// westernActors.ts) keeps roughly half of each page.
+const POPULAR_PEOPLE_PAGES = 8;
 const ROW_SIZE = 15;
 
 // TMDB's overall people-popularity ranking is dominated by actors — even
@@ -31,6 +34,44 @@ const FEATURED_DIRECTORS = [
   "Sofia Coppola",
   "Ryan Coogler",
   "Taika Waititi",
+];
+
+// The Crew page leads with actors. Popular right now comes from TMDB; these
+// two rows are hand-picked so the page always has the faces people expect.
+const HOLLYWOOD_GREATS = [
+  "Meryl Streep",
+  "Denzel Washington",
+  "Tom Hanks",
+  "Leonardo DiCaprio",
+  "Viola Davis",
+  "Al Pacino",
+  "Cate Blanchett",
+  "Robert De Niro",
+  "Morgan Freeman",
+  "Julia Roberts",
+  "Daniel Day-Lewis",
+  "Nicole Kidman",
+  "Samuel L. Jackson",
+  "Sigourney Weaver",
+  "Harrison Ford",
+];
+
+const RISING_STARS = [
+  "Timothée Chalamet",
+  "Zendaya",
+  "Florence Pugh",
+  "Austin Butler",
+  "Jenna Ortega",
+  "Paul Mescal",
+  "Sydney Sweeney",
+  "Jacob Elordi",
+  "Anya Taylor-Joy",
+  "Barry Keoghan",
+  "Glen Powell",
+  "Margaret Qualley",
+  "Mikey Madison",
+  "Josh O'Connor",
+  "Ayo Edebiri",
 ];
 
 const FEATURED_CINEMATOGRAPHERS = [
@@ -83,10 +124,14 @@ async function resolveByName<T>(
 
 
 export async function getBrowseRows() {
-  const [peoplePages, directors, cinematographers, studios] = await Promise.all([
+  const [peoplePages, greats, rising, directors, cinematographers, studios] = await Promise.all([
     Promise.all(
-      Array.from({ length: POPULAR_PEOPLE_PAGES }, (_, i) => getPopularPeople(i + 1))
+      Array.from({ length: POPULAR_PEOPLE_PAGES }, (_, i) =>
+        getPopularPeople(i + 1).catch(() => ({ results: [] as TmdbPerson[], total_pages: 0 }))
+      )
     ),
+    resolveByName(HOLLYWOOD_GREATS, searchPeople),
+    resolveByName(RISING_STARS, searchPeople),
     resolveByName(FEATURED_DIRECTORS, searchPeople),
     resolveByName(FEATURED_CINEMATOGRAPHERS, searchPeople),
     resolveByName(FEATURED_STUDIOS, searchCompanies, pickCompany),
@@ -94,13 +139,16 @@ export async function getBrowseRows() {
 
   const allPeople = dedupeById(peoplePages.flatMap((p) => p.results));
 
-  const actors = allPeople
-    .filter((p) => p.known_for_department === "Acting")
-    .slice(0, ROW_SIZE);
+  const actors = allPeople.filter(isWesternActor).slice(0, ROW_SIZE);
+  // Someone popular this week who is also hand-picked below shows once, in
+  // the popular row.
+  const shownActors = new Set(actors.map((p) => p.id));
 
   return {
-    directors: directors.slice(0, ROW_SIZE),
     actors,
+    greats: greats.filter((p) => !shownActors.has(p.id)).slice(0, ROW_SIZE),
+    rising: rising.filter((p) => !shownActors.has(p.id)).slice(0, ROW_SIZE),
+    directors: directors.slice(0, ROW_SIZE),
     cinematographers: cinematographers.slice(0, ROW_SIZE),
     studios: dedupeById(studios).slice(0, ROW_SIZE),
   };

@@ -32,6 +32,31 @@ type Details = {
 
 const FOCUSABLE = "[data-tv]";
 
+type Direction = "left" | "right" | "up" | "down";
+
+// The arrow keys and WASD both work as the remote's direction pad.
+const KEY_DIRECTIONS: Record<string, Direction> = {
+  ArrowLeft: "left",
+  ArrowRight: "right",
+  ArrowUp: "up",
+  ArrowDown: "down",
+  a: "left",
+  d: "right",
+  w: "up",
+  s: "down",
+};
+
+function remoteDirection(e: {
+  key: string;
+  ctrlKey: boolean;
+  metaKey: boolean;
+  altKey: boolean;
+}): Direction | undefined {
+  // Leave shortcuts like Ctrl+S or Cmd+A to the browser.
+  if (e.ctrlKey || e.metaKey || e.altKey) return undefined;
+  return KEY_DIRECTIONS[e.key.length === 1 ? e.key.toLowerCase() : e.key];
+}
+
 function subscribeClock(cb: () => void) {
   const id = setInterval(cb, 15_000);
   return () => clearInterval(id);
@@ -61,7 +86,7 @@ function ensureVisible(el: HTMLElement, root: HTMLElement) {
 }
 
 /** Moves focus to the nearest item in a direction, the way a TV remote does. */
-function moveFocus(root: HTMLElement, dir: "left" | "right" | "up" | "down") {
+function moveFocus(root: HTMLElement, dir: Direction) {
   const items = [...root.querySelectorAll<HTMLElement>(FOCUSABLE)];
   const current = document.activeElement as HTMLElement | null;
   if (!current || !items.includes(current)) {
@@ -135,7 +160,7 @@ export function CouchTv({ data, username }: { data: CouchData; username: string 
   useEffect(() => {
     function onWindowKey(e: KeyboardEvent) {
       const root = rootRef.current;
-      if (!root || !e.key.startsWith("Arrow")) return;
+      if (!root || !remoteDirection(e)) return;
       const active = document.activeElement;
       if (active && active !== document.body) return;
       e.preventDefault();
@@ -148,12 +173,7 @@ export function CouchTv({ data, username }: { data: CouchData; username: string 
   function onKeyDown(e: React.KeyboardEvent) {
     const root = rootRef.current;
     if (!root) return;
-    const dir = { ArrowLeft: "left", ArrowRight: "right", ArrowUp: "up", ArrowDown: "down" }[e.key] as
-      | "left"
-      | "right"
-      | "up"
-      | "down"
-      | undefined;
+    const dir = remoteDirection(e);
     if (dir) {
       e.preventDefault();
       moveFocus(root, dir);
@@ -182,7 +202,7 @@ export function CouchTv({ data, username }: { data: CouchData; username: string 
       onKeyDown={onKeyDown}
       role="application"
       aria-roledescription="TV"
-      aria-label="Flixtally TV. Use the arrow keys to move, Enter to choose and Escape to go back."
+      aria-label="Flixtally TV. Use the arrow keys or W, A, S and D to move, Enter to choose and Escape to go back."
       className="relative h-full w-full overflow-hidden bg-[#06080d] text-white [font-size:max(9px,2.05cqw)]"
     >
       {screen.kind === "home" && (
@@ -347,21 +367,28 @@ function HomeScreen({
         </h2>
       </div>
 
-      <Row title="Your apps">
-        {data.services.map((s) => (
+      <section className="mt-[0.9em]">
+        <h3 className="mb-[0.45em] text-[0.85em] font-semibold text-white/85">
+          Your apps <span className="font-normal text-white/45">{data.services.length}</span>
+        </h3>
+        {/* A wrapping grid, not a scrolling row: every service on the
+            account gets a tile you can see at once. */}
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(7.6em,1fr))] gap-[0.7em] py-[0.35em]">
+          {data.services.map((s) => (
           <button
             key={s.id}
             type="button"
             data-tv
             onClick={() => onService(s.id)}
             onMouseEnter={(e) => e.currentTarget.focus({ preventScroll: true })}
-            className={`flex aspect-video w-[8.4em] shrink-0 flex-col items-center justify-center gap-[0.35em] rounded-[0.5em] bg-white/[0.07] ring-1 ring-white/10 ${focusRing}`}
+            className={`flex aspect-video min-w-0 flex-col items-center justify-center gap-[0.35em] rounded-[0.5em] bg-white/[0.07] ring-1 ring-white/10 ${focusRing}`}
           >
-            <ServiceLogo service={s} size="2.6em" />
+            <ServiceLogo service={s} size="2.4em" />
             <span className="max-w-full truncate px-[0.4em] text-[0.7em] text-white/80">{s.name}</span>
           </button>
-        ))}
-      </Row>
+          ))}
+        </div>
+      </section>
 
       {picks.length > 0 && (
         <Row title="Picked for you">

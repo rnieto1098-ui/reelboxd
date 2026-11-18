@@ -38,10 +38,19 @@ export type CouchData = {
 const MIN_ROW = 3;
 
 export async function getCouchData(userId: string): Promise<CouchData> {
-  const [feed, watched] = await Promise.all([
+  // Services straight from the account, not from the (cached) feed, so
+  // every service the user has added gets an app tile, in the order they
+  // added them.
+  const [feed, watched, accountServices] = await Promise.all([
     getDiscoverFeed(userId, null, null),
     getWatchedTmdbIds(userId),
+    prisma.streamingService.findMany({
+      where: { userId },
+      select: { providerId: true, providerName: true, logoPath: true },
+      orderBy: { createdAt: "asc" },
+    }),
   ]);
+  const allServices = accountServices.map((s) => ({ id: s.providerId, name: s.providerName, logoPath: s.logoPath }));
 
   const films: Record<number, CouchFilm> = {};
   for (const row of feed.rows) {
@@ -58,7 +67,7 @@ export async function getCouchData(userId: string): Promise<CouchData> {
   }
 
   const popular = await Promise.all(
-    feed.services.map((s) =>
+    allServices.map((s) =>
       discoverMovies({
         watchProviderIds: [s.id],
         watchRegion: WATCH_REGION,
@@ -71,7 +80,7 @@ export async function getCouchData(userId: string): Promise<CouchData> {
     )
   );
 
-  const services: CouchService[] = feed.services.map((s, i) => {
+  const services: CouchService[] = allServices.map((s, i) => {
     const rows = feed.rows
       .map((row) => ({
         title: row.title,

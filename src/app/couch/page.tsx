@@ -57,7 +57,7 @@ export default async function CouchPage() {
       <CouchScene
         footer={
           <p className="pointer-events-none absolute inset-x-0 bottom-[3%] hidden text-center text-xs text-white/55 pointer-fine:block">
-            Use the arrow keys like a remote · Enter to choose · Esc to go back
+            Arrow keys or WASD to move · Enter to choose · Esc to go back
           </p>
         }
       >

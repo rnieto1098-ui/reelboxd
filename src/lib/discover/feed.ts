@@ -512,10 +512,19 @@ export async function getDiscoverFeed(
   mood: Mood | null,
   runtime: RuntimeLimit | null
 ): Promise<DiscoverFeed> {
+  // The user's services are part of the cache key, so adding or removing a
+  // service rebuilds the feed straight away instead of up to three hours
+  // later. One small indexed query.
+  const serviceKey = (
+    await prisma.streamingService.findMany({ where: { userId }, select: { providerId: true } })
+  )
+    .map((s) => s.providerId)
+    .sort((a, b) => a - b)
+    .join(",");
   const [feed, watched, dismissedRows, watchlist] = await Promise.all([
     unstable_cache(
       () => buildFeed(userId, mood, runtime),
-      ["discover-feed-v2", userId, mood?.id ?? "all", String(runtime ?? "any")],
+      ["discover-feed-v2", userId, mood?.id ?? "all", String(runtime ?? "any"), serviceKey],
       { revalidate: FEED_CACHE_SECONDS, tags: [discoverCacheTag(userId)] }
     )(),
     getWatchedTmdbIds(userId),

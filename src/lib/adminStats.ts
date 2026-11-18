@@ -1,5 +1,4 @@
 import { prisma } from "@/lib/prisma";
-import { GAME_KEY, todayKey } from "@/lib/dailyGame";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 export const CHART_DAYS = 30;
@@ -41,7 +40,6 @@ export async function getAdminOverview() {
     challenges,
     watchlistItems,
     moviesCached,
-    gamesToday,
     letterboxdConnected,
     recentSignups,
     recentLogs,
@@ -58,7 +56,6 @@ export async function getAdminOverview() {
     prisma.challenge.count(),
     prisma.watchlistItem.count(),
     prisma.movie.count(),
-    prisma.gameResult.count({ where: { game: GAME_KEY, day: todayKey(now) } }),
     prisma.user.count({ where: { letterboxdUsername: { not: null } } }),
     prisma.user.findMany({ where: { createdAt: { gte: since30 } }, select: { createdAt: true } }),
     prisma.diaryEntry.findMany({
@@ -110,7 +107,6 @@ export async function getAdminOverview() {
       challenges,
       watchlistItems,
       moviesCached,
-      gamesToday,
       letterboxdConnected,
     },
     signupsByDay: bucketByDay(

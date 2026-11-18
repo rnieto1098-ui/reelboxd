@@ -37,7 +37,7 @@ export async function NavBar() {
           { href: "/challenges", label: "Challenges", icon: "trophy" } as const,
         ]
       : []),
-    { href: "/play", label: "Play", icon: "gamepad" },
+    { href: "/couch", label: "Couch", icon: "tv" },
     { href: "/crew", label: "Crew", icon: "users" },
   ];
 

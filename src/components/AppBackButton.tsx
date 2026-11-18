@@ -5,7 +5,7 @@ import { ChevronLeft } from "lucide-react";
 
 // The main destinations, reached straight from the menu. They are starting points, so
 // they don't get a back button.
-const ROOTS = new Set(["/", "/search", "/watchlist", "/challenges", "/lists", "/play", "/login"]);
+const ROOTS = new Set(["/", "/search", "/watchlist", "/challenges", "/lists", "/couch", "/discover", "/login"]);
 
 /**
  * A back button for the installed app on phones.

@@ -17,7 +17,7 @@ const COLUMNS: { title: string; links: { href: string; label: string }[] }[] = [
       { href: "/watchlist", label: "Watchlist" },
       { href: "/challenges", label: "Challenges" },
       { href: "/discover", label: "Discover" },
-      { href: "/play", label: "Daily game" },
+      { href: "/couch", label: "Couch" },
     ],
   },
   {

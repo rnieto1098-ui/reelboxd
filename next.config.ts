@@ -33,7 +33,11 @@ const nextConfig: NextConfig = {
   },
   async redirects() {
     // The old prompt-based Recommend page became Discover.
-    return [{ source: "/recommend", destination: "/discover", permanent: true }];
+    return [
+      { source: "/recommend", destination: "/discover", permanent: true },
+      // The Daily Reel game was removed; its tab became the Couch TV.
+      { source: "/play", destination: "/couch", permanent: true },
+    ];
   },
   async headers() {
     return [

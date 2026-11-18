@@ -33,8 +33,8 @@ const FEATURES: { icon: LucideIcon; title: string; body: string }[] = [
   },
   {
     icon: Trophy,
-    title: "Challenges and a daily game",
-    body: "Set a yearly goal, take on a director's whole filmography, or guess today's mystery film.",
+    title: "Challenges to chase",
+    body: "Set a yearly goal, take on a director's whole filmography, or turn any list into a challenge.",
   },
   {
     icon: BarChart3,

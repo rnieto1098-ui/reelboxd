@@ -4,7 +4,6 @@ import {
   BookOpen,
   Bookmark,
   Film,
-  Gamepad2,
   ListChecks,
   RefreshCw,
   Star,
@@ -146,7 +145,6 @@ export default async function AdminOverviewPage() {
         <StatTile icon={Bookmark} label="Watchlist films" value={totals.watchlistItems} />
         <StatTile icon={ListChecks} label="Member lists" value={totals.userLists} />
         <StatTile icon={Trophy} label="Challenges" value={totals.challenges} />
-        <StatTile icon={Gamepad2} label="Daily games finished today" value={totals.gamesToday} />
         <StatTile
           icon={RefreshCw}
           label="Letterboxd accounts linked"

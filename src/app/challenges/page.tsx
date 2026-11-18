@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Flame, Gamepad2, Trophy } from "lucide-react";
+import { Flame, Trophy } from "lucide-react";
 import { auth } from "@/auth";
 import { getGoalProgress } from "@/lib/goals";
 import { getChallengesWithProgress } from "@/lib/challenges";
@@ -146,21 +146,6 @@ export default async function ChallengesPage() {
         </section>
       )}
 
-      <Link
-        href="/play"
-        className="card card-interactive flex items-center gap-4 p-5 sm:gap-5"
-      >
-        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-accent-green-soft text-accent-green">
-          <Gamepad2 aria-hidden className="h-6 w-6" />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block font-semibold">Today&apos;s mystery film</span>
-          <span className="block text-sm text-muted">
-            A new film to guess every day, from six clues. Keep a streak going.
-          </span>
-        </span>
-        <span className="btn btn-primary btn-sm hidden shrink-0 sm:inline-flex">Play</span>
-      </Link>
     </div>
   );
 }

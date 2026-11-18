@@ -534,6 +534,9 @@ model ListItem {
 // devices. `day` is the puzzle's UTC date as "YYYY-MM-DD"; the unique
 // constraint is what makes "one result per player per day" true even if two
 // tabs submit at once.
+// Results from the Daily Reel game, which was removed in November 2026.
+// Nothing reads or writes this any more; the table is kept so past results
+// aren't deleted. Drop it with a migration if they're no longer wanted.
 model GameResult {
   id        String   @id @default(cuid())
   game      String

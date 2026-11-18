@@ -26,9 +26,9 @@ export default function manifest(): MetadataRoute.Manifest {
     // Long-press the home-screen icon to jump straight to one of these.
     shortcuts: [
       {
-        name: "Today's Daily Reel",
-        short_name: "Daily Reel",
-        url: "/play",
+        name: "Discover something to watch",
+        short_name: "Discover",
+        url: "/discover",
         icons: [{ src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }],
       },
       {

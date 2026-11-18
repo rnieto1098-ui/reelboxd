@@ -57,7 +57,8 @@ const SORT_OPTIONS = {
   },
 } satisfies Record<string, { label: string; orderBy: (dir: Prisma.SortOrder) => SavedMovieOrderBy }>;
 
-type SortKey = keyof typeof SORT_OPTIONS;
+export type SavedSortKey = keyof typeof SORT_OPTIONS;
+type SortKey = SavedSortKey;
 
 const SAVED_LISTS = [
   { href: "/watchlist", label: "Watchlist" },
@@ -101,10 +102,15 @@ type CurrentState = {
   certification: string | null;
 };
 
-function buildHref(basePath: string, current: CurrentState, overrides: Partial<CurrentState>): string {
+function buildHref(
+  basePath: string,
+  defaultSort: SortKey,
+  current: CurrentState,
+  overrides: Partial<CurrentState>
+): string {
   const s = { ...current, ...overrides };
   const params = new URLSearchParams();
-  if (s.sortKey !== "added") params.set("sort", s.sortKey);
+  if (s.sortKey !== defaultSort) params.set("sort", s.sortKey);
   if (s.sortDir !== "desc") params.set("dir", s.sortDir);
   if (s.avail) params.set("avail", s.avail);
   if (s.genre) params.set("genre", s.genre);
@@ -140,6 +146,7 @@ export async function SavedMoviesPage({
   headerActions,
   loadItems,
   allInWatchlist,
+  defaultSort = "added",
 }: {
   userId: string;
   searchParams: Record<string, string | string[] | undefined>;
@@ -151,9 +158,11 @@ export async function SavedMoviesPage({
   // True for the watchlist itself; anywhere else, each card's bookmark
   // reflects whether that film is actually on the watchlist.
   allInWatchlist: boolean;
+  // The sort used when the URL names none (newest first).
+  defaultSort?: SortKey;
 }) {
   const { sort, dir, avail, genre, director, runtime, cert } = searchParams;
-  const sortKey: SortKey = typeof sort === "string" && sort in SORT_OPTIONS ? (sort as SortKey) : "added";
+  const sortKey: SortKey = typeof sort === "string" && sort in SORT_OPTIONS ? (sort as SortKey) : defaultSort;
   const sortDir: SortDir = dir === "asc" ? "asc" : "desc";
   const availRaw = typeof avail === "string" ? avail : "";
   const directorId =
@@ -168,7 +177,7 @@ export async function SavedMoviesPage({
     runtimeBucket: typeof runtime === "string" && runtime ? runtime : null,
     certification: typeof cert === "string" && cert ? cert : null,
   };
-  const href = (overrides: Partial<CurrentState>) => buildHref(basePath, current, overrides);
+  const href = (overrides: Partial<CurrentState>) => buildHref(basePath, defaultSort, current, overrides);
   const attributeFilters: WatchlistFilters = {
     genre: current.genre,
     directorId: current.directorId,

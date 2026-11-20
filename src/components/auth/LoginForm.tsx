@@ -1,10 +1,11 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { FormMessage } from "@/components/auth/AuthShell";
+import { readRememberedEmail, rememberEmail } from "@/lib/rememberedEmail";
 
 export function LoginForm({ next }: { next: string }) {
   const router = useRouter();
@@ -14,6 +15,16 @@ export function LoginForm({ next }: { next: string }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const passwordRef = useRef<HTMLInputElement>(null);
+
+  // This device's last account, filled in so signing back in is just the password.
+  useEffect(() => {
+    const saved = readRememberedEmail();
+    if (saved) {
+      setEmail((current) => current || saved);
+      passwordRef.current?.focus();
+    }
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -37,6 +48,7 @@ export function LoginForm({ next }: { next: string }) {
       return;
     }
 
+    rememberEmail(email);
     // Left in the loading state on purpose: the page is about to change.
     router.push(next);
     router.refresh();
@@ -78,6 +90,7 @@ export function LoginForm({ next }: { next: string }) {
           type="password"
           autoComplete="current-password"
           required
+          ref={passwordRef}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           className="input"

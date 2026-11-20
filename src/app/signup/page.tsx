@@ -5,17 +5,21 @@ import { auth } from "@/auth";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { SignupForm } from "@/components/auth/SignupForm";
 import { getSiteSettings } from "@/lib/siteSettings";
+import { safeNextPath } from "@/lib/loginHref";
 
 export const metadata: Metadata = { title: "Create an account" };
 
-export default async function SignupPage() {
+export default async function SignupPage({ searchParams }: PageProps<"/signup">) {
+  const next = safeNextPath((await searchParams).next);
   const [session, settings] = await Promise.all([auth(), getSiteSettings()]);
-  if (session?.user) redirect("/");
+  if (session?.user) redirect(next);
 
   const signInLink = (
     <>
       Already have an account?{" "}
-      <Link href="/login" className="font-medium text-accent-green underline-offset-2 hover:underline">
+      <Link
+        href={next === "/" ? "/login" : `/login?next=${encodeURIComponent(next)}`}
+        className="font-medium text-accent-green underline-offset-2 hover:underline">
         Sign in
       </Link>
     </>
@@ -29,8 +33,8 @@ export default async function SignupPage() {
         subtitle="Flixtally isn't taking new accounts right now. Check back soon."
         footer={signInLink}
       >
-        <Link href="/" className="btn btn-secondary">
-          Browse films
+        <Link href="/login" className="btn btn-secondary">
+          Sign in
         </Link>
       </AuthShell>
     );
@@ -42,7 +46,7 @@ export default async function SignupPage() {
       subtitle="Free, and it takes about a minute."
       footer={signInLink}
     >
-      <SignupForm />
+      <SignupForm next={next} />
     </AuthShell>
   );
 }

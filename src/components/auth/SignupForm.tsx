@@ -5,8 +5,9 @@ import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { FormMessage } from "@/components/auth/AuthShell";
+import { rememberEmail } from "@/lib/rememberedEmail";
 
-export function SignupForm() {
+export function SignupForm({ next = "/" }: { next?: string }) {
   const router = useRouter();
   const usernameId = useId();
   const emailId = useId();
@@ -52,7 +53,8 @@ export function SignupForm() {
       return;
     }
 
-    router.push("/");
+    rememberEmail(email);
+    router.push(next);
     router.refresh();
   }
 

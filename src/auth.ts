@@ -37,7 +37,9 @@ const getSessionAccount = cache((userId: string) =>
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
-  session: { strategy: "jwt" },
+  // Stays signed in on this device for a year, renewed whenever it is used.
+  // The whole site needs an account, so signing in again often would be a chore.
+  session: { strategy: "jwt", maxAge: 60 * 60 * 24 * 365 },
   pages: { signIn: "/login" },
   providers: [
     Credentials({

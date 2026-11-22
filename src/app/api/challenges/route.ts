@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { createChallenge } from "@/lib/challenges";
+import { pickedFilmsSchema } from "@/lib/pickedFilmsSchema";
 
 // Trimmed and capped, but otherwise optional — an omitted or blank title
 // falls back to the auto-generated one in createChallenge.
@@ -34,6 +35,12 @@ const challengeSchema = z.discriminatedUnion("type", [
     type: z.literal("LIST"),
     listId: z.string().min(1),
     title: titleField,
+  }),
+  // Hand-picked films. There is nothing to name it after, so the title is required.
+  z.object({
+    type: z.literal("CUSTOM"),
+    title: z.string().trim().min(1, "Give the challenge a name").max(100),
+    films: pickedFilmsSchema,
   }),
 ]);
 

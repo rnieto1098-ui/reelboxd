@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { useToast } from "@/components/Toast";
 import { Dialog } from "@/components/Dialog";
+import { FilmPicker } from "@/components/FilmPicker";
+import type { PickedFilm } from "@/lib/challenges";
 
 type PersonResult = {
   id: number;
@@ -19,6 +21,7 @@ const CHALLENGE_TYPES = [
   { key: "GENRE", label: "Genre" },
   { key: "TIMEFRAME", label: "Time frame" },
   { key: "CREW", label: "Crew" },
+  { key: "CUSTOM", label: "Hand-picked" },
 ] as const;
 
 type ChallengeTypeKey = (typeof CHALLENGE_TYPES)[number]["key"];
@@ -50,6 +53,8 @@ export function NewChallengeForm({ genres }: { genres: string[] }) {
   const [departments, setDepartments] = useState<DepartmentOption[] | null>(null);
   const [loadingDepartments, setLoadingDepartments] = useState(false);
   const [department, setDepartment] = useState<string | null>(null);
+
+  const [pickedFilms, setPickedFilms] = useState<PickedFilm[]>([]);
 
   // Fetched once, up front, rather than per-keystroke — there are only a
   // couple dozen genres, so one request covers every option in the select.
@@ -174,6 +179,16 @@ export function NewChallengeForm({ genres }: { genres: string[] }) {
         return;
       }
       payload = { type: "TIMEFRAME", startDate, endDate, target: Math.round(target) };
+    } else if (type === "CUSTOM") {
+      if (!customTitle.trim()) {
+        setFormError("Give the challenge a name.");
+        return;
+      }
+      if (pickedFilms.length === 0) {
+        setFormError("Pick at least one film.");
+        return;
+      }
+      payload = { type: "CUSTOM", films: pickedFilms };
     } else {
       if (!selectedPerson || !department) return;
       payload = {
@@ -212,6 +227,7 @@ export function NewChallengeForm({ genres }: { genres: string[] }) {
     showToast("Challenge added");
     setOpen(false);
     setCustomTitle("");
+    setPickedFilms([]);
     resetCrewFields();
     router.refresh();
   }
@@ -220,6 +236,7 @@ export function NewChallengeForm({ genres }: { genres: string[] }) {
     setOpen(false);
     setCustomTitle("");
     setFormError(null);
+    setPickedFilms([]);
     resetCrewFields();
   }
 
@@ -236,7 +253,7 @@ export function NewChallengeForm({ genres }: { genres: string[] }) {
       <div
         role="group"
         aria-label="Kind of challenge"
-        className="flex w-fit gap-1 rounded-full border border-border-strong p-1 text-sm"
+        className="flex w-fit max-w-full gap-1 overflow-x-auto rounded-full border border-border-strong p-1 text-sm"
       >
         {CHALLENGE_TYPES.map((t) => (
           <button
@@ -247,7 +264,7 @@ export function NewChallengeForm({ genres }: { genres: string[] }) {
               setType(t.key);
               setFormError(null);
             }}
-            className={`rounded-full px-3.5 py-1.5 font-medium transition-colors ${
+            className={`shrink-0 whitespace-nowrap rounded-full px-3.5 py-1.5 font-medium transition-colors ${
               type === t.key ? "bg-accent-green text-black" : "text-muted hover:text-foreground"
             }`}
           >
@@ -427,16 +444,24 @@ export function NewChallengeForm({ genres }: { genres: string[] }) {
         </div>
       )}
 
+      {type === "CUSTOM" && <FilmPicker films={pickedFilms} onChange={setPickedFilms} />}
+
       <div>
         <label htmlFor={titleId} className="field-label">
-          Name <span className="font-normal text-subtle">(optional)</span>
+          Name{" "}
+          {type !== "CUSTOM" && <span className="font-normal text-subtle">(optional)</span>}
         </label>
         <input
           id={titleId}
           type="text"
           value={customTitle}
           onChange={(e) => setCustomTitle(e.target.value)}
-          placeholder="We'll name it for you if you leave this blank"
+          placeholder={
+            type === "CUSTOM"
+              ? "e.g. Oscar winners I've never seen"
+              : "We'll name it for you if you leave this blank"
+          }
+          required={type === "CUSTOM"}
           maxLength={100}
           className="input"
         />
@@ -454,7 +479,11 @@ export function NewChallengeForm({ genres }: { genres: string[] }) {
         </button>
         <button
           type="submit"
-          disabled={saving || (type === "CREW" && (!selectedPerson || !department))}
+          disabled={
+            saving ||
+            (type === "CREW" && (!selectedPerson || !department)) ||
+            (type === "CUSTOM" && pickedFilms.length === 0)
+          }
           className="btn btn-primary"
         >
           {saving ? "Adding…" : "Add challenge"}

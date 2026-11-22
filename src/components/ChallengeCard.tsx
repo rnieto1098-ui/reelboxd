@@ -4,6 +4,7 @@ import {
   Clapperboard,
   Drama,
   ListChecks,
+  Popcorn,
   type LucideIcon,
 } from "lucide-react";
 import type { ChallengeSummary } from "@/lib/challenges";
@@ -18,6 +19,7 @@ const TYPE: Record<ChallengeSummary["type"], { label: string; icon: LucideIcon }
   TIMEFRAME: { label: "Date range", icon: CalendarRange },
   CREW: { label: "Filmography", icon: Clapperboard },
   LIST: { label: "List", icon: ListChecks },
+  CUSTOM: { label: "Hand-picked", icon: Popcorn },
 };
 
 /**

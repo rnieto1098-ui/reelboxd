@@ -51,7 +51,7 @@ export default async function ChallengesPage() {
           <h1 className="page-title">Give your watching a goal</h1>
           <p className="mt-2 max-w-xl text-muted">
             Set a number for the year, take on a genre or a director&apos;s whole filmography,
-            and watch the rings fill in.
+            hand-pick your own set of films, and watch the rings fill in.
           </p>
         </div>
         <dl className="flex gap-3">
@@ -98,7 +98,7 @@ export default async function ChallengesPage() {
             </p>
             <p className="mx-auto mt-1 max-w-md text-sm text-muted">
               Try a genre quota, a number of films inside a date range, or every film by a
-              director you like. To turn a list into a challenge, open the list and choose
+              director you like, or hand-pick the films yourself. To turn a list into a challenge, open the list and choose
               &ldquo;Make this a challenge&rdquo;.
             </p>
             <Link href="/lists" className="btn btn-outline btn-sm mt-4">

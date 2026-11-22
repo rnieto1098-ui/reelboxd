@@ -23,6 +23,7 @@ import { FadeWatchedControl } from "@/components/FadeWatchedControl";
 import { MovieRow } from "@/components/MovieRow";
 import { AvailabilityFilterLinks } from "@/components/AvailabilityFilterLinks";
 import { AddAllToWatchlistButton } from "@/components/AddAllToWatchlistButton";
+import { EditChallengeFilmsButton } from "@/components/EditChallengeFilmsButton";
 
 function buildHref(id: string, streamingOnly: boolean) {
   return streamingOnly ? `/challenges/${id}?streaming=1` : `/challenges/${id}`;
@@ -33,7 +34,12 @@ const TYPE_LABEL: Record<string, string> = {
   TIMEFRAME: "Time frame challenge",
   CREW: "Crew challenge",
   LIST: "List challenge",
+  CUSTOM: "Hand-picked challenge",
 };
+
+// Challenge types whose page shows a fixed set of films to work through,
+// watched and not, rather than only the films already counted.
+const SET_TYPES = new Set(["CREW", "LIST", "CUSTOM"]);
 
 export default async function ChallengeDetailPage({
   params,
@@ -55,6 +61,7 @@ export default async function ChallengeDetailPage({
     include: {
       user: { select: { username: true } },
       list: { select: { id: true, title: true } },
+      films: { orderBy: { position: "asc" } },
     },
   });
   if (!challenge) notFound();
@@ -124,6 +131,24 @@ export default async function ChallengeDetailPage({
       owned: ownedIds.has(item.tmdbId),
       inWatchlist: watchlistIds.has(item.tmdbId),
       watched: watchedTmdbIds.has(item.tmdbId),
+    }));
+    progressCount = watchedTmdbIds.size;
+    subtitle = `${watchedTmdbIds.size} of ${target} watched`;
+  } else if (challenge.type === "CUSTOM") {
+    const films = challenge.films;
+    target = films.length;
+    const watchedTmdbIds = await getWatchedAmong(
+      ownerId,
+      films.map((f) => f.tmdbId)
+    );
+    credits = films.map((film) => ({
+      id: film.tmdbId,
+      title: film.title,
+      posterPath: film.posterPath,
+      year: film.releaseDate?.slice(0, 4),
+      owned: ownedIds.has(film.tmdbId),
+      inWatchlist: watchlistIds.has(film.tmdbId),
+      watched: watchedTmdbIds.has(film.tmdbId),
     }));
     progressCount = watchedTmdbIds.size;
     subtitle = `${watchedTmdbIds.size} of ${target} watched`;
@@ -210,7 +235,7 @@ export default async function ChallengeDetailPage({
   // already watched. target/subtitle above are computed from the full,
   // unfiltered set on purpose — filtering narrows what the grid *shows*,
   // not the challenge's actual progress.
-  const filterableType = challenge.type === "CREW" || challenge.type === "LIST";
+  const filterableType = SET_TYPES.has(challenge.type);
   const totalCredits = credits.length;
   const canFilterByAvailability = !!viewerId && hasStreamingAvailability(userProviderIds, ownedIds);
   const applyStreamingFilter = filterableType && streamingOnly && canFilterByAvailability;
@@ -266,12 +291,25 @@ export default async function ChallengeDetailPage({
           From the list &ldquo;{challenge.list.title}&rdquo;
         </Link>
       )}
-      {viewerId && hasAddableFilms && (
-        <div className="mt-3">
-          <AddAllToWatchlistButton
-            endpoint={`/api/challenges/${id}/add-to-watchlist`}
-            body={applyStreamingFilter ? { streaming: true } : undefined}
-          />
+      {viewerId && (hasAddableFilms || (isOwner && challenge.type === "CUSTOM")) && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {hasAddableFilms && (
+            <AddAllToWatchlistButton
+              endpoint={`/api/challenges/${id}/add-to-watchlist`}
+              body={applyStreamingFilter ? { streaming: true } : undefined}
+            />
+          )}
+          {isOwner && challenge.type === "CUSTOM" && (
+            <EditChallengeFilmsButton
+              challengeId={id}
+              films={challenge.films.map((f) => ({
+                tmdbId: f.tmdbId,
+                title: f.title,
+                posterPath: f.posterPath,
+                releaseDate: f.releaseDate,
+              }))}
+            />
+          )}
         </div>
       )}
       <div className="mb-8" />
@@ -294,9 +332,11 @@ export default async function ChallengeDetailPage({
               ? "No movie credits found for this person."
               : challenge.type === "LIST"
                 ? "That list doesn't have any movies in it yet."
-                : "No movies have contributed to this challenge yet."}
+                : challenge.type === "CUSTOM"
+                  ? "This challenge doesn't have any films yet."
+                  : "No movies have contributed to this challenge yet."}
         </p>
-      ) : challenge.type === "CREW" || challenge.type === "LIST" ? (
+      ) : SET_TYPES.has(challenge.type) ? (
         <FadeWatchedControl>
           <CreditGrid title="Movies" credits={credits} />
         </FadeWatchedControl>

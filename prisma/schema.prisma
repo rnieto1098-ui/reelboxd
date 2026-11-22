@@ -497,6 +497,10 @@ model Challenge {
   listId String?
   list   List?   @relation(fields: [listId], references: [id], onDelete: Cascade)
 
+  // CUSTOM — films hand-picked by the owner, kept on the challenge itself
+  // rather than in a list so they don't show up on the Lists page.
+  films ChallengeFilm[]
+
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -510,6 +514,24 @@ model Challenge {
   // index, and listId is null for every other type — so a user can still
   // have as many GENRE/TIMEFRAME/CREW challenges as they like.
   @@unique([userId, type, listId])
+}
+
+// One hand-picked film in a CUSTOM challenge. Title, poster and date are
+// copied from TMDB when picked, like ListItem, so the challenge page can draw
+// its grid without a TMDB call per film.
+model ChallengeFilm {
+  id          String  @id @default(cuid())
+  tmdbId      Int
+  title       String
+  posterPath  String?
+  releaseDate String?
+  position    Int
+
+  challengeId String
+  challenge   Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+
+  @@unique([challengeId, tmdbId])
+  @@index([challengeId])
 }
 
 model ListItem {

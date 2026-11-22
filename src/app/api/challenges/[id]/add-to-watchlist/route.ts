@@ -24,7 +24,7 @@ export async function POST(
   const { id } = await context.params;
   const challenge = await prisma.challenge.findUnique({
     where: { id },
-    select: { type: true, personId: true, department: true, listId: true, genreName: true },
+    select: { id: true, type: true, personId: true, department: true, listId: true, genreName: true },
   });
   if (!challenge) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -34,8 +34,8 @@ export async function POST(
   let candidates = await getChallengeWatchlistCandidates(userId, challenge);
 
   // Mirrors the challenge page: the streaming filter only narrows CREW and
-  // LIST grids, so "add all" adds exactly what the viewer is looking at.
-  if (streamingOnly && (challenge.type === "CREW" || challenge.type === "LIST")) {
+  // LIST (and hand-picked) grids, so "add all" adds exactly what the viewer is looking at.
+  if (streamingOnly && ["CREW", "LIST", "CUSTOM"].includes(challenge.type)) {
     const [providerIds, ownedIds] = await Promise.all([
       getUserProviderIds(userId),
       getUserOwnedTmdbIds(userId),

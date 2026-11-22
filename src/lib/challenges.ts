@@ -14,7 +14,15 @@ import {
 // this person's whole filmography" completionist goal). The built-in yearly
 // challenge is a separate model (WatchGoal, see lib/goals.ts) since it's the
 // one shown on the homepage — these are Challenges-tab-only.
-export type ChallengeType = "GENRE" | "TIMEFRAME" | "CREW" | "LIST";
+export type ChallengeType = "GENRE" | "TIMEFRAME" | "CREW" | "LIST" | "CUSTOM";
+
+/** A film picked by hand for a CUSTOM challenge, as the form sends it. */
+export type PickedFilm = {
+  tmdbId: number;
+  title: string;
+  posterPath: string | null;
+  releaseDate: string | null;
+};
 
 export type ChallengeSummary = {
   id: string;
@@ -168,6 +176,23 @@ async function watchedCountAmong(userId: string, tmdbIds: number[]): Promise<num
   return (await getWatchedAmong(userId, tmdbIds)).size;
 }
 
+// The films in a CUSTOM challenge, in the order they were picked.
+export async function getCustomChallengeTmdbIds(challengeId: string): Promise<number[]> {
+  const films = await prisma.challengeFilm.findMany({
+    where: { challengeId },
+    select: { tmdbId: true },
+    orderBy: { position: "asc" },
+  });
+  return films.map((f) => f.tmdbId);
+}
+
+async function setProgress(
+  userId: string,
+  tmdbIds: number[]
+): Promise<{ count: number; target: number }> {
+  return { count: await watchedCountAmong(userId, tmdbIds), target: tmdbIds.length };
+}
+
 async function listProgress(
   userId: string,
   listId: string
@@ -237,6 +262,11 @@ export async function checkNewlyCompletedChallenges(
       if (tmdbIds.length === 0 || !tmdbIds.includes(movie.tmdbId)) continue;
       const count = await watchedCountAmong(userId, tmdbIds);
       if (count === tmdbIds.length) completions.push({ id: c.id, title: c.title });
+    } else if (c.type === "CUSTOM") {
+      const tmdbIds = await getCustomChallengeTmdbIds(c.id);
+      if (tmdbIds.length === 0 || !tmdbIds.includes(movie.tmdbId)) continue;
+      const count = await watchedCountAmong(userId, tmdbIds);
+      if (count === tmdbIds.length) completions.push({ id: c.id, title: c.title });
     }
   }
 
@@ -292,6 +322,10 @@ export async function getChallengesWithProgress(userId: string): Promise<Challen
         const progress = await listProgress(userId, c.listId);
         count = progress.count;
         target = progress.target;
+      } else if (c.type === "CUSTOM") {
+        const progress = await setProgress(userId, await getCustomChallengeTmdbIds(c.id));
+        count = progress.count;
+        target = progress.target;
       }
 
       return {
@@ -320,7 +354,21 @@ export async function createChallenge(
     | { type: "TIMEFRAME"; startDate: Date; endDate: Date; target: number; title?: string }
     | { type: "CREW"; personId: number; personName: string; department: string | null; title?: string }
     | { type: "LIST"; listId: string; listTitle: string; title?: string }
+    | { type: "CUSTOM"; title: string; films: PickedFilm[] }
 ) {
+  if (input.type === "CUSTOM") {
+    return prisma.challenge.create({
+      data: {
+        userId,
+        type: "CUSTOM",
+        title: input.title.trim(),
+        films: {
+          create: input.films.map((f, position) => ({ ...f, position })),
+        },
+      },
+    });
+  }
+
   const defaultTitle =
     input.type === "GENRE"
       ? `Watch ${input.target} ${input.genreName} movies`
@@ -348,6 +396,27 @@ export async function createChallenge(
       listId: input.type === "LIST" ? input.listId : null,
     },
   });
+}
+
+// Replaces the films in one of the user's CUSTOM challenges. Returns false
+// when there is no such challenge of theirs.
+export async function setCustomChallengeFilms(
+  userId: string,
+  id: string,
+  films: PickedFilm[]
+): Promise<boolean> {
+  const challenge = await prisma.challenge.findFirst({
+    where: { id, userId, type: "CUSTOM" },
+    select: { id: true },
+  });
+  if (!challenge) return false;
+  await prisma.$transaction([
+    prisma.challengeFilm.deleteMany({ where: { challengeId: id } }),
+    prisma.challengeFilm.createMany({
+      data: films.map((f, position) => ({ ...f, position, challengeId: id })),
+    }),
+  ]);
+  return true;
 }
 
 // Returns true when a matching, owned challenge was actually found and
@@ -499,7 +568,7 @@ export async function getChallengeSuggestions(
   userId: string,
   challenge: { type: string; genreName: string | null }
 ): Promise<TmdbMovieSummary[]> {
-  if (challenge.type === "CREW" || challenge.type === "LIST") return [];
+  if (challenge.type !== "GENRE" && challenge.type !== "TIMEFRAME") return [];
 
   const [genresData, logged] = await Promise.all([
     challenge.type === "GENRE" ? getGenres().catch(() => ({ genres: [] })) : null,
@@ -532,6 +601,7 @@ export async function getChallengeSuggestions(
 export async function getChallengeWatchlistCandidates(
   viewerId: string,
   challenge: {
+    id: string;
     type: string;
     personId: number | null;
     department: string | null;
@@ -544,6 +614,9 @@ export async function getChallengeWatchlistCandidates(
   }
   if (challenge.type === "LIST" && challenge.listId) {
     return (await getListChallengeTmdbIds(challenge.listId)).map((id) => ({ id }));
+  }
+  if (challenge.type === "CUSTOM") {
+    return (await getCustomChallengeTmdbIds(challenge.id)).map((id) => ({ id }));
   }
   return getChallengeSuggestions(viewerId, challenge);
 }

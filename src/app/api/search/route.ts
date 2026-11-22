@@ -10,6 +10,9 @@ export type SearchSuggestion = {
   title: string;
   year: string;
   poster: string | null;
+  /** TMDB's own path, for saving a picked film (see the hand-picked challenge form). */
+  posterPath: string | null;
+  releaseDate: string | null;
 };
 
 // Powers the header search box's as-you-type dropdown. Public, like the
@@ -28,6 +31,8 @@ export async function GET(request: Request) {
         title: m.title,
         year: m.release_date?.slice(0, 4) ?? "",
         poster: posterUrl(m.poster_path, "w200"),
+        posterPath: m.poster_path ?? null,
+        releaseDate: m.release_date || null,
       }));
   } catch {
     return NextResponse.json({ error: "Search is unavailable right now" }, { status: 502 });

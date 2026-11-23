@@ -26,7 +26,15 @@ const MAX_BROWSABLE_PROVIDERS = 40;
 // e.g. standalone Starz and HBO Max both rank well past 100th. Pin them so
 // they show up regardless of where TMDB's own ordering would otherwise put
 // them.
-const FEATURED_PROVIDER_IDS = [1899, 43, 2754, 2445]; // HBO Max, Starz, Howdy, MovieSphere+
+// HBO Max, Starz, Howdy, MovieSphere+, Sony Pictures Core (which TMDB only
+// lists as its Amazon Channel in the US).
+const FEATURED_PROVIDER_IDS = [1899, 43, 2754, 2445, 2745];
+
+// Names to show instead of TMDB's, where its name is clumsier than the one
+// people know the service by.
+const PROVIDER_NAME_OVERRIDES: Record<number, string> = {
+  2745: "Sony Pictures Core",
+};
 
 /** The catalog of services shown on /streaming for the user to pick their own. */
 export async function getBrowsableProviders(): Promise<TmdbWatchProvider[]> {
@@ -46,7 +54,11 @@ export async function getBrowsableProviders(): Promise<TmdbWatchProvider[]> {
     .map((id) => catalog.results.find((p) => p.provider_id === id))
     .filter((p): p is TmdbWatchProvider => p != null);
 
-  return [...topProviders, ...featuredMissing];
+  return [...topProviders, ...featuredMissing].map((p) =>
+    PROVIDER_NAME_OVERRIDES[p.provider_id]
+      ? { ...p, provider_name: PROVIDER_NAME_OVERRIDES[p.provider_id] }
+      : p
+  );
 }
 
 export async function getUserProviderIds(userId: string | undefined): Promise<Set<number>> {

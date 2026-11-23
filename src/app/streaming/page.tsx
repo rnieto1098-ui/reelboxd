@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { getBrowsableProviders, getUserProviderIds } from "@/lib/streaming";
-import { StreamingServiceToggle } from "@/components/StreamingServiceToggle";
+import { StreamingServicesGrid } from "@/components/StreamingServicesGrid";
 
 export default async function StreamingPage() {
   const session = await auth();
@@ -20,17 +20,14 @@ export default async function StreamingPage() {
         your watchlist are ready to watch right now.
       </p>
 
-      <div className="flex flex-wrap gap-3">
-        {providers.map((provider) => (
-          <StreamingServiceToggle
-            key={provider.provider_id}
-            providerId={provider.provider_id}
-            providerName={provider.provider_name}
-            logoPath={provider.logo_path}
-            initialSelected={selectedIds.has(provider.provider_id)}
-          />
-        ))}
-      </div>
+      <StreamingServicesGrid
+        providers={providers.map(({ provider_id, provider_name, logo_path }) => ({
+          provider_id,
+          provider_name,
+          logo_path,
+        }))}
+        selectedIds={[...selectedIds]}
+      />
     </div>
   );
 }

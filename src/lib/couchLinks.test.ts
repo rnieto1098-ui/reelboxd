@@ -33,3 +33,8 @@ test("services without a working search fall back to the TMDB watch page", () =>
   assert.equal(watchLink({ id: 337, name: "Disney Plus" }, "Heat", null), null);
   assert.equal(watchLink({ id: 8, name: "Netflix" }, "Heat", null)?.label, "Netflix");
 });
+
+test("Sony Pictures Core opens Prime Video, where its channel lives", () => {
+  assert.equal(watchesOnPrimeVideo(2745, "Sony Pictures Core"), true);
+  assert.equal(watchLink({ id: 2745, name: "Sony Pictures Core" }, "Heat", null)?.label, "Prime Video");
+});

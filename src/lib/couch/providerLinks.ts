@@ -22,6 +22,7 @@ const PRIME_VIDEO_IDS = new Set([
   1899, 1825, // HBO Max, HBO Max Amazon Channel
   34, 583, // MGM+, MGM+ Amazon Channel
   526, 528, // AMC+, AMC+ Amazon Channel
+  2745, // Sony Pictures Core Amazon Channel (shown as "Sony Pictures Core")
 ]);
 
 const SEARCH_URLS: Record<number, (q: string) => string> = {

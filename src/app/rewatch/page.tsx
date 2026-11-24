@@ -22,6 +22,8 @@ export default async function RewatchPage({ searchParams }: PageProps<"/rewatch"
         </>
       }
       allInWatchlist={false}
+      // Like the watchlist: open on what you can put on tonight.
+      defaultAvail="on"
       headerActions={(itemCount) => (
         <>
           <ListImportForm

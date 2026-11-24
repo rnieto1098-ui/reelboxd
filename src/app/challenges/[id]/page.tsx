@@ -24,6 +24,7 @@ import { MovieRow } from "@/components/MovieRow";
 import { AvailabilityFilterLinks } from "@/components/AvailabilityFilterLinks";
 import { AddAllToWatchlistButton } from "@/components/AddAllToWatchlistButton";
 import { EditChallengeFilmsButton } from "@/components/EditChallengeFilmsButton";
+import { ChallengeBadge, type BadgeKind } from "@/components/ChallengeBadge";
 
 function buildHref(id: string, streamingOnly: boolean) {
   return streamingOnly ? `/challenges/${id}?streaming=1` : `/challenges/${id}`;
@@ -264,6 +265,9 @@ export default async function ChallengeDetailPage({
         {!isOwner && ` · ${challenge.user.username}`}
       </p>
       <h1 className="page-title flex flex-wrap items-center gap-x-3 gap-y-1">
+        {status === "complete" && (
+          <ChallengeBadge kind={challenge.type as BadgeKind} size={64} />
+        )}
         {challenge.title}
         {status === "complete" && (
           <span className="inline-flex items-center gap-1 rounded-full bg-accent-green px-2.5 py-1 font-sans text-xs font-semibold tracking-normal text-black">

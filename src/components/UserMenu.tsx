@@ -15,6 +15,7 @@ import {
   User,
   type LucideIcon,
 } from "lucide-react";
+import { avatarSrc } from "@/lib/avatars";
 
 // The signed-in user's avatar in the header, opening the account menu.
 export function UserMenu({
@@ -82,11 +83,13 @@ export function UserMenu({
             : "border-border-strong hover:border-accent-green"
         }`}
       >
-        {image ? (
-          <Image src={image} alt="" width={36} height={36} className="h-full w-full object-cover" />
-        ) : (
-          username[0]?.toUpperCase()
-        )}
+        <Image
+          src={avatarSrc(image, username)}
+          alt=""
+          width={36}
+          height={36}
+          className="h-full w-full object-cover"
+        />
       </button>
 
       {open && (

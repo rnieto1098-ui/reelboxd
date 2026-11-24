@@ -26,6 +26,8 @@ import { DeleteAccountForm } from "@/components/DeleteAccountForm";
 import { InstallAppCard } from "@/components/InstallApp";
 import { SignOutEverywhereButton } from "@/components/SignOutEverywhereButton";
 import { pickerSelection, resolveBackground } from "@/lib/backgrounds";
+import { avatarSrc, isPresetAvatar } from "@/lib/avatars";
+import { AvatarPicker } from "@/components/AvatarPicker";
 
 export const metadata: Metadata = { title: "Settings" };
 
@@ -141,23 +143,25 @@ export default async function SettingsPage() {
             description="How you appear on your public profile page."
           >
             <Row title="Photo">
-              <div className="flex items-center gap-4">
-                <div className="h-16 w-16 shrink-0 overflow-hidden rounded-full bg-background ring-1 ring-white/15">
-                  {user.image ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-4">
+                  <div className="h-16 w-16 shrink-0 overflow-hidden rounded-full bg-background ring-1 ring-white/15">
                     <Image
-                      src={user.image}
+                      src={avatarSrc(user.image, username)}
                       alt=""
                       width={64}
                       height={64}
                       className="h-full w-full object-cover"
                     />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center text-xl font-bold text-accent-green">
-                      {username[0]?.toUpperCase()}
-                    </div>
-                  )}
+                  </div>
+                  {/* "Remove" goes back to the default picture, so it only
+                      makes sense once something has been picked or uploaded. */}
+                  <ProfileImageUpload type="avatar" label="Upload photo" hasImage={!!user.image} />
                 </div>
-                <ProfileImageUpload type="avatar" label="Upload photo" hasImage={!!user.image} />
+                <AvatarPicker
+                  current={user.image}
+                  hasUpload={!!user.image && !isPresetAvatar(user.image)}
+                />
               </div>
             </Row>
             <Row title="Username">

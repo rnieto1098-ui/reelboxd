@@ -15,9 +15,11 @@ export default async function RewatchPage({ searchParams }: PageProps<"/rewatch"
       searchParams={await searchParams}
       basePath="/rewatch"
       title="Your Rewatch List"
+      emptyArt="rewatch"
+      emptyTitle="Nothing queued to rewatch"
       emptyMessage={
         <>
-          Nothing here yet. Open a movie and click &ldquo;Rewatch list&rdquo; under its poster, or use
+          Open a movie and click &ldquo;Rewatch list&rdquo; under its poster, or use
           the rewatch button when you hover over any poster. Logging a watch takes it off again.
         </>
       }

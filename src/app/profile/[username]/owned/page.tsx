@@ -8,6 +8,7 @@ import { getWatchedTmdbIds } from "@/lib/recommendations";
 import { OwnedMovieGrid, type OwnedGridEntry } from "@/components/OwnedMovieGrid";
 import { Pagination } from "@/components/Pagination";
 import { getUserOwnedTmdbIds } from "@/lib/streaming";
+import { EmptyState } from "@/components/EmptyState";
 
 // A collection has no natural ceiling, and this page used to load every row
 // (each with its full Movie join) into one response and one DOM. Paged so
@@ -85,7 +86,9 @@ export default async function OwnedMoviesPage({
       </p>
 
       {totalCount === 0 ? (
-        <p className="text-muted">No owned movies marked yet.</p>
+        <EmptyState art="owned" title="No owned movies marked yet">
+          Mark a film as owned from its page and it counts as watchable wherever streaming does.
+        </EmptyState>
       ) : entries.length === 0 ? (
         <p className="text-muted">Nothing on this page — try going back.</p>
       ) : (

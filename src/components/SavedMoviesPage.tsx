@@ -22,6 +22,7 @@ import {
 import { WatchlistGrid } from "@/components/WatchlistGrid";
 import { getWatchedTmdbIds } from "@/lib/recommendations";
 import { FilterSelect, type FilterOption } from "@/components/FilterSelect";
+import { EmptyState, type EmptyArt } from "@/components/EmptyState";
 import { SortChips } from "@/components/SortChips";
 import type { SortDir } from "@/lib/sortComparator";
 
@@ -148,6 +149,8 @@ export async function SavedMoviesPage({
   basePath,
   title,
   emptyMessage,
+  emptyTitle,
+  emptyArt,
   headerActions,
   loadItems,
   allInWatchlist,
@@ -159,6 +162,8 @@ export async function SavedMoviesPage({
   basePath: string;
   title: string;
   emptyMessage: ReactNode;
+  emptyTitle: ReactNode;
+  emptyArt: EmptyArt;
   headerActions?: (itemCount: number) => ReactNode;
   loadItems: (orderBy: SavedMovieOrderBy) => Promise<SavedMovieItem[]>;
   // True for the watchlist itself; anywhere else, each card's bookmark
@@ -434,7 +439,22 @@ export async function SavedMoviesPage({
       )}
 
       {items.length === 0 ? (
-        <p className="text-muted">{emptyMessage}</p>
+        <EmptyState art={emptyArt} title={emptyTitle}>
+          {emptyMessage}
+        </EmptyState>
+      ) : visibleEntries.length === 0 && availMode.kind === "on" && !hasActiveFilters(attributeFilters) ? (
+        <EmptyState
+          art="nothing-on"
+          title="Nothing here is on your services right now"
+          action={
+            <Link href={href({ avail: "" })} className="btn btn-outline btn-sm">
+              Show all movies
+            </Link>
+          }
+        >
+          Streaming catalogs change every month, so check back, or add more of the services you
+          have.
+        </EmptyState>
       ) : visibleEntries.length === 0 ? (
         <p className="text-sm text-muted">
           No movies match your filters.{" "}

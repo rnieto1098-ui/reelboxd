@@ -3,9 +3,10 @@
 import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Check, Pencil, Target, Trash2 } from "lucide-react";
+import { Pencil, Target, Trash2 } from "lucide-react";
 import { useToast } from "@/components/Toast";
 import { ProgressBar, ProgressRing } from "@/components/Progress";
+import { ChallengeBadge } from "@/components/ChallengeBadge";
 
 const MAX_TARGET = 2000;
 
@@ -174,9 +175,11 @@ export function WatchGoalWidget({
       className={`card p-5 ${reached ? "border-accent-green/45 bg-gradient-to-br from-accent-green-soft to-surface" : ""}`}
     >
       <div className="flex items-center gap-4 sm:gap-5">
-        <ProgressRing percent={percent} size={72} stroke={6}>
-          {reached ? <Check className="h-7 w-7" strokeWidth={3} /> : undefined}
-        </ProgressRing>
+        {reached ? (
+          <ChallengeBadge kind="GOAL" size={72} label="Watch goal reached" />
+        ) : (
+          <ProgressRing percent={percent} size={72} stroke={6} />
+        )}
 
         <div className="min-w-0 flex-1">
           <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-subtle">

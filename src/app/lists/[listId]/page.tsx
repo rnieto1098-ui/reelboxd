@@ -27,6 +27,7 @@ import { ListTagsEditor } from "@/components/ListTagsEditor";
 import { EditableTitle } from "@/components/EditableTitle";
 import { getCachedList } from "@/lib/listCache";
 import { parseStoredTags } from "@/lib/listTags";
+import { EmptyState } from "@/components/EmptyState";
 
 const SORT_OPTIONS = {
   order: { label: "List Order" },
@@ -313,9 +314,11 @@ export default async function ListDetailPage({
       )}
 
       {list.items.length === 0 ? (
-        <p className="text-muted">No movies in this list yet.</p>
+        <EmptyState art="list" title="No movies in this list yet" />
       ) : sortedItems.length === 0 ? (
-        <p className="text-muted">None of these are on your streaming services or owned right now.</p>
+        <EmptyState art="nothing-on" title="None of these are on your services right now">
+          Streaming catalogs change every month, so check back later.
+        </EmptyState>
       ) : userId ? (
         <FadeWatchedControl>{grid}</FadeWatchedControl>
       ) : (

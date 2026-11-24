@@ -12,6 +12,7 @@ import { WatchGoalWidget } from "@/components/WatchGoalWidget";
 import { NewChallengeForm } from "@/components/NewChallengeForm";
 import { RandomChallengeButton } from "@/components/RandomChallengeButton";
 import { ChallengeCard } from "@/components/ChallengeCard";
+import { EmptyState } from "@/components/EmptyState";
 
 export const metadata: Metadata = { title: "Challenges" };
 
@@ -91,20 +92,19 @@ export default async function ChallengesPage() {
         </div>
 
         {active.length === 0 ? (
-          <div className="rounded-[0.875rem] border border-dashed border-border-strong px-6 py-10 text-center">
-            <Trophy aria-hidden className="mx-auto mb-3 h-8 w-8 text-subtle" />
-            <p className="font-semibold">
-              {challenges.length === 0 ? "No challenges yet" : "Nothing in progress"}
-            </p>
-            <p className="mx-auto mt-1 max-w-md text-sm text-muted">
-              Try a genre quota, a number of films inside a date range, or every film by a
-              director you like, or hand-pick the films yourself. To turn a list into a challenge, open the list and choose
-              &ldquo;Make this a challenge&rdquo;.
-            </p>
-            <Link href="/lists" className="btn btn-outline btn-sm mt-4">
-              Browse lists
-            </Link>
-          </div>
+          <EmptyState
+            art="challenges"
+            title={challenges.length === 0 ? "No challenges yet" : "Nothing in progress"}
+            action={
+              <Link href="/lists" className="btn btn-outline btn-sm">
+                Browse lists
+              </Link>
+            }
+          >
+            Try a genre quota, a number of films inside a date range, or every film by a director
+            you like, or hand-pick the films yourself. To turn a list into a challenge, open the list
+            and choose &ldquo;Make this a challenge&rdquo;.
+          </EmptyState>
         ) : (
           <div className="stagger grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {active.map(({ challenge }, i) => (

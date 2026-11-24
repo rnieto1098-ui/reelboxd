@@ -15,7 +15,9 @@ export default async function WatchlistPage({ searchParams }: PageProps<"/watchl
       searchParams={await searchParams}
       basePath="/watchlist"
       title="Your Watchlist"
-      emptyMessage={<>Nothing here yet. Find a movie and click &ldquo;+ Watchlist&rdquo; to add it.</>}
+      emptyArt="watchlist"
+      emptyTitle="Your watchlist is empty"
+      emptyMessage={<>Find a movie and click &ldquo;+ Watchlist&rdquo; to save it for later.</>}
       allInWatchlist
       // Newest releases first: what's just out is usually what you want next.
       defaultSort="release"

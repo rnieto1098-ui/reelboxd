@@ -22,6 +22,7 @@ import {
   type FilmsParams,
   type SortDir,
 } from "@/lib/profileFilms";
+import { EmptyState } from "@/components/EmptyState";
 
 // Every film someone has rated (or, under "Not rated", logged or marked
 // watched without a rating): the profile's Recently logged row stops at 60,
@@ -164,7 +165,14 @@ export default async function ProfileFilmsPage({
         />
       </div>
 
-      {rows.length === 0 ? (
+      {rows.length === 0 && total === 0 && query.stars == null ? (
+        <EmptyState
+          art="ratings"
+          title={isOwnProfile ? "You haven't rated any films yet" : `${username} hasn't rated any films yet`}
+        >
+          {isOwnProfile ? "Rate a film from its page and it lands here, with your stars." : null}
+        </EmptyState>
+      ) : rows.length === 0 ? (
         <p className="rounded-xl border border-dashed border-border-strong px-4 py-8 text-center text-sm text-muted">
           {total > 0
             ? "Nothing on this page. Try going back."

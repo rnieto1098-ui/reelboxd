@@ -1,6 +1,5 @@
 import {
   CalendarRange,
-  Check,
   Clapperboard,
   Drama,
   ListChecks,
@@ -13,6 +12,7 @@ import { formatTimeLeft } from "@/lib/dates";
 import { ProgressBar, ProgressRing } from "@/components/Progress";
 import { EditableTitle } from "@/components/EditableTitle";
 import { DeleteChallengeButton } from "@/components/DeleteChallengeButton";
+import { ChallengeBadge } from "@/components/ChallengeBadge";
 
 const TYPE: Record<ChallengeSummary["type"], { label: string; icon: LucideIcon }> = {
   GENRE: { label: "Genre", icon: Drama },
@@ -58,9 +58,12 @@ export function ChallengeCard({
       }`}
     >
       <div className="flex items-start gap-4">
-        <ProgressRing percent={challenge.percent}>
-          {status === "complete" ? <Check className="h-5 w-5" strokeWidth={3} /> : undefined}
-        </ProgressRing>
+        {status === "complete" ? (
+          // A finished challenge earns its type's medal in place of the full ring.
+          <ChallengeBadge kind={challenge.type} />
+        ) : (
+          <ProgressRing percent={challenge.percent} />
+        )}
 
         <div className="min-w-0 flex-1">
           <p className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-subtle">

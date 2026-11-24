@@ -9,6 +9,7 @@ import { getGoalProgress } from "@/lib/goals";
 import { yearBounds, parseYearParam } from "@/lib/dates";
 import { DeleteDiaryEntryButton } from "@/components/DeleteDiaryEntryButton";
 import { Pagination } from "@/components/Pagination";
+import { EmptyState } from "@/components/EmptyState";
 
 // A diary only ever grows, and this page used to load every entry — with its
 // full Movie join — into a single response and a single DOM.
@@ -109,9 +110,12 @@ export default async function DiaryPage({
       </div>
 
       {totalCount === 0 ? (
-        <p className="text-muted">
-          {year != null ? `No entries logged in ${year} yet.` : "No diary entries yet."}
-        </p>
+        <EmptyState
+          art="diary"
+          title={year != null ? `No entries logged in ${year} yet` : "No diary entries yet"}
+        >
+          Every film you log shows up here, by the date you watched it.
+        </EmptyState>
       ) : entries.length === 0 ? (
         <p className="text-muted">Nothing on this page — try going back.</p>
       ) : (

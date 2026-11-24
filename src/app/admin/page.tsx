@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { requireAdmin } from "@/lib/admin";
 import { CHART_DAYS, getAdminOverview } from "@/lib/adminStats";
+import { avatarSrc } from "@/lib/avatars";
 
 const number = (n: number) => n.toLocaleString("en-US");
 
@@ -169,17 +170,13 @@ export default async function AdminOverviewPage() {
             {newestUsers.map((user) => (
               <li key={user.id} className="flex items-center gap-3">
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-background text-xs font-bold text-accent-green ring-1 ring-white/10">
-                  {user.image ? (
-                    <Image
-                      src={user.image}
-                      alt=""
-                      width={32}
-                      height={32}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    user.username[0]?.toUpperCase()
-                  )}
+                  <Image
+                    src={avatarSrc(user.image, user.username)}
+                    alt=""
+                    width={32}
+                    height={32}
+                    className="h-full w-full object-cover"
+                  />
                 </span>
                 <Link
                   href={`/profile/${user.username}`}

@@ -64,7 +64,9 @@ export function PosterPlaceholder({ title, year }: { title: string; year?: strin
   return (
     // @container: the same placeholder fills a 112px row card and a 240px
     // movie-page poster, so the text scales with the slot, not the viewport.
-    <div className="@container flex h-full w-full flex-col items-center justify-center gap-1 bg-gradient-to-b from-surface-hover via-surface to-background p-3 text-center">
+    // The backdrop is a blank, textless poster (public/art/no-poster.webp,
+    // Higgsfield), so a missing poster still reads as a poster.
+    <div className="@container flex h-full w-full flex-col items-center justify-center gap-1 bg-surface bg-[url(/art/no-poster.webp)] bg-cover bg-center p-3 text-center">
       <ImageIcon className="mb-1 h-5 w-5 shrink-0 text-muted opacity-50 @[12rem]:h-8 @[12rem]:w-8" />
       <span className="line-clamp-4 text-xs font-semibold leading-snug text-foreground/90 @[12rem]:text-xl">
         {title}

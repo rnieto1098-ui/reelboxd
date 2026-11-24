@@ -23,6 +23,27 @@ const interTight = Inter_Tight({
 const TITLE = "Flixtally";
 const DESCRIPTION = "Track films you've watched. Discover what to watch next.";
 
+// iPhone launch screens for the home-screen app (public/splash, Higgsfield
+// art with the icon on top). iOS only uses one whose size matches the device
+// exactly, so each common portrait size is listed.
+const LAUNCH_SCREENS = (
+  [
+    [440, 956, 3],
+    [430, 932, 3],
+    [402, 874, 3],
+    [393, 852, 3],
+    [390, 844, 3],
+    [428, 926, 3],
+    [414, 896, 3],
+    [375, 812, 3],
+    [414, 896, 2],
+    [375, 667, 2],
+  ] as const
+).map(([w, h, ratio]) => ({
+  url: `/splash/launch-${w * ratio}x${h * ratio}.jpg`,
+  media: `(device-width: ${w}px) and (device-height: ${h}px) and (-webkit-device-pixel-ratio: ${ratio}) and (orientation: portrait)`,
+}));
+
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: { default: TITLE, template: `%s · ${TITLE}` },
@@ -31,7 +52,12 @@ export const metadata: Metadata = {
   // For iPhones and iPads, which read these instead of the web manifest
   // when the site is added to the Home Screen. "black-translucent" lets the
   // page draw under the status bar; the header pads itself clear of it.
-  appleWebApp: { capable: true, title: TITLE, statusBarStyle: "black-translucent" },
+  appleWebApp: {
+    capable: true,
+    title: TITLE,
+    statusBarStyle: "black-translucent",
+    startupImage: LAUNCH_SCREENS,
+  },
   // Stops iOS turning strings of digits (years, counts) into phone links.
   formatDetection: { telephone: false },
   openGraph: {

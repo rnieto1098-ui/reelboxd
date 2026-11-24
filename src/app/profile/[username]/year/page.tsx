@@ -97,7 +97,21 @@ export default async function YearInReviewPage({
         ← {username}
       </Link>
 
-      <div className="mt-1 mb-8 flex items-center gap-3">
+      <div className="relative isolate mt-1 mb-8 flex min-h-28 items-end gap-3 overflow-hidden rounded-2xl px-5 pb-5 pt-16 sm:min-h-40">
+        {/* Celebration art (public/art/year-in-review.webp, Higgsfield); its
+            bottom fades to the page colour so the title reads on top. */}
+        <Image
+          src="/art/year-in-review.webp"
+          alt=""
+          fill
+          priority
+          sizes="(max-width: 1280px) 100vw, 1280px"
+          className="-z-10 object-cover object-top"
+        />
+        <div
+          aria-hidden
+          className="absolute inset-0 -z-10 bg-gradient-to-t from-background via-background/55 to-transparent"
+        />
         <h1 className="page-title">
           {username}&apos;s {year} in Review
         </h1>

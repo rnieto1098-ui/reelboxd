@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { hasAdminRole, requireAdmin } from "@/lib/admin";
 import { AdminUserActions } from "@/components/admin/AdminUserActions";
 import { Pagination } from "@/components/Pagination";
+import { avatarSrc } from "@/lib/avatars";
 
 const PAGE_SIZE = 25;
 
@@ -122,17 +123,13 @@ export default async function AdminUsersPage({ searchParams }: PageProps<"/admin
                     <th scope="row" className="px-4 py-3 text-left font-normal">
                       <div className="flex items-center gap-3">
                         <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-background text-xs font-bold text-accent-green ring-1 ring-white/10">
-                          {user.image ? (
-                            <Image
-                              src={user.image}
-                              alt=""
-                              width={36}
-                              height={36}
-                              className="h-full w-full object-cover"
-                            />
-                          ) : (
-                            user.username[0]?.toUpperCase()
-                          )}
+                          <Image
+                            src={avatarSrc(user.image, user.username)}
+                            alt=""
+                            width={36}
+                            height={36}
+                            className="h-full w-full object-cover"
+                          />
                         </span>
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">

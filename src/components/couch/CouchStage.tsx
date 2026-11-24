@@ -133,6 +133,24 @@ export function CouchStage({ children }: { children: ReactNode }) {
             sizes="(max-width: 639px) 200vw, 180vw"
             className="pointer-events-none select-none object-cover"
           />
+          {/* The same room, alive: a 6s Higgsfield loop (lamp flicker, drifting
+              dust) that starts and ends on the photo above, so it loops without
+              a seam and the photo shows until it has loaded. Left out for
+              anyone who asks for reduced motion.
+              The model reframed the room very slightly; the transform (fitted
+              by comparing a frame to the photo) puts the TV back exactly where
+              SCREEN expects it. */}
+          <video
+            src="/couch/room-loop.mp4"
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="auto"
+            aria-hidden
+            className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover motion-reduce:hidden"
+            style={{ transform: "translate(0.94%, 3.9%) scale(1.01)" }}
+          />
           <div
             className={`absolute overflow-hidden rounded-[0.3%] bg-black [container-type:size] ${
               poweredOn ? "shadow-[0_0_6vw_0.8vw_rgba(110,150,255,0.16)]" : ""

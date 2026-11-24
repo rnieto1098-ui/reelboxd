@@ -21,6 +21,7 @@ import { compareNullableNumbers, type SortDir } from "@/lib/sortComparator";
 import type { TmdbMovieSummary } from "@/lib/tmdb";
 import type { Movie } from "@prisma/client";
 import { currentYearUTC } from "@/lib/dates";
+import { avatarSrc } from "@/lib/avatars";
 
 const SORT_OPTIONS = {
   recent: { label: "Recently Logged" },
@@ -254,19 +255,13 @@ export default async function ProfilePage({
     <div>
       <div className="mb-8 flex flex-wrap items-center gap-4">
         <div className="h-16 w-16 shrink-0 overflow-hidden rounded-full border border-border bg-surface">
-          {user.image ? (
-            <Image
-              src={user.image}
-              alt={user.username}
-              width={64}
-              height={64}
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center text-xl font-bold text-accent-green">
-              {user.username[0]?.toUpperCase()}
-            </div>
-          )}
+          <Image
+            src={avatarSrc(user.image, user.username)}
+            alt={user.username}
+            width={64}
+            height={64}
+            className="h-full w-full object-cover"
+          />
         </div>
         <div>
           <h1 className="page-title">{user.username}</h1>

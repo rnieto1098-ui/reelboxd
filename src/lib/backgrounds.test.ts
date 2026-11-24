@@ -65,3 +65,10 @@ test("style: plain has none, uploads get the heavier overlay", () => {
   assert.match(String(backgroundStyle(BLOB)?.backgroundImage), /0\.88.*u-1\.png/);
   assert.match(String(backgroundStyle(null)?.backgroundImage), /0\.6\b.*festival-lights\.webp/);
 });
+
+test("style: phones get the portrait cut of a preset, and an upload as-is", () => {
+  const mobile = (stored: string | null) =>
+    String((backgroundStyle(stored) as Record<string, unknown> | undefined)?.["--bg-mobile"]);
+  assert.match(mobile(null), /\/backgrounds\/mobile\/festival-lights\.webp/);
+  assert.match(mobile(BLOB), /u-1\.png/);
+});

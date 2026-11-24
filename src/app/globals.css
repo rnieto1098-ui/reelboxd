@@ -720,3 +720,10 @@ select:focus-visible {
     animation: none;
   }
 }
+
+/* Phones get the portrait cut of a preset background (see backgroundStyle). */
+@media (max-width: 767px) {
+  .page-bg {
+    background-image: var(--bg-mobile) !important;
+  }
+}

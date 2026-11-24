@@ -9,10 +9,12 @@ import type { CSSProperties } from "react";
 //   "none"              — a plain background
 //   anything else       — the URL of the user's own uploaded Vercel Blob image
 
-export type BackgroundPreset = { id: string; name: string; src: string };
+// Each preset also has a portrait cut in public/backgrounds/mobile (Higgsfield,
+// 9:16), which phones use instead of cropping a sliver out of the wide image.
+export type BackgroundPreset = { id: string; name: string; src: string; mobileSrc: string };
 
 function preset(id: string, name: string): BackgroundPreset {
-  return { id, name, src: `/backgrounds/${id}.webp` };
+  return { id, name, src: `/backgrounds/${id}.webp`, mobileSrc: `/backgrounds/mobile/${id}.webp` };
 }
 
 export const BACKGROUND_PRESETS: BackgroundPreset[] = [
@@ -112,10 +114,19 @@ export function backgroundStyle(
 ): CSSProperties | undefined {
   const choice = resolveBackground(stored, pathname);
   if (choice.kind === "none") return undefined;
-  const [url, overlay] =
-    choice.kind === "upload" ? [choice.url, 0.88] : [choice.preset.src, 0.6];
+  const [url, mobileUrl, overlay] =
+    choice.kind === "upload"
+      ? [choice.url, choice.url, 0.88]
+      : [choice.preset.src, choice.preset.mobileSrc, 0.6];
+  const layer = (src: string, top: number, mid: string, end: string) =>
+    `linear-gradient(to bottom, rgba(10, 12, 16, ${top}) 0%, rgba(10, 12, 16, 0.94) ${mid}, rgb(10, 12, 16) ${end}), url(${src})`;
+  // The portrait cuts are composed dark, with the subject in the top half, so
+  // a phone can show more of it: a lighter veil that fades further down.
+  const mobileTop = choice.kind === "upload" ? overlay : 0.42;
   return {
-    backgroundImage: `linear-gradient(to bottom, rgba(10, 12, 16, ${overlay}) 0%, rgba(10, 12, 16, 0.94) 45%, rgb(10, 12, 16) 78%), url(${url})`,
+    backgroundImage: layer(url, overlay, "45%", "78%"),
+    // Swapped in on narrow screens by the .page-bg rule in globals.css.
+    ["--bg-mobile" as string]: layer(mobileUrl, mobileTop, "58%", "88%"),
     backgroundSize: "cover",
     backgroundPosition: "center top",
   };

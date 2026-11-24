@@ -17,7 +17,7 @@ export function PageBackground({ stored }: { stored: string | null }) {
       // fades the new one in instead of swapping it abruptly.
       key={String(style.backgroundImage)}
       aria-hidden
-      className="pointer-events-none fixed inset-0 -z-10 animate-fade-in"
+      className="page-bg pointer-events-none fixed inset-0 -z-10 animate-fade-in"
       style={style}
     />
   );

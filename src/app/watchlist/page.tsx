@@ -19,6 +19,8 @@ export default async function WatchlistPage({ searchParams }: PageProps<"/watchl
       allInWatchlist
       // Newest releases first: what's just out is usually what you want next.
       defaultSort="release"
+      // Open on what you can actually watch tonight; "All movies" is one pick away.
+      defaultAvail="on"
       loadItems={(orderBy) =>
         prisma.watchlistItem.findMany({
           where: { userId },

@@ -102,9 +102,14 @@ type CurrentState = {
   certification: string | null;
 };
 
+// In the URL, "all" stands for the "" (all movies) choice, which a page whose
+// default filter is something else needs to be able to say out loud.
+const AVAIL_ALL_PARAM = "all";
+
 function buildHref(
   basePath: string,
   defaultSort: SortKey,
+  defaultAvail: string,
   current: CurrentState,
   overrides: Partial<CurrentState>
 ): string {
@@ -112,7 +117,7 @@ function buildHref(
   const params = new URLSearchParams();
   if (s.sortKey !== defaultSort) params.set("sort", s.sortKey);
   if (s.sortDir !== "desc") params.set("dir", s.sortDir);
-  if (s.avail) params.set("avail", s.avail);
+  if (s.avail !== defaultAvail) params.set("avail", s.avail || AVAIL_ALL_PARAM);
   if (s.genre) params.set("genre", s.genre);
   if (s.directorId != null) params.set("director", String(s.directorId));
   if (s.runtimeBucket) params.set("runtime", s.runtimeBucket);
@@ -147,6 +152,7 @@ export async function SavedMoviesPage({
   loadItems,
   allInWatchlist,
   defaultSort = "added",
+  defaultAvail = "",
 }: {
   userId: string;
   searchParams: Record<string, string | string[] | undefined>;
@@ -160,24 +166,31 @@ export async function SavedMoviesPage({
   allInWatchlist: boolean;
   // The sort used when the URL names none (newest first).
   defaultSort?: SortKey;
+  // The streaming filter used when the URL names none ("" = all movies).
+  // Ignored for someone with no services or owned films to filter by.
+  defaultAvail?: string;
 }) {
   const { sort, dir, avail, genre, director, runtime, cert } = searchParams;
   const sortKey: SortKey = typeof sort === "string" && sort in SORT_OPTIONS ? (sort as SortKey) : defaultSort;
   const sortDir: SortDir = dir === "asc" ? "asc" : "desc";
-  const availRaw = typeof avail === "string" ? avail : "";
+  const availParam = typeof avail === "string" ? avail : null;
   const directorId =
     typeof director === "string" && Number.isFinite(Number(director)) ? Number(director) : null;
 
   const current: CurrentState = {
     sortKey,
     sortDir,
-    avail: availRaw,
+    // Settled once we know whether there's anything to filter by (below).
+    avail: "",
     genre: typeof genre === "string" && genre ? genre : null,
     directorId,
     runtimeBucket: typeof runtime === "string" && runtime ? runtime : null,
     certification: typeof cert === "string" && cert ? cert : null,
   };
-  const href = (overrides: Partial<CurrentState>) => buildHref(basePath, defaultSort, current, overrides);
+  // Reassigned below once the default streaming filter is known; href reads it at call time.
+  let effectiveDefaultAvail = "";
+  const href = (overrides: Partial<CurrentState>) =>
+    buildHref(basePath, defaultSort, effectiveDefaultAvail, current, overrides);
   const attributeFilters: WatchlistFilters = {
     genre: current.genre,
     directorId: current.directorId,
@@ -221,6 +234,10 @@ export async function SavedMoviesPage({
   const isOnAnyService = ({ providerIds, owned }: { providerIds: Set<number>; owned: boolean }) =>
     owned || isAvailableOnServiceIds(providerIds, userProviderIds);
 
+  effectiveDefaultAvail = canFilterByAvailability ? defaultAvail : "";
+  const availRaw =
+    availParam == null ? effectiveDefaultAvail : availParam === AVAIL_ALL_PARAM ? "" : availParam;
+  current.avail = availRaw;
   const availMode = parseAvail(availRaw);
   function matchesAvail(entry: { providerIds: Set<number>; owned: boolean }): boolean {
     switch (availMode.kind) {

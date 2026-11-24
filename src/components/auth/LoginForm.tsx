@@ -1,30 +1,33 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { FormMessage } from "@/components/auth/AuthShell";
 import { readRememberedEmail, rememberEmail } from "@/lib/rememberedEmail";
 
+// Nothing to subscribe to: the saved email only changes when this form signs in.
+const noSubscribe = () => () => {};
+
 export function LoginForm({ next }: { next: string }) {
   const router = useRouter();
   const emailId = useId();
   const passwordId = useId();
-  const [email, setEmail] = useState("");
+  // This device's last account, filled in so signing back in is just the
+  // password. Read after hydration (the server has no localStorage), and
+  // replaced by whatever the user types.
+  const saved = useSyncExternalStore(noSubscribe, readRememberedEmail, () => null);
+  const [typed, setTyped] = useState<string | null>(null);
+  const email = typed ?? saved ?? "";
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const passwordRef = useRef<HTMLInputElement>(null);
 
-  // This device's last account, filled in so signing back in is just the password.
   useEffect(() => {
-    const saved = readRememberedEmail();
-    if (saved) {
-      setEmail((current) => current || saved);
-      passwordRef.current?.focus();
-    }
-  }, []);
+    if (saved) passwordRef.current?.focus();
+  }, [saved]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -68,7 +71,7 @@ export function LoginForm({ next }: { next: string }) {
           required
           autoFocus
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          onChange={(e) => setTyped(e.target.value)}
           className="input"
         />
       </div>
